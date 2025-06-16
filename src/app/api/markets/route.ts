@@ -1,0 +1,289 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { Event } from '@/lib/stores'
+import { proxyFetch } from '@/lib/fetch'
+
+const POLYMARKET_API_URL = 'https://gamma-api.polymarket.com'
+
+// Cache for storing filtered events data
+let eventsCache: Event[] = []
+let cacheTimestamp: number = 0
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+// Function to filter and transform API response to our simplified Event structure
+function transformEvent(apiEvent: any): Event {
+  return {
+    id: apiEvent.id,
+    title: apiEvent.title,
+    slug: apiEvent.slug || '',
+    startDate: apiEvent.startDate,
+    endDate: apiEvent.endDate,
+    volume: apiEvent.volume || 0,
+    volume24hr: apiEvent.volume24hr || 0,
+    volume1wk: apiEvent.volume1wk || 0,
+    volume1mo: apiEvent.volume1mo || 0,
+    liquidity: apiEvent.liquidity || 0,
+    markets: apiEvent.markets?.map((market: any) => {
+      // Function to safely parse the nested JSON string format
+      function parseOutcomePrices(outcomePricesData: any): string[] {
+        try {
+          // If it's already an array, return it
+          if (Array.isArray(outcomePricesData)) {
+            return outcomePricesData
+          }
+          
+          // If it's a string, try to parse the JSON
+          if (typeof outcomePricesData === 'string') {
+            // Handle the nested format: "[\"0.9765\", \"0.0235\"]"
+            const parsed = JSON.parse(outcomePricesData)
+            if (Array.isArray(parsed)) {
+              return parsed
+            }
+          }
+          
+          return []
+        } catch (error) {
+          console.warn('Failed to parse outcomePrices:', {
+            question: market.question,
+            outcomePrices: outcomePricesData,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          })
+          return []
+        }
+      }
+      
+      const parsedOutcomePrices = parseOutcomePrices(market.outcomePrices)
+      
+      return {
+        question: market.question,
+        conditionId: market.conditionId,
+        bestBid: market.bestBid,
+        bestAsk: market.bestAsk,
+        outcomePrices: parsedOutcomePrices,
+        oneHourPriceChange: market.oneHourPriceChange,
+        oneDayPriceChange: market.oneDayPriceChange,
+        oneWeekPriceChange: market.oneWeekPriceChange,
+        oneMonthPriceChange: market.oneMonthPriceChange,
+        volume24hr: market.volume24hr,
+        volume1wk: market.volume1wk,
+        volume1mo: market.volume1mo,
+        active: market.active,
+        archived: market.archived,
+        closed: market.closed,
+        clobTokenIds: market.clobTokenIds
+      }
+    }) || [],
+    tags: apiEvent.tags?.map((tag: any) => ({
+      id: tag.id,
+      label: tag.label
+    })) || []
+  }
+}
+
+// Store for detailed fetch logs to send to frontend
+let fetchLogs: Array<{stage: string, message: string, isError: boolean}> = []
+
+function addFetchLog(stage: string, message: string, isError: boolean = false) {
+  fetchLogs.push({ stage, message, isError })
+  console.log(message)
+  // Keep only last 10 logs
+  if (fetchLogs.length > 10) {
+    fetchLogs = fetchLogs.slice(-10)
+  }
+}
+
+async function fetchAllEvents() {
+  // Reset logs for new fetch
+  fetchLogs = []
+  
+  // Define the 5 parallel requests with different offsets
+  const offsets = [0, 500, 1000, 1500, 2000]
+  const limit = 500
+  
+  addFetchLog('request', `Sending 5 parallel requests to Polymarket API with offsets: ${offsets.join(', ')}`)
+  
+  // Define the result type
+  type FetchResult = {
+    offset: number
+    events: any[]
+    hasMore: boolean
+    error?: string
+  }
+  
+  try {
+    // Create all 5 requests simultaneously
+    const requests = offsets.map(offset => {
+      const url = `${POLYMARKET_API_URL}/events/pagination?limit=${limit}&offset=${offset}&active=true&archived=false&closed=false&order=volume24hr&ascending=false`
+      addFetchLog('request', `Creating request for offset ${offset}`)
+      
+      return proxyFetch(url, {
+        headers: {
+          'User-Agent': 'Polymarket Dashboard',
+          'Accept': 'application/json',
+        },
+      }).then(async response => {
+        if (!response.ok) {
+          throw new Error(`Polymarket API error at offset ${offset}: ${response.status} ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        const events = data.data || []
+        
+        addFetchLog('success', `✅ Offset ${offset}: Got ${events.length} events`)
+        
+        return {
+          offset,
+          events,
+          hasMore: data.pagination?.hasMore || false
+        } as FetchResult
+      }).catch(error => {
+        addFetchLog('error', `❌ Offset ${offset}: ${error instanceof Error ? error.message : 'Unknown error'}`, true)
+        return {
+          offset,
+          events: [],
+          hasMore: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        } as FetchResult
+      })
+    })
+    
+    // Wait for all requests to complete
+    addFetchLog('request', 'Waiting for all parallel requests to complete...')
+    const results = await Promise.all(requests)
+    
+    // Combine all results
+    const allEvents: Event[] = []
+    let totalFetched = 0
+    let hasErrors = false
+    
+    // Sort results by offset to maintain order
+    results.sort((a, b) => a.offset - b.offset)
+    
+    for (const result of results) {
+      if (result.error) {
+        hasErrors = true
+        continue
+      }
+      
+      if (result.events.length > 0) {
+        const transformedEvents = result.events.map(transformEvent)
+        allEvents.push(...transformedEvents)
+        totalFetched += result.events.length
+      }
+    }
+    
+    if (hasErrors && allEvents.length === 0) {
+      throw new Error('All parallel requests failed')
+    }
+    
+    addFetchLog('complete', `🎉 Parallel fetch complete! Total: ${allEvents.length} events from ${totalFetched} raw records`)
+    
+    // Log summary of each batch
+    results.forEach(result => {
+      if (!result.error && result.events.length > 0) {
+        addFetchLog('summary', `Batch ${result.offset}-${result.offset + result.events.length - 1}: ${result.events.length} events`)
+      }
+    })
+    
+    return allEvents
+    
+  } catch (error) {
+    addFetchLog('error', `Parallel fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`, true)
+    throw error
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const search = searchParams.get('search')
+  const category = searchParams.get('category')
+  const minPrice = searchParams.get('minPrice')
+  const maxPrice = searchParams.get('maxPrice')
+  const active = searchParams.get('active')
+  const page = parseInt(searchParams.get('page') || '1')
+  const limit = parseInt(searchParams.get('limit') || '20')
+
+  try {
+    // Check if cache is valid
+    const now = Date.now()
+    if (!eventsCache.length || (now - cacheTimestamp) > CACHE_DURATION) {
+      try {
+        eventsCache = await fetchAllEvents()
+        cacheTimestamp = now
+      } catch (error) {
+        console.error('Failed to fetch fresh data:', error)
+        
+        // If we have cached data, use it even if expired
+        if (eventsCache.length > 0) {
+          console.log('Using expired cache data due to fetch error')
+        } else {
+          // No cached data and fetch failed
+          return NextResponse.json({
+            error: 'Unable to fetch market data. Please try again later.',
+            details: error instanceof Error ? error.message : 'Unknown error'
+          }, { status: 503 })
+        }
+      }
+    }
+
+    // Filter events based on search parameters
+    let filteredEvents = [...eventsCache]
+
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase()
+      filteredEvents = filteredEvents.filter(event => 
+        event.title?.toLowerCase().includes(searchLower)
+      )
+    }
+
+    // Apply category filter
+    if (category) {
+      filteredEvents = filteredEvents.filter(event => 
+        event.tags?.some((tag: any) => tag.slug === category)
+      )
+    }
+
+    // Apply active filter - since we only fetch active events, we'll skip this filter
+    // All events in our cache are active by default from the API query
+
+    // Apply price filters (based on first market's first outcome price)
+    if (minPrice || maxPrice) {
+      filteredEvents = filteredEvents.filter(event => {
+        const firstMarket = event.markets?.[0]
+        if (!firstMarket?.outcomePrices) return true
+        
+        const price = parseFloat(firstMarket.outcomePrices[0])
+        if (minPrice && price < parseFloat(minPrice)) return false
+        if (maxPrice && price > parseFloat(maxPrice)) return false
+        return true
+      })
+    }
+
+    // Apply pagination
+    const total = filteredEvents.length
+    const startIndex = (page - 1) * limit
+    const endIndex = startIndex + limit
+    const paginatedEvents = filteredEvents.slice(startIndex, endIndex)
+
+    return NextResponse.json({
+      events: paginatedEvents,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      logs: fetchLogs,
+      cache: {
+        totalEvents: eventsCache.length,
+        lastUpdated: new Date(cacheTimestamp).toISOString(),
+      },
+    })
+  } catch (error) {
+    console.error('API error:', error)
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+} 
