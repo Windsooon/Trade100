@@ -30,11 +30,12 @@ function transformEventData(rawEvent: RawEventData): Event {
     slug: rawEvent.slug || '',
     startDate: rawEvent.startDate,
     endDate: rawEvent.endDate,
-    volume: rawEvent.volume || 0,
-    volume24hr: rawEvent.volume24hr || 0,
-    volume1wk: rawEvent.volume1wk || 0,
-    volume1mo: rawEvent.volume1mo || 0,
-    liquidity: rawEvent.liquidity || 0,
+    // Only set volume fields if they exist and are valid numbers, otherwise leave undefined
+    volume: (typeof rawEvent.volume === 'number' && rawEvent.volume > 0) ? rawEvent.volume : undefined,
+    volume24hr: (typeof rawEvent.volume24hr === 'number' && rawEvent.volume24hr > 0) ? rawEvent.volume24hr : undefined,
+    volume1wk: (typeof rawEvent.volume1wk === 'number' && rawEvent.volume1wk > 0) ? rawEvent.volume1wk : undefined,
+    volume1mo: (typeof rawEvent.volume1mo === 'number' && rawEvent.volume1mo > 0) ? rawEvent.volume1mo : undefined,
+    liquidity: (typeof rawEvent.liquidity === 'number' && rawEvent.liquidity > 0) ? rawEvent.liquidity : undefined,
     markets: rawEvent.markets?.map((market: any) => ({
       question: market.question || '',
       conditionId: market.conditionId || '',

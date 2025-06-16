@@ -54,14 +54,15 @@ function transformEvent(apiEvent: ApiEvent): Event {
   return {
     id: apiEvent.id,
     title: apiEvent.title,
-    slug: apiEvent.slug || '',
+    slug: apiEvent.slug || apiEvent.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
     startDate: apiEvent.startDate,
     endDate: apiEvent.endDate,
-    volume: apiEvent.volume || 0,
-    volume24hr: apiEvent.volume24hr || 0,
-    volume1wk: apiEvent.volume1wk || 0,
-    volume1mo: apiEvent.volume1mo || 0,
-    liquidity: apiEvent.liquidity || 0,
+    // Only set volume fields if they exist and are valid numbers, otherwise leave undefined
+    volume: (typeof apiEvent.volume === 'number' && apiEvent.volume > 0) ? apiEvent.volume : undefined,
+    volume24hr: (typeof apiEvent.volume24hr === 'number' && apiEvent.volume24hr > 0) ? apiEvent.volume24hr : undefined,
+    volume1wk: (typeof apiEvent.volume1wk === 'number' && apiEvent.volume1wk > 0) ? apiEvent.volume1wk : undefined,
+    volume1mo: (typeof apiEvent.volume1mo === 'number' && apiEvent.volume1mo > 0) ? apiEvent.volume1mo : undefined,
+    liquidity: (typeof apiEvent.liquidity === 'number' && apiEvent.liquidity > 0) ? apiEvent.liquidity : undefined,
     markets: apiEvent.markets?.map((market: ApiMarket) => {
       // Function to safely parse the nested JSON string format
       function parseOutcomePrices(outcomePricesData: string | string[]): string[] {

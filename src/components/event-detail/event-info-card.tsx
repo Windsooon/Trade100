@@ -15,17 +15,17 @@ interface EventInfoCardProps {
 }
 
 const formatVolume = (volume: number | undefined | null): string => {
-  // Handle undefined, null, or invalid values
+  // Handle undefined, null, or invalid values - show "None" for missing data
   if (volume === undefined || volume === null || isNaN(volume)) {
-    return '0'
+    return 'None'
   }
   
   if (volume >= 1000000) {
-    return `${(volume / 1000000).toFixed(1)}M`
+    return `$${(volume / 1000000).toFixed(1)}M`
   } else if (volume >= 1000) {
-    return `${(volume / 1000).toFixed(1)}K`
+    return `$${(volume / 1000).toFixed(1)}K`
   }
-  return volume.toString()
+  return `$${volume.toFixed(2)}`
 }
 
 const formatDate = (dateString: string): string => {
