@@ -136,11 +136,11 @@ async function fetchAllEvents() {
   // Reset logs for new fetch
   fetchLogs = []
   
-  // Define the 5 parallel requests with different offsets
-  const offsets = [0, 500, 1000, 1500, 2000]
+  // Define the 3 parallel requests with different offsets
+  const offsets = [0, 500, 1000]
   const limit = 500
   
-  addFetchLog('request', `Sending 5 parallel requests to Polymarket API with offsets: ${offsets.join(', ')}`)
+  addFetchLog('request', `Sending 3 parallel requests to Polymarket API with offsets: ${offsets.join(', ')}`)
   
   // Define the result type
   type FetchResult = {
@@ -151,7 +151,7 @@ async function fetchAllEvents() {
   }
   
   try {
-    // Create all 5 requests simultaneously
+    // Create all 3 requests simultaneously
     const requests = offsets.map(offset => {
       const url = `${POLYMARKET_API_URL}/events/pagination?limit=${limit}&offset=${offset}&active=true&archived=false&closed=false&order=volume24hr&ascending=false`
       addFetchLog('request', `Creating request for offset ${offset}`)
