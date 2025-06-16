@@ -1,5 +1,6 @@
 
 
+
 <div align="center">
   <h3 align="center">Trade100 Dashboard</h3>
 
@@ -24,8 +25,8 @@
     <li>
       <a href="#about-the-project">About The Project</a>
       <ul>
-        <li><a href="#features">Features</a></li>
         <li><a href="#demo">Demo</a></li>
+        <li><a href="#features">Features</a></li>
         <li><a href="#deploy">Deployment</a></li>
       </ul>
     </li>
@@ -52,6 +53,7 @@ Trade100 is a professional open-source trading interface for Polymarket predicti
 
 ### Demo
 
+[https://trade100.vercel.app/](https://trade100.vercel.app/)
 
 ### Features
 
