@@ -2,7 +2,7 @@
 
 
 <div align="center">
-  <h3 align="center">Trade100 Dashboard</h3>
+  <h3 align="center">Trade100</h3>
 </div>
 
 <!-- TABLE OF CONTENTS -->
@@ -36,7 +36,7 @@
 ## About The Project
 
 
-Trade100 is a professional open-source trading interface for Polymarket prediction markets, built with Next.js and designed for both individual traders and institutional users.
+Trade100 is a professional open-source trading interface for Polymarket prediction markets, easy to deploy anywhere with one click.
 
 ### Demo
 
