@@ -21,11 +21,11 @@ const formatVolume = (volume: number | undefined | null): string => {
   }
   
   if (volume >= 1000000) {
-    return `$${(volume / 1000000).toFixed(1)}M`
+    return `${(volume / 1000000).toFixed(1)}M`
   } else if (volume >= 1000) {
-    return `$${(volume / 1000).toFixed(1)}K`
+    return `${(volume / 1000).toFixed(1)}K`
   }
-  return `$${volume.toFixed(2)}`
+  return `${volume.toFixed(2)}`
 }
 
 const formatDate = (dateString: string): string => {
