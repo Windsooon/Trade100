@@ -40,7 +40,16 @@ Trade100 is a professional open-source trading interface for Polymarket predicti
 
 ### Demo
 
+### Website
 [https://trade100.vercel.app/](https://trade100.vercel.app/)
+
+### Screenshot
+
+![demo_home](https://raw.githubusercontent.com/Windsooon/Trade100/0ef3fc284f899974016742bcac264b2a9557bd6e/imgs/demo_home.png)
+
+![demo_detail](https://raw.githubusercontent.com/Windsooon/Trade100/0ef3fc284f899974016742bcac264b2a9557bd6e/imgs/demo_detail.png)
+
+
 
 ### Features
 
