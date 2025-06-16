@@ -8,11 +8,11 @@ export interface Event {
   slug: string
   startDate: string
   endDate: string
-  volume: number
-  volume24hr: number
-  volume1wk: number
-  volume1mo: number
-  liquidity: number
+  volume?: number
+  volume24hr?: number
+  volume1wk?: number
+  volume1mo?: number
+  liquidity?: number
   markets: Market[]
   tags: Tag[]
 }

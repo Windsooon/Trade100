@@ -14,7 +14,12 @@ interface EventInfoCardProps {
   event: Event
 }
 
-const formatVolume = (volume: number): string => {
+const formatVolume = (volume: number | undefined | null): string => {
+  // Handle undefined, null, or invalid values
+  if (volume === undefined || volume === null || isNaN(volume)) {
+    return '0'
+  }
+  
   if (volume >= 1000000) {
     return `${(volume / 1000000).toFixed(1)}M`
   } else if (volume >= 1000) {
