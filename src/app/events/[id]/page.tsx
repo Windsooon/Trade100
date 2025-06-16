@@ -1,16 +1,19 @@
 import { Navbar } from '@/components/ui/navbar'
-import { EventInfoCard } from '@/components/event-detail/event-info-card'
-import { MarketListCard } from '@/components/event-detail/market-list-card'
-import { TradingChartCard } from '@/components/event-detail/trading-chart-card'
-import { TradingOperationsCard } from '@/components/event-detail/trading-operations-card'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { AlertCircleIcon } from 'lucide-react'
 import EventDetailClient from '@/components/event-detail/event-detail-client'
 import { proxyFetch } from '@/lib/fetch'
 
+interface EventData {
+  id: string
+  title: string
+  // Add other properties as needed
+  [key: string]: unknown
+}
+
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: eventId } = await params
-  let eventData: any = null
+  let eventData: EventData | null = null
   let error: string | null = null
 
   try {
@@ -27,11 +30,11 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
     if (!res.ok) {
       error = `Polymarket API error: ${res.status} ${res.statusText}`
     } else {
-      eventData = await res.json()
+      eventData = await res.json() as EventData
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('[SSR] Fetch error:', e)
-    error = e?.message || 'Unknown error occurred while fetching event data.'
+    error = e instanceof Error ? e.message : 'Unknown error occurred while fetching event data.'
   }
 
   if (error || !eventData) {

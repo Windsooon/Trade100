@@ -7,15 +7,16 @@ import { MarketListCard } from './market-list-card'
 import { TradingChartCard } from './trading-chart-card'
 import { OperationsCard } from './operations-card'
 import { OrderBookCard } from './order-book-card'
+import { Event, Market } from '@/lib/stores'
 
-export default function EventDetailClient({ event }: { event: any }) {
-  const [selectedMarket, setSelectedMarket] = useState<any>(null)
+export default function EventDetailClient({ event }: { event: Event }) {
+  const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   const [selectedToken, setSelectedToken] = useState<'yes' | 'no'>('yes')
 
   useEffect(() => {
     if (event?.markets && event.markets.length > 0 && !selectedMarket) {
       // Default to first active market, or first market if no active ones
-      const activeMarkets = event.markets.filter((m: any) => 
+      const activeMarkets = event.markets.filter((m: Market) => 
         m.active === true && m.archived === false && m.closed === false
       )
       const defaultMarket = activeMarkets.length > 0 ? activeMarkets[0] : event.markets[0]

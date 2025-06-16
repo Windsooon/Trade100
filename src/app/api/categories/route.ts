@@ -3,6 +3,13 @@ import { proxyFetch } from '@/lib/fetch'
 
 const POLYMARKET_API_URL = 'https://polymarket.com/api'
 
+interface TagData {
+  id: string
+  name: string
+  slug: string
+  count?: number
+}
+
 export async function GET() {
   try {
     // Fetch tags from Polymarket API
@@ -16,10 +23,10 @@ export async function GET() {
       throw new Error(`Polymarket API error: ${response.status}`)
     }
 
-    const data = await response.json()
+    const data: TagData[] = await response.json()
     
     // Transform tags data into categories
-    const categories = data.map((tag: any) => ({
+    const categories = data.map((tag: TagData) => ({
       id: tag.id,
       name: tag.name,
       slug: tag.slug,

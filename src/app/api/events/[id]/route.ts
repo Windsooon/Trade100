@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Event } from '@/lib/stores'
 
 // Import the cache from the markets route
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 // Temporary import - we'll need to export these from the markets route
-let eventsCache: any[] = []
+let eventsCache: Event[] = []
 let cacheTimestamp = 0
 
 export async function GET(
@@ -21,7 +22,7 @@ export async function GET(
         // Fetch from our own markets API to use the same cache
         const response = await fetch(`${request.nextUrl.origin}/api/markets?limit=9999`)
         if (response.ok) {
-          const data = await response.json()
+          const data: { events: Event[] } = await response.json()
           eventsCache = data.events || []
           cacheTimestamp = now
         }

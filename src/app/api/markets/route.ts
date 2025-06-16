@@ -9,8 +9,48 @@ let eventsCache: Event[] = []
 let cacheTimestamp: number = 0
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
+// Define interfaces for API response types
+interface ApiEvent {
+  id: string
+  title: string
+  slug?: string
+  startDate: string
+  endDate: string
+  volume?: number
+  volume24hr?: number
+  volume1wk?: number
+  volume1mo?: number
+  liquidity?: number
+  markets?: ApiMarket[]
+  tags?: ApiTag[]
+}
+
+interface ApiMarket {
+  question: string
+  conditionId: string
+  bestBid?: string
+  bestAsk?: string
+  outcomePrices: string | string[]
+  oneHourPriceChange?: number
+  oneDayPriceChange?: number
+  oneWeekPriceChange?: number
+  oneMonthPriceChange?: number
+  volume24hr?: number
+  volume1wk?: number
+  volume1mo?: number
+  active?: boolean
+  archived?: boolean
+  closed?: boolean
+  clobTokenIds?: string
+}
+
+interface ApiTag {
+  id: string
+  label: string
+}
+
 // Function to filter and transform API response to our simplified Event structure
-function transformEvent(apiEvent: any): Event {
+function transformEvent(apiEvent: ApiEvent): Event {
   return {
     id: apiEvent.id,
     title: apiEvent.title,
@@ -22,9 +62,9 @@ function transformEvent(apiEvent: any): Event {
     volume1wk: apiEvent.volume1wk || 0,
     volume1mo: apiEvent.volume1mo || 0,
     liquidity: apiEvent.liquidity || 0,
-    markets: apiEvent.markets?.map((market: any) => {
+    markets: apiEvent.markets?.map((market: ApiMarket) => {
       // Function to safely parse the nested JSON string format
-      function parseOutcomePrices(outcomePricesData: any): string[] {
+      function parseOutcomePrices(outcomePricesData: string | string[]): string[] {
         try {
           // If it's already an array, return it
           if (Array.isArray(outcomePricesData)) {
@@ -72,7 +112,7 @@ function transformEvent(apiEvent: any): Event {
         clobTokenIds: market.clobTokenIds
       }
     }) || [],
-    tags: apiEvent.tags?.map((tag: any) => ({
+    tags: apiEvent.tags?.map((tag: ApiTag) => ({
       id: tag.id,
       label: tag.label
     })) || []
@@ -104,7 +144,7 @@ async function fetchAllEvents() {
   // Define the result type
   type FetchResult = {
     offset: number
-    events: any[]
+    events: ApiEvent[]
     hasMore: boolean
     error?: string
   }
@@ -125,7 +165,7 @@ async function fetchAllEvents() {
           throw new Error(`Polymarket API error at offset ${offset}: ${response.status} ${response.statusText}`)
         }
         
-        const data = await response.json()
+        const data: { data?: ApiEvent[], pagination?: { hasMore?: boolean } } = await response.json()
         const events = data.data || []
         
         addFetchLog('success', `✅ Offset ${offset}: Got ${events.length} events`)
@@ -198,7 +238,6 @@ export async function GET(request: NextRequest) {
   const category = searchParams.get('category')
   const minPrice = searchParams.get('minPrice')
   const maxPrice = searchParams.get('maxPrice')
-  const active = searchParams.get('active')
   const page = parseInt(searchParams.get('page') || '1')
   const limit = parseInt(searchParams.get('limit') || '20')
 
@@ -239,12 +278,9 @@ export async function GET(request: NextRequest) {
     // Apply category filter
     if (category) {
       filteredEvents = filteredEvents.filter(event => 
-        event.tags?.some((tag: any) => tag.slug === category)
+        event.tags?.some((tag) => tag.id === category || tag.label.toLowerCase().includes(category.toLowerCase()))
       )
     }
-
-    // Apply active filter - since we only fetch active events, we'll skip this filter
-    // All events in our cache are active by default from the API query
 
     // Apply price filters (based on first market's first outcome price)
     if (minPrice || maxPrice) {

@@ -1,3 +1,5 @@
+import { ProxyAgent } from 'undici'
+
 // Enhanced fetch wrapper that automatically detects and uses proxy when needed
 export async function proxyFetch(url: string, options: RequestInit = {}): Promise<Response> {
   // Only attempt proxy setup on server side
@@ -11,14 +13,14 @@ export async function proxyFetch(url: string, options: RequestInit = {}): Promis
 
     if (proxyUrl) {
       try {
-        const { ProxyAgent } = require('undici')
         const proxyAgent = new ProxyAgent(proxyUrl)
         
+        console.log(`[Proxy] Using proxy: ${proxyUrl}`)
         
         // Use undici dispatcher with Node.js fetch
         return fetch(url, {
           ...options,
-          // @ts-ignore - TypeScript doesn't know about dispatcher option
+          // @ts-expect-error - TypeScript doesn't know about dispatcher option in fetch
           dispatcher: proxyAgent,
           // Add timeout to prevent hanging
           signal: options.signal || AbortSignal.timeout(30000)
