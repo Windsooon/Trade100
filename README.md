@@ -3,19 +3,6 @@
 
 <div align="center">
   <h3 align="center">Trade100 Dashboard</h3>
-
-  <p align="center">
-    An open-source trading dashboard for Polymarket prediction markets
-    <br />
-    <a href="#about-the-project"><strong>Explore the docs »</strong></a>
-    <br />
-    <br />
-    <a href="https://trade100-dashboard.vercel.app">View Demo</a>
-    ·
-    <a href="https://github.com/Windsooon/Trade100/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/Windsooon/Trade100/issues">Request Feature</a>
-  </p>
 </div>
 
 <!-- TABLE OF CONTENTS -->
@@ -185,4 +172,3 @@ See the [open issues](https://github.com/Windsooon/Trade100/issues) for a full l
 ## Contributing
 
 Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
