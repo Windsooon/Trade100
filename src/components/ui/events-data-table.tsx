@@ -33,13 +33,16 @@ import {
 import { Event, Market } from "@/lib/stores"
 
 // Helper functions
-const formatVolume = (volume: number): string => {
-  if (volume >= 1000000) {
-    return `${(volume / 1000000).toFixed(1)}M`
-  } else if (volume >= 1000) {
-    return `${(volume / 1000).toFixed(1)}K`
+const formatVolume = (volume: number | undefined): string => {
+  if (!volume || volume === 0) {
+    return '0'
   }
-  return volume.toString()
+  if (volume >= 1000000) {
+    return `${(volume / 1000000).toFixed(2)}M`
+  } else if (volume >= 1000) {
+    return `${(volume / 1000).toFixed(2)}K`
+  }
+  return volume.toFixed(2)
 }
 
 const formatDate = (dateString: string): string => {
@@ -50,13 +53,16 @@ const formatDate = (dateString: string): string => {
   }
 }
 
-const formatLiquidity = (liquidity: number): string => {
-  if (liquidity >= 1000000) {
-    return `${(liquidity / 1000000).toFixed(1)}M`
-  } else if (liquidity >= 1000) {
-    return `${(liquidity / 1000).toFixed(1)}K`
+const formatLiquidity = (liquidity: number | undefined): string => {
+  if (!liquidity || liquidity === 0) {
+    return '0'
   }
-  return liquidity.toString()
+  if (liquidity >= 1000000) {
+    return `${(liquidity / 1000000).toFixed(2)}M`
+  } else if (liquidity >= 1000) {
+    return `${(liquidity / 1000).toFixed(2)}K`
+  }
+  return liquidity.toFixed(2)
 }
 
 
@@ -75,11 +81,11 @@ function MarketsTable({ markets }: MarketsTableProps) {
     )
   }
 
-  // Sort markets by Yes price (first outcomePrices value) in descending order
+  // Sort markets by 1-hour price change in descending order (highest changes first)
   const sortedMarkets = [...markets].sort((a, b) => {
-    const aYesPrice = a.outcomePrices?.[0] ? parseFloat(a.outcomePrices[0]) : 0
-    const bYesPrice = b.outcomePrices?.[0] ? parseFloat(b.outcomePrices[0]) : 0
-    return bYesPrice - aYesPrice
+    const aChange = a.oneHourPriceChange || 0
+    const bChange = b.oneHourPriceChange || 0
+    return bChange - aChange
   })
 
   return (
@@ -192,8 +198,8 @@ export function EventsDataTable({ data }: EventsDataTableProps) {
       accessorKey: "liquidity",
       header: "Liquidity",
       cell: ({ row }) => {
-        const liquidity = row.getValue("liquidity") as number
-        return <div>${formatLiquidity(liquidity || 0)}</div>
+        const liquidity = row.getValue("liquidity") as number | undefined
+        return <div>{formatLiquidity(liquidity)}</div>
       },
       enableSorting: false,
     },
@@ -201,7 +207,7 @@ export function EventsDataTable({ data }: EventsDataTableProps) {
       accessorKey: "volume24hr",
       header: "Volume (24h)",
       cell: ({ row }) => {
-        const volume = row.getValue("volume24hr") as number
+        const volume = row.getValue("volume24hr") as number | undefined
         return <div>${formatVolume(volume)}</div>
       },
       enableSorting: false,
@@ -210,7 +216,7 @@ export function EventsDataTable({ data }: EventsDataTableProps) {
       accessorKey: "volume1wk",
       header: "Volume (1w)",
       cell: ({ row }) => {
-        const volume = row.getValue("volume1wk") as number
+        const volume = row.getValue("volume1wk") as number | undefined
         return <div>${formatVolume(volume)}</div>
       },
       enableSorting: false,

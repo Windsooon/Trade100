@@ -101,11 +101,11 @@ export function TopVolumeCard({ events, availableTags, tagsLoading }: TopVolumeC
 
   const formatVolume = (volume: number): string => {
     if (volume >= 1000000) {
-      return `$${(volume / 1000000).toFixed(1)}M`
+      return `$${(volume / 1000000).toFixed(2)}M`
     } else if (volume >= 1000) {
-      return `$${(volume / 1000).toFixed(0)}K`
+      return `$${(volume / 1000).toFixed(2)}K`
     } else {
-      return `$${volume.toFixed(0)}`
+      return `$${volume.toFixed(2)}`
     }
   }
 
