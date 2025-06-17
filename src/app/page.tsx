@@ -103,8 +103,8 @@ export default function Dashboard() {
       }
     },
     retry: 1,
-    staleTime: 0, // No client-side caching
-    gcTime: 0, // No garbage collection time
+    staleTime: 30 * 1000, // 30 seconds client-side cache (matches server cache)
+    gcTime: 60 * 1000, // 1 minute garbage collection time
   })
 
   // Fetch tags data with 1-hour caching
