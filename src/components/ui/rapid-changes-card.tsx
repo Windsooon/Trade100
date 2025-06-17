@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +12,8 @@ import { useRouter } from 'next/navigation'
 
 interface RapidChangesCardProps {
   events: Event[]
+  availableTags: Tag[]
+  tagsLoading: boolean
 }
 
 type TimePeriod = '1D' | '1W' | '1M'
@@ -32,49 +34,10 @@ interface Tag {
   slug: string
 }
 
-export function RapidChangesCard({ events }: RapidChangesCardProps) {
+export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidChangesCardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1D')
   const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined)
-  const [availableTags, setAvailableTags] = useState<Tag[]>([])
-  const [tagsLoading, setTagsLoading] = useState(true)
   const router = useRouter()
-
-  // Fetch tags from API
-  useEffect(() => {
-    const fetchTags = async () => {
-      try {
-        setTagsLoading(true)
-        const response = await fetch('/api/tags')
-        const data = await response.json()
-        if (data.success && data.tags) {
-          setAvailableTags(data.tags)
-        } else {
-          setAvailableTags(data.tags || [])
-        }
-      } catch (error) {
-        // Use basic fallback if everything fails
-        setAvailableTags([
-          { id: 'politics', label: 'Politics', slug: 'politics' },
-          { id: 'sports', label: 'Sports', slug: 'sports' },
-          { id: 'crypto', label: 'Crypto', slug: 'crypto' }
-        ])
-      } finally {
-        setTagsLoading(false)
-      }
-    }
-
-    fetchTags()
-  }, [])
-
-  // Debug: Log available event tags
-  useEffect(() => {
-    if (events.length > 0) {
-      const eventTags = new Set<string>()
-      events.slice(0, 5).forEach(event => { // Check first 5 events
-        event.tags?.forEach(tag => eventTags.add(tag.label))
-      })
-    }
-  }, [events])
 
   const topChanges = useMemo(() => {
     const allMarkets: MarketChange[] = []

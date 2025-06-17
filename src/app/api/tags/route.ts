@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { proxyFetch } from '@/lib/fetch'
 
+// Cache for tags data
+let tagsCache: any = null
+let tagsCacheTimestamp: number = 0
+const TAGS_CACHE_DURATION = 60 * 60 * 1000 // 1 hour
+
 interface PolymarketTag {
   id: string
   label: string
@@ -11,6 +16,12 @@ interface PolymarketTag {
 
 export async function GET(request: NextRequest) {
   try {
+    // Check if cache is valid
+    const now = Date.now()
+    if (tagsCache && (now - tagsCacheTimestamp) <= TAGS_CACHE_DURATION) {
+      return NextResponse.json(tagsCache)
+    }
+
     // Use the correct Polymarket API URL
     const tagsUrl = 'https://polymarket.com/api/tags/filtered?tag=100221&status=active'
     
@@ -43,11 +54,17 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => a.label.localeCompare(b.label))
     
-    return NextResponse.json({
+    const responseData = {
       tags: filteredTags,
       success: true,
       count: filteredTags.length
-    })
+    }
+
+    // Cache the successful response
+    tagsCache = responseData
+    tagsCacheTimestamp = now
+
+    return NextResponse.json(responseData)
 
   } catch (error) {
     // Return fallback tags if API fails

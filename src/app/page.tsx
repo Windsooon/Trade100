@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { RefreshCw, Filter, X, TrendingUp } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { RefreshCw, Filter, X, TrendingUp, Info } from 'lucide-react'
 import { Event } from '@/lib/stores'
 import { Navbar } from '@/components/ui/navbar'
 import { EventsDataTable } from '@/components/ui/events-data-table'
@@ -37,6 +38,20 @@ interface EventsResponse {
   }
 }
 
+interface Tag {
+  id: string
+  label: string
+  slug: string
+}
+
+interface TagsResponse {
+  tags: Tag[]
+  success: boolean
+  count: number
+  error?: string
+  fallback?: boolean
+}
+
 // Predefined tags list
 const PREDEFINED_TAGS = [
   'Politics', 'Sports', 'Crypto', 'Tech', 'Culture', 
@@ -47,13 +62,18 @@ export default function Dashboard() {
   const [selectedTag, setSelectedTag] = useState<string>('')
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1])
   const [sortBy, setSortBy] = useState<string>('volume24hr')
+  
+  // Auto-refresh state - enabled by default
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
+  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Fetch events data - no caching
   const {
     data: allEventsData,
-    isLoading,
-    isError,
-    error,
-    refetch,
+    isLoading: eventsLoading,
+    isError: eventsError,
+    error: eventsErrorDetails,
+    refetch: refetchEvents,
   } = useQuery<EventsResponse>({
     queryKey: ['all-events'],
     queryFn: async () => {
@@ -83,22 +103,55 @@ export default function Dashboard() {
       }
     },
     retry: 1,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 0, // No client-side caching
+    gcTime: 0, // No garbage collection time
   })
 
-  const handleRefresh = () => {
-    refetch()
-  }
+  // Fetch tags data with 1-hour caching
+  const {
+    data: tagsData,
+    isLoading: tagsLoading,
+    isError: tagsError,
+    refetch: refetchTags,
+  } = useQuery<TagsResponse>({
+    queryKey: ['tags'],
+    queryFn: async () => {
+      const response = await fetch('/api/tags')
+      if (!response.ok) {
+        throw new Error('Failed to fetch tags')
+      }
+      return response.json()
+    },
+    retry: 1,
+    staleTime: 60 * 60 * 1000, // 1 hour
+    gcTime: 2 * 60 * 60 * 1000, // 2 hours
+  })
 
-  const handleTagToggle = (tag: string) => {
-    setSelectedTag(prev => prev === tag ? '' : tag)
-  }
+  // Auto-refresh logic
+  useEffect(() => {
+    if (autoRefreshEnabled) {
+      // Set up the auto-refresh interval
+      autoRefreshIntervalRef.current = setInterval(() => {
+        refetchEvents()
+      }, 10 * 60 * 1000) // 10 minutes
+    } else {
+      // Clean up intervals
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current)
+        autoRefreshIntervalRef.current = null
+      }
+    }
 
-  const clearAllFilters = () => {
-    setSelectedTag('')
-    setPriceRange([0, 1])
-    setSortBy('volume24hr')
+    // Cleanup on unmount
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current)
+      }
+    }
+  }, [autoRefreshEnabled, refetchEvents])
+
+  const handleAutoRefreshToggle = (checked: boolean) => {
+    setAutoRefreshEnabled(checked)
   }
 
   // Client-side filtering and sorting
@@ -124,11 +177,11 @@ export default function Dashboard() {
     .sort((a, b) => {
       switch (sortBy) {
         case 'volume24hr':
-          return b.volume24hr - a.volume24hr
+          return (b.volume24hr || 0) - (a.volume24hr || 0)
         case 'volume1wk':
-          return b.volume1wk - a.volume1wk
+          return (b.volume1wk || 0) - (a.volume1wk || 0)
         case 'volume':
-          return b.volume - a.volume
+          return (b.volume || 0) - (a.volume || 0)
         case 'title':
           return a.title.localeCompare(b.title)
         case 'endDate':
@@ -140,6 +193,10 @@ export default function Dashboard() {
 
   const hasActiveFilters = selectedTag !== '' || priceRange[0] > 0 || priceRange[1] < 1 || sortBy !== 'volume24hr'
 
+  // Overall loading state
+  const isLoading = eventsLoading || tagsLoading
+  const isError = eventsError || tagsError
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
@@ -147,11 +204,21 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Data Latency Notice */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+          <Info className="h-4 w-4" />
+          <span>Market data may have up to 30 seconds latency. Tags are cached for 1 hour.</span>
+        </div>
+
         {/* Top Row: Rapid Changes + Top Volume Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Rapid Changes Card */}
           {allEventsData?.events ? (
-            <RapidChangesCard events={allEventsData.events} />
+            <RapidChangesCard 
+              events={allEventsData.events} 
+              availableTags={tagsData?.tags || []}
+              tagsLoading={tagsLoading}
+            />
           ) : (
             <Card>
               <CardHeader>
@@ -162,7 +229,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-center text-muted-foreground py-8">
-                  {isLoading ? 'Loading market data...' : 'No data available'}
+                  {eventsLoading ? 'Loading market data...' : 'No data available'}
                 </div>
               </CardContent>
             </Card>
@@ -170,7 +237,11 @@ export default function Dashboard() {
 
           {/* Top Volume Markets Card */}
           {allEventsData?.events ? (
-            <TopVolumeCard events={allEventsData.events} />
+            <TopVolumeCard 
+              events={allEventsData.events} 
+              availableTags={tagsData?.tags || []}
+              tagsLoading={tagsLoading}
+            />
           ) : (
             <Card>
               <CardHeader>
@@ -181,7 +252,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-center text-muted-foreground py-8">
-                  {isLoading ? 'Loading market data...' : 'No data available'}
+                  {eventsLoading ? 'Loading market data...' : 'No data available'}
                 </div>
               </CardContent>
             </Card>
@@ -211,7 +282,11 @@ export default function Dashboard() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={clearAllFilters}
+                      onClick={() => {
+                        setSelectedTag('')
+                        setPriceRange([0, 1])
+                        setSortBy('volume24hr')
+                      }}
                       className="h-8 px-2"
                     >
                       <X className="h-4 w-4" />
@@ -251,7 +326,7 @@ export default function Dashboard() {
                       key={tag}
                       variant={selectedTag === tag ? "default" : "ghost"}
                       size="sm"
-                      onClick={() => handleTagToggle(tag)}
+                      onClick={() => setSelectedTag(tag)}
                       className="w-full justify-start text-left h-8 cursor-pointer"
                     >
                       {tag}
@@ -317,14 +392,32 @@ export default function Dashboard() {
           {/* Events DataTable */}
           <Card className="lg:col-span-3">
             <CardHeader>
-              <CardTitle>Events</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Events</CardTitle>
+                <div className="flex items-center gap-4">
+                  {/* Auto-refresh controls */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="auto-refresh"
+                      checked={autoRefreshEnabled}
+                      onCheckedChange={handleAutoRefreshToggle}
+                    />
+                    <label
+                      htmlFor="auto-refresh"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Auto-refresh (10min)
+                    </label>
+                  </div>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <div className="flex items-center justify-center h-64">
                   <div className="text-center space-y-2">
                     <RefreshCw className="h-8 w-8 animate-spin mx-auto" />
-                    <p className="text-muted-foreground">Loading all active Markets, it may take some times</p>
+                    <p className="text-muted-foreground">To improve performance for sorting and filtering, it may take about 30s to load all events.</p>
                   </div>
                 </div>
               ) : isError ? (
@@ -332,11 +425,8 @@ export default function Dashboard() {
                   <div className="text-center space-y-4">
                     <p className="text-destructive">Failed to load events</p>
                     <p className="text-sm text-muted-foreground">
-                      {error instanceof Error ? error.message : 'Unknown error'}
+                      {eventsErrorDetails instanceof Error ? eventsErrorDetails.message : 'Unknown error'}
                     </p>
-                    <Button onClick={handleRefresh} variant="outline">
-                      Try Again
-                    </Button>
                   </div>
                 </div>
               ) : filteredAndSortedEvents.length === 0 ? (
