@@ -76,10 +76,10 @@ export function TopVolumeCard({ events }: TopVolumeCardProps) {
       })
     })
 
-    // Sort by volume (highest first) and take top 10
+    // Sort by volume (highest first) and take top 30
     return allMarkets
       .sort((a, b) => b.volume - a.volume)
-      .slice(0, 10)
+      .slice(0, 30)
   }, [events, selectedPeriod])
 
   const formatVolume = (volume: number): string => {

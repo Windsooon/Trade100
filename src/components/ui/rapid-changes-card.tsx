@@ -78,10 +78,10 @@ export function RapidChangesCard({ events }: RapidChangesCardProps) {
       })
     })
 
-    // Sort by absolute price change (biggest changes first) and take top 10
+    // Sort by absolute price change (biggest changes first) and take top 30
     return allMarkets
       .sort((a, b) => b.absPriceChange - a.absPriceChange)
-      .slice(0, 10)
+      .slice(0, 30)
   }, [events, selectedPeriod])
 
   const formatPercentage = (change: number): string => {
