@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react'
 import { Event, Market } from '@/lib/stores'
 import { useRouter } from 'next/navigation'
@@ -25,15 +26,69 @@ interface MarketChange {
   absPriceChange: number
 }
 
+interface Tag {
+  id: string
+  label: string
+  slug: string
+}
+
 export function RapidChangesCard({ events }: RapidChangesCardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1D')
+  const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined)
+  const [availableTags, setAvailableTags] = useState<Tag[]>([])
+  const [tagsLoading, setTagsLoading] = useState(true)
   const router = useRouter()
+
+  // Fetch tags from API
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        setTagsLoading(true)
+        const response = await fetch('/api/tags')
+        const data = await response.json()
+        if (data.success && data.tags) {
+          setAvailableTags(data.tags)
+        } else {
+          setAvailableTags(data.tags || [])
+        }
+      } catch (error) {
+        // Use basic fallback if everything fails
+        setAvailableTags([
+          { id: 'politics', label: 'Politics', slug: 'politics' },
+          { id: 'sports', label: 'Sports', slug: 'sports' },
+          { id: 'crypto', label: 'Crypto', slug: 'crypto' }
+        ])
+      } finally {
+        setTagsLoading(false)
+      }
+    }
+
+    fetchTags()
+  }, [])
+
+  // Debug: Log available event tags
+  useEffect(() => {
+    if (events.length > 0) {
+      const eventTags = new Set<string>()
+      events.slice(0, 5).forEach(event => { // Check first 5 events
+        event.tags?.forEach(tag => eventTags.add(tag.label))
+      })
+    }
+  }, [events])
 
   const topChanges = useMemo(() => {
     const allMarkets: MarketChange[] = []
 
-    // Collect all active markets from all events
-    events.forEach(event => {
+    // Filter events by selected tag first, if any
+    const filteredEvents = selectedTag
+      ? events.filter(event => {
+          const hasTag = event.tags?.some(tag => tag.label === selectedTag)
+          return hasTag
+        })
+      : events
+
+    // Collect all active markets from filtered events
+    filteredEvents.forEach(event => {
       if (!event.markets) return
 
       event.markets.forEach(market => {
@@ -82,7 +137,7 @@ export function RapidChangesCard({ events }: RapidChangesCardProps) {
     return allMarkets
       .sort((a, b) => b.absPriceChange - a.absPriceChange)
       .slice(0, 30)
-  }, [events, selectedPeriod])
+  }, [events, selectedPeriod, selectedTag])
 
   const formatPercentage = (change: number): string => {
     const percentage = (change * 100).toFixed(1)
@@ -95,6 +150,10 @@ export function RapidChangesCard({ events }: RapidChangesCardProps) {
 
   const handleMarketClick = (eventId: string) => {
     router.push(`/events/${eventId}`)
+  }
+
+  const handleTagChange = (value: string) => {
+    setSelectedTag(value === 'all' ? undefined : value)
   }
 
   return (
@@ -113,18 +172,40 @@ export function RapidChangesCard({ events }: RapidChangesCardProps) {
             <TabsTrigger value="1M">1M</TabsTrigger>
           </TabsList>
 
-          <TabsContent value={selectedPeriod} className="mt-4">
+          {/* Tag Filter */}
+          <div className="mt-4 mb-4">
+            <Select value={selectedTag || 'all'} onValueChange={handleTagChange} disabled={tagsLoading}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder={tagsLoading ? "Loading tags..." : "Filter by tag"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tags</SelectItem>
+                {availableTags.map(tag => (
+                  <SelectItem key={tag.id} value={tag.label}>
+                    {tag.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <TabsContent value={selectedPeriod} className="mt-0">
             {topChanges.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No price change data available for this period</p>
+                <p>
+                  {selectedTag
+                    ? `No markets found for selected tag "${selectedTag}"`
+                    : "No price change data available for this period"
+                  }
+                </p>
               </div>
             ) : (
               <ScrollArea className="h-[240px]">
                 <div className="space-y-3 pr-4">
                   {topChanges.map((change, index) => (
                     <div
-                      key={`${change.eventId}-${change.marketName}`}
+                      key={`${change.eventId}-${change.marketName}-${index}`}
                       className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
                       onClick={() => handleMarketClick(change.eventId)}
                     >

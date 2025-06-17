@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TrendingUp, ArrowUpRight } from 'lucide-react'
 import { Event } from '@/lib/stores'
 import { useRouter } from 'next/navigation'
@@ -24,15 +25,58 @@ interface VolumeMarket {
   volume: number
 }
 
+interface Tag {
+  id: string
+  label: string
+  slug: string
+}
+
 export function TopVolumeCard({ events }: TopVolumeCardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1D')
+  const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined)
+  const [availableTags, setAvailableTags] = useState<Tag[]>([])
+  const [tagsLoading, setTagsLoading] = useState(true)
   const router = useRouter()
+
+  // Fetch tags from API
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        setTagsLoading(true)
+        const response = await fetch('/api/tags')
+        const data = await response.json()
+        if (data.success && data.tags) {
+          setAvailableTags(data.tags)
+        } else {
+          setAvailableTags(data.tags || [])
+        }
+      } catch (error) {
+        // Use basic fallback if everything fails
+        setAvailableTags([
+          { id: 'politics', label: 'Politics', slug: 'politics' },
+          { id: 'sports', label: 'Sports', slug: 'sports' },
+          { id: 'crypto', label: 'Crypto', slug: 'crypto' }
+        ])
+      } finally {
+        setTagsLoading(false)
+      }
+    }
+
+    fetchTags()
+  }, [])
 
   const topVolumeMarkets = useMemo(() => {
     const allMarkets: VolumeMarket[] = []
 
-    // Collect all active markets from all events
-    events.forEach(event => {
+    // Filter events by selected tag first, if any
+    const filteredEvents = selectedTag
+      ? events.filter(event => 
+          event.tags?.some(tag => tag.label === selectedTag)
+        )
+      : events
+
+    // Collect all active markets from filtered events
+    filteredEvents.forEach(event => {
       if (!event.markets) return
 
       event.markets.forEach(market => {
@@ -80,7 +124,7 @@ export function TopVolumeCard({ events }: TopVolumeCardProps) {
     return allMarkets
       .sort((a, b) => b.volume - a.volume)
       .slice(0, 30)
-  }, [events, selectedPeriod])
+  }, [events, selectedPeriod, selectedTag])
 
   const formatVolume = (volume: number): string => {
     if (volume >= 1000000) {
@@ -100,6 +144,10 @@ export function TopVolumeCard({ events }: TopVolumeCardProps) {
     router.push(`/events/${eventId}`)
   }
 
+  const handleTagChange = (value: string) => {
+    setSelectedTag(value === 'all' ? undefined : value)
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -116,18 +164,40 @@ export function TopVolumeCard({ events }: TopVolumeCardProps) {
             <TabsTrigger value="1M">1M</TabsTrigger>
           </TabsList>
 
-          <TabsContent value={selectedPeriod} className="mt-4">
+          {/* Tag Filter */}
+          <div className="mt-4 mb-4">
+            <Select value={selectedTag || 'all'} onValueChange={handleTagChange} disabled={tagsLoading}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder={tagsLoading ? "Loading tags..." : "Filter by tag"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tags</SelectItem>
+                {availableTags.map(tag => (
+                  <SelectItem key={tag.id} value={tag.label}>
+                    {tag.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <TabsContent value={selectedPeriod} className="mt-0">
             {topVolumeMarkets.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No volume data available for this period</p>
+                <p>
+                  {selectedTag
+                    ? `No markets found for selected tag "${selectedTag}"`
+                    : "No volume data available for this period"
+                  }
+                </p>
               </div>
             ) : (
               <ScrollArea className="h-[240px]">
                 <div className="space-y-3 pr-4">
                   {topVolumeMarkets.map((market, index) => (
                     <div
-                      key={`${market.eventId}-${market.marketName}`}
+                      key={`${market.eventId}-${market.marketName}-${index}`}
                       className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
                       onClick={() => handleMarketClick(market.eventId)}
                     >
