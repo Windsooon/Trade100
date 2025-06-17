@@ -181,7 +181,7 @@ export default function Dashboard() {
         case 'volume1wk':
           return (b.volume1wk || 0) - (a.volume1wk || 0)
         case 'volume':
-          return (b.volume || 0) - (a.volume || 0)
+          return (b.liquidity || 0) - (a.liquidity || 0)
         case 'title':
           return a.title.localeCompare(b.title)
         case 'endDate':
@@ -366,7 +366,7 @@ export default function Dashboard() {
                   <SelectContent>
                     <SelectItem value="volume24hr">Volume (24h)</SelectItem>
                     <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
-                    <SelectItem value="volume">Total Volume</SelectItem>
+                    <SelectItem value="volume">Liquidity</SelectItem>
                     <SelectItem value="title">Title (A-Z)</SelectItem>
                     <SelectItem value="endDate">End Date</SelectItem>
                   </SelectContent>
