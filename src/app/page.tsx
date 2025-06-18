@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
-import { RefreshCw, Filter, X, TrendingUp, Info } from 'lucide-react'
+import { RefreshCw, Filter, X, TrendingUp, Info, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { Event } from '@/lib/stores'
 import { Navbar } from '@/components/ui/navbar'
 import { EventsDataTable } from '@/components/ui/events-data-table'
@@ -62,6 +62,7 @@ export default function Dashboard() {
   const [selectedTag, setSelectedTag] = useState<string>('')
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1])
   const [sortBy, setSortBy] = useState<string>('volume24hr')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   
   // Auto-refresh state - enabled by default
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
@@ -182,23 +183,31 @@ export default function Dashboard() {
       return true
     })
     .sort((a, b) => {
+      let comparison = 0
+
       switch (sortBy) {
         case 'volume24hr':
-          return (b.volume24hr || 0) - (a.volume24hr || 0)
+          comparison = (a.volume24hr || 0) - (b.volume24hr || 0)
+          break
         case 'volume1wk':
-          return (b.volume1wk || 0) - (a.volume1wk || 0)
+          comparison = (a.volume1wk || 0) - (b.volume1wk || 0)
+          break
         case 'volume':
-          return (b.liquidity || 0) - (a.liquidity || 0)
+          comparison = (a.liquidity || 0) - (b.liquidity || 0)
+          break
         case 'title':
-          return a.title.localeCompare(b.title)
+          comparison = a.title.localeCompare(b.title)
+          break
         case 'endDate':
-          return new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
+          comparison = new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
+          break
         default:
           return 0
       }
+      return sortDirection === 'desc' ? -comparison : comparison
     }) : []
 
-  const hasActiveFilters = selectedTag !== '' || priceRange[0] > 0 || priceRange[1] < 1 || sortBy !== 'volume24hr'
+  const hasActiveFilters = selectedTag !== '' || priceRange[0] > 0 || priceRange[1] < 1 || sortBy !== 'volume24hr' || sortDirection !== 'desc'
 
   // Overall loading state
   const isLoading = eventsLoading || tagsLoading
@@ -287,6 +296,7 @@ export default function Dashboard() {
                         setSelectedTag('')
                         setPriceRange([0, 1])
                         setSortBy('volume24hr')
+                        setSortDirection('desc')
                       }}
                       className="h-8 px-2"
                     >
@@ -307,9 +317,9 @@ export default function Dashboard() {
                         Yes Price: {priceRange[0].toFixed(2)}-{priceRange[1].toFixed(2)}
                       </Badge>
                     )}
-                    {sortBy !== 'volume24hr' && (
+                    {(sortBy !== 'volume24hr' || sortDirection !== 'desc') && (
                       <Badge variant="secondary" className="text-xs">
-                        Sort: {sortBy}
+                        Sort: {sortBy} ({sortDirection})
                       </Badge>
                     )}
                   </div>
@@ -361,23 +371,39 @@ export default function Dashboard() {
 
               <Separator />
 
-              {/* Sort By with Select */}
+              {/* Sort By with Direction Toggle */}
               <div className="space-y-4">
                 <label className="text-sm font-medium mb-4 block">Sort By</label>
-                <Select value={sortBy} onValueChange={(value) => {
-                  setSortBy(value)
-                }}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="volume24hr">Volume (24h)</SelectItem>
-                    <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
-                    <SelectItem value="volume">Liquidity</SelectItem>
-                    <SelectItem value="title">Title (A-Z)</SelectItem>
-                    <SelectItem value="endDate">End Date</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={sortBy} onValueChange={(value) => {
+                    setSortBy(value)
+                  }}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="volume24hr">Volume (24h)</SelectItem>
+                      <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
+                      <SelectItem value="volume">Liquidity</SelectItem>
+                      <SelectItem value="title">Title (A-Z)</SelectItem>
+                      <SelectItem value="endDate">End Date</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {/* Compact Sort Direction Toggle */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+                    className="px-2 h-9 flex-shrink-0"
+                    title={sortDirection === 'desc' ? 'Descending (High to Low)' : 'Ascending (Low to High)'}
+                  >
+                    {sortDirection === 'desc' ? (
+                      <ArrowDown className="h-4 w-4" />
+                    ) : (
+                      <ArrowUp className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
 
               {/* Results Summary */}
