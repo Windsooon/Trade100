@@ -71,7 +71,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
     let periodStartTime: number
     switch (period) {
       case '1m':
-        periodStartTime = now - (1 * 24 * 60 * 60 * 1000) // 1 days ago
+        periodStartTime = now - (1 * 12 * 60 * 60 * 1000) // 12 hours ago
         break
       case '1h':
         periodStartTime = now - (7 * 24 * 60 * 60 * 1000) // 1 week ago
