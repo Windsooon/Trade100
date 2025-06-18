@@ -22,6 +22,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -281,7 +282,15 @@ export function EventsDataTable({ data }: EventsDataTableProps) {
 
   return (
     <div className="w-full">
-      <div className="flex items-center py-4">
+      <div className="flex items-center py-4 gap-4">
+        <Input
+          placeholder="Search events by title..."
+          value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
+          onChange={(event) =>
+            table.getColumn("title")?.setFilterValue(event.target.value)
+          }
+          className="max-w-sm"
+        />
         <div className="flex-1">
           <div className="text-sm text-muted-foreground">
             Showing {table.getFilteredRowModel().rows.length} events
