@@ -166,13 +166,18 @@ export default function Dashboard() {
         if (!hasMatchingTag) return false
       }
 
-      // Check if any market in the event has a Yes price within the range
+      // Check if any market in the event has a Yes OR No price within the range
       if (event.markets && event.markets.length > 0) {
         const hasMatchingMarket = event.markets.some(market => {
-          if (market.outcomePrices && market.outcomePrices.length >= 1) {
+          if (market.outcomePrices && market.outcomePrices.length >= 2) {
             const yesPrice = parseFloat(market.outcomePrices[0])
-            if (isNaN(yesPrice)) return false
-            return yesPrice >= priceRange[0] && yesPrice <= priceRange[1]
+            const noPrice = parseFloat(market.outcomePrices[1])
+
+            // Check if either Yes or No price is within range
+            const yesPriceInRange = !isNaN(yesPrice) && yesPrice >= priceRange[0] && yesPrice <= priceRange[1]
+            const noPriceInRange = !isNaN(noPrice) && noPrice >= priceRange[0] && noPrice <= priceRange[1]
+
+            return yesPriceInRange || noPriceInRange
           }
           return false
         })
@@ -314,7 +319,7 @@ export default function Dashboard() {
                     )}
                     {(priceRange[0] > 0 || priceRange[1] < 1) && (
                       <Badge variant="secondary" className="text-xs">
-                        Yes Price: {priceRange[0].toFixed(2)}-{priceRange[1].toFixed(2)}
+                        Price Range: {priceRange[0].toFixed(2)}-{priceRange[1].toFixed(2)}
                       </Badge>
                     )}
                     {(sortBy !== 'volume24hr' || sortDirection !== 'desc') && (
@@ -350,7 +355,7 @@ export default function Dashboard() {
 
               {/* Price Range */}
               <div className="space-y-4">
-                <label className="text-sm font-medium mb-4 block">Yes Price Range</label>
+                <label className="text-sm font-medium mb-4 block">Price Range (Yes or No)</label>
                 <div className="px-3">
                   <Slider
                     value={priceRange}
