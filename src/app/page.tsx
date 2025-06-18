@@ -165,11 +165,18 @@ export default function Dashboard() {
         if (!hasMatchingTag) return false
       }
 
-      const firstMarket = event.markets?.[0]
-      if (firstMarket?.outcomePrices && firstMarket.outcomePrices.length >= 1) {
-        const yesPrice = parseFloat(firstMarket.outcomePrices[0])
-        if (isNaN(yesPrice)) return true
-        if (yesPrice < priceRange[0] || yesPrice > priceRange[1]) return false
+      // Check if any market in the event has a Yes price within the range
+      if (event.markets && event.markets.length > 0) {
+        const hasMatchingMarket = event.markets.some(market => {
+          if (market.outcomePrices && market.outcomePrices.length >= 1) {
+            const yesPrice = parseFloat(market.outcomePrices[0])
+            if (isNaN(yesPrice)) return false
+            return yesPrice >= priceRange[0] && yesPrice <= priceRange[1]
+          }
+          return false
+        })
+        // If no markets match the price range, exclude this event
+        if (!hasMatchingMarket) return false
       }
 
       return true
