@@ -26,6 +26,7 @@ interface MarketChange {
   noPrice: number
   priceChange: number
   absPriceChange: number
+  conditionId: string
 }
 
 interface Tag {
@@ -91,7 +92,8 @@ export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidCh
           yesPrice,
           noPrice,
           priceChange,
-          absPriceChange: Math.abs(priceChange)
+          absPriceChange: Math.abs(priceChange),
+          conditionId: market.conditionId
         })
       })
     })
@@ -111,8 +113,8 @@ export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidCh
     return `$${price.toFixed(3)}`
   }
 
-  const handleMarketClick = (eventId: string) => {
-    router.push(`/events/${eventId}`)
+  const handleMarketClick = (eventId: string, conditionId: string) => {
+    window.open(`/events/${eventId}?market=${conditionId}`, '_blank')
   }
 
   const handleTagChange = (value: string) => {
@@ -170,7 +172,7 @@ export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidCh
                     <div
                       key={`${change.eventId}-${change.marketName}-${index}`}
                       className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => handleMarketClick(change.eventId)}
+                      onClick={() => handleMarketClick(change.eventId, change.conditionId)}
                     >
                       <div className="flex-1 min-w-0 pr-3">
                         <div className="flex items-start gap-2 mb-1">

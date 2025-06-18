@@ -9,20 +9,36 @@ import { OperationsCard } from './operations-card'
 import { OrderBookCard } from './order-book-card'
 import { Event, Market } from '@/lib/stores'
 
-export default function EventDetailClient({ event }: { event: Event }) {
+export default function EventDetailClient({
+  event,
+  selectedMarketId
+}: {
+  event: Event
+  selectedMarketId?: string
+}) {
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   const [selectedToken, setSelectedToken] = useState<'yes' | 'no'>('yes')
 
   useEffect(() => {
-    if (event?.markets && event.markets.length > 0 && !selectedMarket) {
-      // Default to first active market, or first market if no active ones
-      const activeMarkets = event.markets.filter((m: Market) => 
-        m.active === true && m.archived === false && m.closed === false
-      )
-      const defaultMarket = activeMarkets.length > 0 ? activeMarkets[0] : event.markets[0]
-      setSelectedMarket(defaultMarket)
+    if (event?.markets && event.markets.length > 0) {
+      let targetMarket: Market | null = null
+
+      // If selectedMarketId is provided, try to find that specific market
+      if (selectedMarketId) {
+        targetMarket = event.markets.find((m: Market) => m.conditionId === selectedMarketId) || null
+      }
+
+      // If no specific market found or no selectedMarketId, use default logic
+      if (!targetMarket) {
+        const activeMarkets = event.markets.filter((m: Market) =>
+          m.active === true && m.archived === false && m.closed === false
+        )
+        targetMarket = activeMarkets.length > 0 ? activeMarkets[0] : event.markets[0]
+      }
+
+      setSelectedMarket(targetMarket)
     }
-  }, [event, selectedMarket])
+  }, [event, selectedMarketId])
 
   const handleTokenChange = (token: 'yes' | 'no') => {
     setSelectedToken(token)

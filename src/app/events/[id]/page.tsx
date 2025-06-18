@@ -61,8 +61,15 @@ function transformEventData(rawEvent: RawEventData): Event {
   }
 }
 
-export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EventDetailPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ market?: string }>
+}) {
   const { id: eventId } = await params
+  const { market: selectedMarketId } = await searchParams
   let eventData: Event | null = null
   let error: string | null = null
 
@@ -109,7 +116,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <div className="container mx-auto px-4 py-6 flex-1">
-        <EventDetailClient event={eventData} />
+        <EventDetailClient event={eventData} selectedMarketId={selectedMarketId} />
       </div>
     </div>
   )
