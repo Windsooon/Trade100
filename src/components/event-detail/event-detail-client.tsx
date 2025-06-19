@@ -7,6 +7,7 @@ import { MarketListCard } from './market-list-card'
 import { TradingChartCard } from './trading-chart-card'
 import { OperationsCard } from './operations-card'
 import { OrderBookCard } from './order-book-card'
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { Event, Market } from '@/lib/stores'
 
 export default function EventDetailClient({
@@ -50,17 +51,26 @@ export default function EventDetailClient({
         {/* Left Side */}
         <div className="lg:col-span-4 space-y-6">
           <EventInfoCard event={event} />
-          <OrderBookCard 
-            event={event} 
-            selectedMarket={selectedMarket}
-            selectedToken={selectedToken}
-            onTokenChange={handleTokenChange}
-          />
-          <MarketListCard 
-            markets={event.markets} 
-            selectedMarket={selectedMarket}
-            onMarketSelect={setSelectedMarket}
-          />
+
+          {/* Resizable Market List and Order Book */}
+          <ResizablePanelGroup direction="horizontal" className="min-h-[500px] border rounded-lg">
+            <ResizablePanel defaultSize={50}>
+              <MarketListCard
+                markets={event.markets}
+                selectedMarket={selectedMarket}
+                onMarketSelect={setSelectedMarket}
+              />
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={50}>
+              <OrderBookCard
+                event={event}
+                selectedMarket={selectedMarket}
+                selectedToken={selectedToken}
+                onTokenChange={handleTokenChange}
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </div>
         {/* Right Side */}
         <div className="lg:col-span-8 space-y-6">

@@ -575,23 +575,21 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
   const statusDisplay = getConnectionStatusDisplay()
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-            <CardTitle className="flex items-center gap-2 text-base">
-                Order Book
-                <span className={`text-xs ${statusDisplay.color} flex items-center gap-1`}>
-                  {statusDisplay.dot} {statusDisplay.text}
-                </span>
-            </CardTitle>
-            {lastUpdated && connectionStatus === 'connected' && !loading && (
-                <Badge variant="secondary" className="text-xs font-normal">
-                    {formatTimeAgo(lastUpdated)}
-                </Badge>
-            )}
-        </div>
-      </CardHeader>
-      <CardContent>
+    <div className="h-full flex flex-col">
+      <div className="p-3 border-b flex justify-between items-center">
+        <h3 className="flex items-center gap-2 font-semibold text-sm">
+          Order Book
+          <span className={`text-xs ${statusDisplay.color} flex items-center gap-1`}>
+            {statusDisplay.dot} {statusDisplay.text}
+          </span>
+        </h3>
+        {lastUpdated && connectionStatus === 'connected' && !loading && (
+          <Badge variant="secondary" className="text-xs font-normal">
+            {formatTimeAgo(lastUpdated)}
+          </Badge>
+        )}
+      </div>
+      <div className="flex-1 p-3 overflow-hidden flex flex-col">
         {connectionStatus === 'error' && (
           <Alert variant="destructive" className="mb-4">
             <AlertTitle>Connection Error</AlertTitle>
@@ -646,7 +644,7 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
               </div>
               <ScrollArea 
                 ref={scrollAreaRef} 
-                className="h-[450px] relative"
+                className="flex-1 relative"
                 onScroll={handleScroll}
                 onMouseDown={handleUserInteraction}
                 onTouchStart={handleUserInteraction}
@@ -692,7 +690,7 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 } 

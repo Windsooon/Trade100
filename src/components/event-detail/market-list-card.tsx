@@ -45,46 +45,34 @@ export function MarketListCard({ markets, selectedMarket, onMarketSelect }: Mark
 
   const renderMarket = (market: Market, index: number, isActive: boolean) => {
     const isSelected = selectedMarket?.conditionId === market.conditionId
-    const changeValue = market.oneHourPriceChange || 0
-    const changeColor = changeValue >= 0 ? 'text-green-600' : 'text-red-600'
     
     return (
       <div
         key={market.conditionId}
-        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+        className={`p-3 border rounded cursor-pointer transition-colors ${
           isSelected 
             ? 'border-primary bg-primary/5' 
             : 'border-border hover:border-primary/50 hover:bg-muted/50'
         }`}
         onClick={() => onMarketSelect(market)}
       >
-        <div className="space-y-2">
-          <div className="text-sm font-medium leading-tight">
-            {market.question}
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-muted-foreground">
-              1h Change
-            </div>
-            <div className={`text-xs font-medium ${changeColor}`}>
-              {formatPriceChange(market.oneHourPriceChange)}
-            </div>
-          </div>
+        {/* Just the question */}
+        <div className="text-sm font-medium leading-tight">
+          {market.question}
         </div>
       </div>
     )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Target className="h-5 w-5" />
+    <div className="h-full flex flex-col">
+      <div className="p-3 border-b">
+        <h3 className="flex items-center gap-2 font-semibold text-sm">
+          <Target className="h-4 w-4" />
           Markets ({markets.length})
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </h3>
+      </div>
+      <div className="flex-1 p-3 overflow-y-auto">
         <div className="space-y-4">
           {markets.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
@@ -132,7 +120,7 @@ export function MarketListCard({ markets, selectedMarket, onMarketSelect }: Mark
             </>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 } 
