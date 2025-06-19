@@ -119,9 +119,18 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+
 }
 
 @layer utilities {
+  /* Custom container override in utilities layer - loads after Tailwind base */
+  .container {
+    @media (width >= 96rem) {
+      max-width: 114rem;
+    }
+  }
+
   @keyframes accordion-down {
     from { height: 0 }
     to { height: var(--radix-accordion-content-height) }
