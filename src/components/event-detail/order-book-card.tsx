@@ -634,7 +634,7 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
               </Button>
             </div>
 
-            <div className="relative">
+            <div className="relative flex-1 flex flex-col">
               <div className="bg-background border-b sticky top-0 z-10">
                 <div className="grid grid-cols-3 gap-2 px-2 py-2 text-xs font-medium text-muted-foreground">
                   <div>Price</div>
@@ -644,7 +644,7 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
               </div>
               <ScrollArea 
                 ref={scrollAreaRef} 
-                className="flex-1 relative"
+                className="flex-1 max-h-[400px] relative"
                 onScroll={handleScroll}
                 onMouseDown={handleUserInteraction}
                 onTouchStart={handleUserInteraction}

@@ -124,8 +124,11 @@
 }
 
 @layer utilities {
-  /* Custom container override in utilities layer - loads after Tailwind base */
+  /* Custom container overrides in utilities layer - loads after Tailwind base */
   .container {
+    @media (width >= 80rem) {
+      max-width: 90rem;
+    }
     @media (width >= 96rem) {
       max-width: 114rem;
     }
