@@ -46,6 +46,22 @@ export function MarketListCard({ markets, selectedMarket, onMarketSelect }: Mark
   const renderMarket = (market: Market, index: number, isActive: boolean) => {
     const isSelected = selectedMarket?.conditionId === market.conditionId
     
+    // Parse outcome prices - handle string that contains JSON array
+    const getYesNoPrice = (outcomePrices: string[]): { yesPrice: number, noPrice: number } => {
+      try {
+        // outcomePrices should be an array like ["0.459", "0.541"]
+        if (outcomePrices && Array.isArray(outcomePrices) && outcomePrices.length >= 2) {
+          return {
+            yesPrice: parseFloat(outcomePrices[0]) || 0,
+            noPrice: parseFloat(outcomePrices[1]) || 0
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing outcome prices:', error)
+      }
+      return { yesPrice: 0, noPrice: 0 }
+    }
+    const { yesPrice, noPrice } = getYesNoPrice(market.outcomePrices)
     return (
       <div
         key={market.conditionId}
@@ -56,9 +72,24 @@ export function MarketListCard({ markets, selectedMarket, onMarketSelect }: Mark
         }`}
         onClick={() => onMarketSelect(market)}
       >
-        {/* Just the question */}
-        <div className="text-sm font-medium leading-tight">
+        {/* Market question */}
+        <div className="text-sm font-medium leading-tight mb-2">
           {market.question}
+        </div>
+        {/* Yes/No prices */}
+        <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">Yes:</span>
+            <span className="font-medium text-green-600 dark:text-green-400">
+              {yesPrice.toFixed(2)}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">No:</span>
+            <span className="font-medium text-red-600 dark:text-red-400">
+              {noPrice.toFixed(2)}
+            </span>
+          </div>
         </div>
       </div>
     )

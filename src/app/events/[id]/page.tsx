@@ -36,24 +36,37 @@ function transformEventData(rawEvent: RawEventData): Event {
     volume1wk: (typeof rawEvent.volume1wk === 'number' && rawEvent.volume1wk > 0) ? rawEvent.volume1wk : undefined,
     volume1mo: (typeof rawEvent.volume1mo === 'number' && rawEvent.volume1mo > 0) ? rawEvent.volume1mo : undefined,
     liquidity: (typeof rawEvent.liquidity === 'number' && rawEvent.liquidity > 0) ? rawEvent.liquidity : undefined,
-    markets: rawEvent.markets?.map((market: any) => ({
-      question: market.question || '',
-      conditionId: market.conditionId || '',
-      bestBid: market.bestBid,
-      bestAsk: market.bestAsk,
-      outcomePrices: Array.isArray(market.outcomePrices) ? market.outcomePrices : [],
-      oneHourPriceChange: market.oneHourPriceChange,
-      oneDayPriceChange: market.oneDayPriceChange,
-      oneWeekPriceChange: market.oneWeekPriceChange,
-      oneMonthPriceChange: market.oneMonthPriceChange,
-      volume24hr: market.volume24hr,
-      volume1wk: market.volume1wk,
-      volume1mo: market.volume1mo,
-      active: market.active,
-      archived: market.archived,
-      closed: market.closed,
-      clobTokenIds: market.clobTokenIds
-    })) || [],
+    markets: rawEvent.markets?.map((market: any) => {
+      let parsedOutcomePrices: string[] = []
+      try {
+        if (typeof market.outcomePrices === 'string') {
+          parsedOutcomePrices = JSON.parse(market.outcomePrices)
+        } else if (Array.isArray(market.outcomePrices)) {
+          parsedOutcomePrices = market.outcomePrices
+        }
+      } catch (e) {
+        console.error(`Failed to parse outcomePrices for market "${market.question}"`, e)
+      }
+
+      return {
+        question: market.question || '',
+        conditionId: market.conditionId || '',
+        bestBid: market.bestBid,
+        bestAsk: market.bestAsk,
+        outcomePrices: parsedOutcomePrices,
+        oneHourPriceChange: market.oneHourPriceChange,
+        oneDayPriceChange: market.oneDayPriceChange,
+        oneWeekPriceChange: market.oneWeekPriceChange,
+        oneMonthPriceChange: market.oneMonthPriceChange,
+        volume24hr: market.volume24hr,
+        volume1wk: market.volume1wk,
+        volume1mo: market.volume1mo,
+        active: market.active,
+        archived: market.archived,
+        closed: market.closed,
+        clobTokenIds: market.clobTokenIds
+      }
+    }) || [],
     tags: rawEvent.tags?.map((tag: any) => ({
       id: tag.id || '',
       label: tag.label || tag.name || ''
