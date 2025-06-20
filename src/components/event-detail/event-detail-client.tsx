@@ -54,7 +54,7 @@ export default function EventDetailClient({
 
           {/* Resizable Market List and Order Book */}
           <ResizablePanelGroup direction="horizontal" className="min-h-[500px] border rounded-lg">
-            <ResizablePanel defaultSize={50}>
+            <ResizablePanel defaultSize={60}>
               <MarketListCard
                 markets={event.markets}
                 selectedMarket={selectedMarket}
@@ -62,7 +62,7 @@ export default function EventDetailClient({
               />
             </ResizablePanel>
             <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={50}>
+            <ResizablePanel defaultSize={40}>
               <OrderBookCard
                 event={event}
                 selectedMarket={selectedMarket}
