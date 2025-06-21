@@ -82,8 +82,9 @@ function MarketsTable({ markets }: MarketsTableProps) {
     )
   }
 
-  // Sort markets by 1-hour price change in descending order (highest changes first)
-  const sortedMarkets = [...markets].sort((a, b) => {
+  // Filter to only show active markets, then sort by 1-hour price change in descending order (highest changes first)
+  const activeMarkets = markets.filter(market => market.active === true)
+  const sortedMarkets = [...activeMarkets].sort((a, b) => {
     const aChange = a.oneHourPriceChange || 0
     const bChange = b.oneHourPriceChange || 0
     return bChange - aChange
@@ -91,7 +92,7 @@ function MarketsTable({ markets }: MarketsTableProps) {
 
   return (
     <div className="bg-muted/30 p-4 rounded-md">
-      <h4 className="font-medium mb-3 text-sm">Markets ({markets.length})</h4>
+      <h4 className="font-medium mb-3 text-sm">Active Markets ({activeMarkets.length})</h4>
       <div className="border rounded-md bg-background">
         <Table>
           <TableHeader>
