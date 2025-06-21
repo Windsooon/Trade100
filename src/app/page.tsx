@@ -15,6 +15,7 @@ import { Event } from '@/lib/stores'
 import { Navbar } from '@/components/ui/navbar'
 import { EventsDataTable } from '@/components/ui/events-data-table'
 import { RapidChangesCard } from '@/components/ui/rapid-changes-card'
+import { ArbitrageCard } from '@/components/ui/arbitrage-card'
 import { TopVolumeCard } from '@/components/ui/top-volume-card'
 
 interface FetchLog {
@@ -158,6 +159,7 @@ export default function Dashboard() {
   // Client-side filtering and sorting
   const filteredAndSortedEvents = allEventsData?.events ? [...allEventsData.events]
     .filter(event => {
+
       if (selectedTag !== '') {
         const eventTagLabels = event.tags.map(tag => tag.label)
         const hasMatchingTag = eventTagLabels.some(eventTag => 
@@ -225,8 +227,8 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Top Row: Rapid Changes + Top Volume Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Row: Rapid Changes + Arbitrage + Top Volume Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Rapid Changes Card */}
           {allEventsData?.events ? (
             <RapidChangesCard 
@@ -263,6 +265,29 @@ export default function Dashboard() {
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
                   Top Volume Markets
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center text-muted-foreground py-8">
+                  {eventsLoading ? 'Loading market data...' : 'No data available'}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top Arbitrage Events Card */}
+          {allEventsData?.events ? (
+            <ArbitrageCard
+              events={allEventsData.events}
+              availableTags={tagsData?.tags || []}
+              tagsLoading={tagsLoading}
+            />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Top Arbitrage Events
                 </CardTitle>
               </CardHeader>
               <CardContent>

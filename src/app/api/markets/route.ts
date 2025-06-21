@@ -23,6 +23,7 @@ interface ApiEvent {
   liquidity?: number
   markets?: ApiMarket[]
   tags?: ApiTag[]
+  negRisk?: boolean
 }
 
 interface ApiMarket {
@@ -42,6 +43,8 @@ interface ApiMarket {
   archived?: boolean
   closed?: boolean
   clobTokenIds?: string
+  lastTradePrice?: number
+  endDateIso?: string
 }
 
 interface ApiTag {
@@ -63,6 +66,7 @@ function transformEvent(apiEvent: ApiEvent): Event {
     volume1wk: (typeof apiEvent.volume1wk === 'number' && apiEvent.volume1wk > 0) ? apiEvent.volume1wk : undefined,
     volume1mo: (typeof apiEvent.volume1mo === 'number' && apiEvent.volume1mo > 0) ? apiEvent.volume1mo : undefined,
     liquidity: (typeof apiEvent.liquidity === 'number' && apiEvent.liquidity > 0) ? apiEvent.liquidity : undefined,
+    negRisk: apiEvent.negRisk,
     markets: apiEvent.markets?.map((market: ApiMarket) => {
       // Function to safely parse the nested JSON string format
       function parseOutcomePrices(outcomePricesData: string | string[]): string[] {
@@ -110,7 +114,9 @@ function transformEvent(apiEvent: ApiEvent): Event {
         active: market.active,
         archived: market.archived,
         closed: market.closed,
-        clobTokenIds: market.clobTokenIds
+        clobTokenIds: market.clobTokenIds,
+        lastTradePrice: market.lastTradePrice,
+        endDateIso: market.endDateIso
       }
     }) || [],
     tags: apiEvent.tags?.map((tag: ApiTag) => ({

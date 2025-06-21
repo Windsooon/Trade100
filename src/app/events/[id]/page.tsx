@@ -18,6 +18,7 @@ interface RawEventData {
   liquidity?: number
   markets?: any[]
   tags?: any[]
+  negRisk?: boolean
   // Add other properties as needed
   [key: string]: unknown
 }
@@ -36,6 +37,7 @@ function transformEventData(rawEvent: RawEventData): Event {
     volume1wk: (typeof rawEvent.volume1wk === 'number' && rawEvent.volume1wk > 0) ? rawEvent.volume1wk : undefined,
     volume1mo: (typeof rawEvent.volume1mo === 'number' && rawEvent.volume1mo > 0) ? rawEvent.volume1mo : undefined,
     liquidity: (typeof rawEvent.liquidity === 'number' && rawEvent.liquidity > 0) ? rawEvent.liquidity : undefined,
+    negRisk: rawEvent.negRisk,
     markets: rawEvent.markets?.map((market: any) => {
       let parsedOutcomePrices: string[] = []
       try {
@@ -48,24 +50,26 @@ function transformEventData(rawEvent: RawEventData): Event {
         console.error(`Failed to parse outcomePrices for market "${market.question}"`, e)
       }
 
-      return {
-        question: market.question || '',
-        conditionId: market.conditionId || '',
-        bestBid: market.bestBid,
-        bestAsk: market.bestAsk,
-        outcomePrices: parsedOutcomePrices,
-        oneHourPriceChange: market.oneHourPriceChange,
-        oneDayPriceChange: market.oneDayPriceChange,
-        oneWeekPriceChange: market.oneWeekPriceChange,
-        oneMonthPriceChange: market.oneMonthPriceChange,
-        volume24hr: market.volume24hr,
-        volume1wk: market.volume1wk,
-        volume1mo: market.volume1mo,
-        active: market.active,
-        archived: market.archived,
-        closed: market.closed,
-        clobTokenIds: market.clobTokenIds
-      }
+        return {
+          question: market.question || '',
+          conditionId: market.conditionId || '',
+          bestBid: market.bestBid,
+          bestAsk: market.bestAsk,
+          outcomePrices: parsedOutcomePrices,
+          oneHourPriceChange: market.oneHourPriceChange,
+          oneDayPriceChange: market.oneDayPriceChange,
+          oneWeekPriceChange: market.oneWeekPriceChange,
+          oneMonthPriceChange: market.oneMonthPriceChange,
+          volume24hr: market.volume24hr,
+          volume1wk: market.volume1wk,
+          volume1mo: market.volume1mo,
+          active: market.active,
+          archived: market.archived,
+          closed: market.closed,
+          clobTokenIds: market.clobTokenIds,
+          lastTradePrice: market.lastTradePrice,
+          endDateIso: market.endDateIso
+        }
     }) || [],
     tags: rawEvent.tags?.map((tag: any) => ({
       id: tag.id || '',

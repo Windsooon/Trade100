@@ -15,6 +15,7 @@ export interface Event {
   liquidity?: number
   markets: Market[]
   tags: Tag[]
+  negRisk?: boolean
 }
 
 // Simplified Market interface - only keeping necessary fields
@@ -35,6 +36,8 @@ export interface Market {
   archived?: boolean
   closed?: boolean
   clobTokenIds?: string
+  lastTradePrice?: number
+  endDateIso?: string
 }
 
 // Helper function to check if a market is active
