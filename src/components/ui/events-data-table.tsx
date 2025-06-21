@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Event, Market } from "@/lib/stores"
+import { Event, Market, getMarketDisplayTitle } from "@/lib/stores"
 
 // Helper functions
 const formatVolume = (volume: number | undefined): string => {
@@ -117,8 +117,8 @@ function MarketsTable({ markets }: MarketsTableProps) {
               return (
                 <TableRow key={market.conditionId || index} className="text-xs">
                   <TableCell className="max-w-xs">
-                    <div className="truncate" title={market.question}>
-                      {market.question}
+                    <div className="truncate" title={getMarketDisplayTitle(market)}>
+                      {getMarketDisplayTitle(market)}
                     </div>
                   </TableCell>
                   <TableCell>{yesPrice || 'None'}</TableCell>

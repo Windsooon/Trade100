@@ -53,6 +53,7 @@ function transformEventData(rawEvent: RawEventData): Event {
         return {
           question: market.question || '',
           conditionId: market.conditionId || '',
+          groupItemTitle: market.groupItemTitle,
           bestBid: market.bestBid,
           bestAsk: market.bestAsk,
           outcomePrices: parsedOutcomePrices,

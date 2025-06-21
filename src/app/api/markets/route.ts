@@ -29,6 +29,7 @@ interface ApiEvent {
 interface ApiMarket {
   question: string
   conditionId: string
+  groupItemTitle?: string
   bestBid?: string
   bestAsk?: string
   outcomePrices: string | string[]
@@ -101,6 +102,7 @@ function transformEvent(apiEvent: ApiEvent): Event {
       return {
         question: market.question,
         conditionId: market.conditionId,
+        groupItemTitle: market.groupItemTitle,
         bestBid: market.bestBid,
         bestAsk: market.bestAsk,
         outcomePrices: parsedOutcomePrices,

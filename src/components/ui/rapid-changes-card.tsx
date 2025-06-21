@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react'
-import { Event, Market } from '@/lib/stores'
+import { Event, Market, getMarketDisplayTitle } from '@/lib/stores'
 import { useRouter } from 'next/navigation'
 
 interface RapidChangesCardProps {
@@ -86,7 +86,7 @@ export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidCh
         if (isNaN(yesPrice) || isNaN(noPrice)) return
 
         allMarkets.push({
-          marketName: market.question,
+          marketName: getMarketDisplayTitle(market),
           eventId: event.id,
           eventTitle: event.title,
           yesPrice,

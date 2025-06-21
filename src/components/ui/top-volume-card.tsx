@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TrendingUp, ArrowUpRight } from 'lucide-react'
-import { Event } from '@/lib/stores'
+import { Event, getMarketDisplayTitle } from '@/lib/stores'
 import { useRouter } from 'next/navigation'
 
 interface TopVolumeCardProps {
@@ -84,7 +84,7 @@ export function TopVolumeCard({ events, availableTags, tagsLoading }: TopVolumeC
         if (isNaN(yesPrice) || isNaN(noPrice)) return
 
         allMarkets.push({
-          marketName: market.question,
+          marketName: getMarketDisplayTitle(market),
           eventId: event.id,
           eventTitle: event.title,
           yesPrice,

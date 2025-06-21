@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Target, ChevronDown, ChevronRight } from 'lucide-react'
-import { Market, isMarketActive } from '@/lib/stores'
+import { Market, isMarketActive, getMarketDisplayTitle } from '@/lib/stores'
 import { cn } from '@/lib/utils'
 import { useState, useMemo } from 'react'
 
@@ -74,7 +74,7 @@ export function MarketListCard({ markets, selectedMarket, onMarketSelect }: Mark
       >
         {/* Market question */}
         <div className="text-sm font-medium leading-tight mb-2">
-          {market.question}
+          {getMarketDisplayTitle(market)}
         </div>
         {/* Yes/No prices */}
         <div className="flex items-center gap-3 text-xs">

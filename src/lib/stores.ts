@@ -22,6 +22,7 @@ export interface Event {
 export interface Market {
   question: string
   conditionId: string
+  groupItemTitle?: string
   bestBid?: string
   bestAsk?: string
   outcomePrices: string[]
@@ -43,6 +44,11 @@ export interface Market {
 // Helper function to check if a market is active
 export const isMarketActive = (market: Market): boolean => {
   return market.active === true && market.archived === false && market.closed === false
+}
+
+// Helper function to get market display title (groupItemTitle if available, otherwise question)
+export const getMarketDisplayTitle = (market: Market): string => {
+  return market.groupItemTitle || market.question
 }
 
 // Simplified Tag interface - only keeping necessary fields
