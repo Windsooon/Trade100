@@ -40,8 +40,6 @@ interface ActivityFeedProps {
 }
 
 export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
-  console.log('🎬 ActivityFeed component rendering...')
-  
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
   const [trades, setTrades] = useState<TradeActivity[]>([])
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
@@ -105,12 +103,10 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
         )
         
         if (exists) {
-          console.log('🔄 Duplicate trade detected, skipping:', trade.id)
           return prev
         }
         
         const newTrades = [trade, ...prev].slice(0, maxTrades)
-        console.log('✅ Added new trade:', trade.id, 'Total trades:', newTrades.length)
         return newTrades
       })
 
@@ -124,7 +120,6 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
   const connect = () => {
     if (isUnmountingRef.current) return
     
-    console.log('🔌 Starting WebSocket connection...')
     setConnectionStatus('connecting')
 
     try {
@@ -133,17 +128,14 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
 
       ws.onopen = () => {
         if (isUnmountingRef.current) return
-        console.log('✅ WebSocket connected successfully')
         setConnectionStatus('connected')
         setReconnectAttempts(0)
         
         // Send subscription message
         const message = JSON.stringify(subscriptionMessage)
-        console.log('📤 Sending subscription message:', message)
         
         try {
           ws.send(message)
-          console.log('📤 Subscription message sent successfully')
         } catch (sendError) {
           console.error('❌ Failed to send subscription message:', sendError)
         }
@@ -156,15 +148,11 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
           // Skip empty messages
           if (!event.data || event.data.trim() === '') return
           
-          console.log('📥 Received WebSocket message:', event.data)
           const data = JSON.parse(event.data)
           
           // Check if it's a trading activity message
           if (data.topic === 'activity' && data.type === 'orders_matched' && data.payload) {
-            console.log('🎯 Processing trading activity message')
             addTrade(data)
-          } else {
-            console.log('📋 Received non-trading message:', data.topic || 'unknown topic')
           }
         } catch (error) {
           console.error('❌ Error parsing WebSocket message:', error, 'Raw data:', event.data)
@@ -197,13 +185,6 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
       ws.onclose = (event) => {
         if (isUnmountingRef.current) return
         
-        console.log('🔌 WebSocket closed details:', {
-          code: event.code,
-          reason: event.reason || 'No reason provided',
-          wasClean: event.wasClean,
-          timestamp: new Date().toISOString()
-        })
-        
         setConnectionStatus('disconnected')
         
         // Auto-reconnect with exponential backoff
@@ -211,7 +192,6 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
           const currentAttempts = prev
           if (currentAttempts < maxReconnectAttempts) {
             const delay = reconnectDelay * Math.pow(2, currentAttempts)
-            console.log(`🔄 Scheduling reconnect attempt ${currentAttempts + 1} in ${delay}ms`)
             
             reconnectTimeoutRef.current = setTimeout(() => {
               if (!isUnmountingRef.current) {
@@ -220,8 +200,6 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
             }, delay)
             
             return currentAttempts + 1
-          } else {
-            console.log('❌ Max reconnect attempts reached, giving up')
           }
           return currentAttempts
         })
@@ -265,30 +243,19 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
 
   // Auto-connect on mount - simplified dependencies
   useEffect(() => {
-    console.log('🚀 ActivityFeed component mounted, starting connection process...')
-    
     // Reset the unmounting flag in case component was previously unmounted
     isUnmountingRef.current = false
     
     // Connect immediately without delay to avoid race conditions
     if (!isUnmountingRef.current) {
-      console.log('⚡ Connecting immediately...')
       connect()
-    } else {
-      console.log('❌ Component was unmounted before connect could be called')
     }
     
     return () => {
-      console.log('🧹 ActivityFeed component unmounting, cleaning up...')
       isUnmountingRef.current = true
       disconnect()
     }
   }, []) // Remove connect from dependencies to avoid recreating the effect
-
-  // Log connection status changes
-  useEffect(() => {
-    console.log(`📡 Connection status changed to: ${connectionStatus}`)
-  }, [connectionStatus])
 
   const getStatusDisplay = () => {
     switch (connectionStatus) {
