@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sun, Moon, Monitor } from "lucide-react"
 import { useState, useEffect } from "react"
+import { ThemeToggle } from './theme-toggle'
 
 export function Navbar() {
   const [theme, setTheme] = useState(() => {
@@ -42,48 +43,23 @@ export function Navbar() {
             {/* Navigation - moved to left side */}
             <nav className="hidden md:flex items-center space-x-6">
               <Link 
-                href="#" 
+                href="/"
                 className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
-                Home
+                Markets
+              </Link>
+              <Link
+                href="/activity"
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Activity
               </Link>
             </nav>
           </div>
 
           {/* Right side - Theme Toggle */}
           <div className="flex items-center">
-            <Select value={theme} onValueChange={setTheme}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue>
-                  <div className="flex items-center gap-2">
-                    {theme === "light" && <Sun className="h-4 w-4" />}
-                    {theme === "dark" && <Moon className="h-4 w-4" />}
-                    {theme === "system" && <Monitor className="h-4 w-4" />}
-                    <span className="capitalize">{theme}</span>
-                  </div>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="light">
-                  <div className="flex items-center gap-2">
-                    <Sun className="h-4 w-4" />
-                    Light
-                  </div>
-                </SelectItem>
-                <SelectItem value="dark">
-                  <div className="flex items-center gap-2">
-                    <Moon className="h-4 w-4" />
-                    Dark
-                  </div>
-                </SelectItem>
-                <SelectItem value="system">
-                  <div className="flex items-center gap-2">
-                    <Monitor className="h-4 w-4" />
-                    System
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <ThemeToggle />
           </div>
         </div>
       </div>
