@@ -62,20 +62,6 @@ export function ArbitrageCard({ events, availableTags, tagsLoading }: ArbitrageC
 
       // Only include if sum < 1 (arbitrage opportunity exists)
       if (askSum < 1) {
-        console.log(`\n📊 ARBITRAGE FOUND: ${event.title} (ID: ${event.id})`)
-        console.log(`   Valid markets: ${validMarkets.length}`)
-        
-        // Log each market's details
-        let detailedRunningSum = 0
-        validMarkets.forEach((market, index) => {
-          const askPrice = parseFloat(market.bestAsk || '0')
-          detailedRunningSum += askPrice
-          console.log(`   Market ${index + 1}: "${market.question.substring(0, 50)}..." | bestAsk: ${askPrice} | Running Sum: ${detailedRunningSum.toFixed(4)}`)
-        })
-        
-        console.log(`   Final askSum: ${askSum.toFixed(4)} | Profit: ${((1 - askSum) * 100).toFixed(2)}%`)
-        console.log(`   🎯 Adding to arbitrage opportunities!`)
-        
         // Step 5: Opportunity Creation
         opportunities.push({
           eventId: event.id,
