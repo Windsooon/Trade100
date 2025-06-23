@@ -17,7 +17,7 @@ import {
 } from './table'
 import { ScrollArea } from './scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
-import { RefreshCw, DollarSign, Target, User, AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { RefreshCw, DollarSign, Target, AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, BookmarkCheck } from 'lucide-react'
 
 interface TradeActivity {
   id: string
@@ -50,7 +50,11 @@ interface ActivityDataTablesProps {
   onRefresh?: () => void
 }
 
+// Import the watchlist store
+import { useWatchlistStore } from '@/lib/stores'
+
 export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProps) {
+  const { getWatchlistConditionIds } = useWatchlistStore()
   // Whale Trades state
   const [whaleThreshold, setWhaleThreshold] = useState<string>('1000')
   const [whaleTrades, setWhaleTrades] = useState<TradeActivity[]>([])
@@ -75,15 +79,15 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
   const [priceMaxTotalValue, setPriceMaxTotalValue] = useState<string>('')
   const [priceSideFilter, setPriceSideFilter] = useState<string>('all')
 
-  // My Position Markets state (empty for now)
-  const [positionTrades] = useState<TradeActivity[]>([])
-  const [positionCurrentPage, setPositionCurrentPage] = useState(1)
-  const [positionSortBy, setPositionSortBy] = useState<string>('timestamp')
-  const [positionSortDirection, setPositionSortDirection] = useState<'asc' | 'desc'>('asc')
-  const [positionOutcomeFilter, setPositionOutcomeFilter] = useState<string>('all')
-  const [positionMinTotalValue, setPositionMinTotalValue] = useState<string>('')
-  const [positionMaxTotalValue, setPositionMaxTotalValue] = useState<string>('')
-  const [positionSideFilter, setPositionSideFilter] = useState<string>('all')
+  // Watchlist state
+  const [watchlistTrades, setWatchlistTrades] = useState<TradeActivity[]>([])
+  const [watchlistCurrentPage, setWatchlistCurrentPage] = useState(1)
+  const [watchlistSortBy, setWatchlistSortBy] = useState<string>('timestamp')
+  const [watchlistSortDirection, setWatchlistSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [watchlistOutcomeFilter, setWatchlistOutcomeFilter] = useState<string>('all')
+  const [watchlistMinTotalValue, setWatchlistMinTotalValue] = useState<string>('')
+  const [watchlistMaxTotalValue, setWatchlistMaxTotalValue] = useState<string>('')
+  const [watchlistSideFilter, setWatchlistSideFilter] = useState<string>('all')
 
   const recordsPerPage = 20
   const maxTradesPerTab = 5000
@@ -201,6 +205,27 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
     }
   }, [trades, minPrice, maxPrice, priceOutcomeFilter, priceMinTotalValue, priceMaxTotalValue, priceSideFilter, validatePriceRange, priceSortBy, priceSortDirection, sortTrades, applyFilters])
 
+  // Update watchlist trades when watchlist or trades change
+  useEffect(() => {
+    const watchlistConditionIds = getWatchlistConditionIds()
+    
+    if (watchlistConditionIds.size === 0) {
+      setWatchlistTrades([])
+      setWatchlistCurrentPage(1)
+      return
+    }
+    
+    // Filter trades for watchlisted markets
+    const baseFiltered = trades.filter(trade => 
+      watchlistConditionIds.has(trade.market.conditionId)
+    )
+    const filtered = applyFilters(baseFiltered, watchlistOutcomeFilter, watchlistMinTotalValue, watchlistMaxTotalValue, watchlistSideFilter)
+      .slice(0, maxTradesPerTab)
+    const sorted = sortTrades(filtered, watchlistSortBy, watchlistSortDirection)
+    setWatchlistTrades(sorted)
+    setWatchlistCurrentPage(1)
+  }, [trades, getWatchlistConditionIds, watchlistOutcomeFilter, watchlistMinTotalValue, watchlistMaxTotalValue, watchlistSideFilter, watchlistSortBy, watchlistSortDirection, sortTrades, applyFilters])
+
   // Handle input changes for whale threshold
   const handleWhaleThresholdChange = (value: string) => {
     // Allow only numbers and decimal point
@@ -222,7 +247,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
   }
 
   // Handle input changes for total value filters
-  const handleTotalValueChange = (tab: 'whale' | 'price' | 'position', type: 'min' | 'max', value: string) => {
+  const handleTotalValueChange = (tab: 'whale' | 'price' | 'watchlist', type: 'min' | 'max', value: string) => {
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       if (tab === 'whale') {
         if (type === 'min') {
@@ -236,11 +261,11 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
         } else {
           setPriceMaxTotalValue(value)
         }
-      } else if (tab === 'position') {
+      } else if (tab === 'watchlist') {
         if (type === 'min') {
-          setPositionMinTotalValue(value)
+          setWatchlistMinTotalValue(value)
         } else {
-          setPositionMaxTotalValue(value)
+          setWatchlistMaxTotalValue(value)
         }
       }
     }
@@ -258,7 +283,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
   }
 
   // Sort handlers
-  const handleSort = (column: string, tabType: 'whale' | 'price' | 'position') => {
+  const handleSort = (column: string, tabType: 'whale' | 'price' | 'watchlist') => {
     if (tabType === 'whale') {
       if (whaleSortBy === column) {
         setWhaleSortDirection(whaleSortDirection === 'desc' ? 'asc' : 'desc')
@@ -273,12 +298,12 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
         setPriceSortBy(column)
         setPriceSortDirection('asc')
       }
-    } else if (tabType === 'position') {
-      if (positionSortBy === column) {
-        setPositionSortDirection(positionSortDirection === 'desc' ? 'asc' : 'desc')
+    } else if (tabType === 'watchlist') {
+      if (watchlistSortBy === column) {
+        setWatchlistSortDirection(watchlistSortDirection === 'desc' ? 'asc' : 'desc')
       } else {
-        setPositionSortBy(column)
-        setPositionSortDirection('asc')
+        setWatchlistSortBy(column)
+        setWatchlistSortDirection('asc')
       }
     }
   }
@@ -286,13 +311,13 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
   // Paginated data
   const paginatedWhaleTrades = getPaginatedData(whaleTrades, whaleCurrentPage)
   const paginatedPriceRangeTrades = getPaginatedData(priceRangeTrades, priceCurrentPage)
-  const sortedPositionTrades = sortTrades(positionTrades, positionSortBy, positionSortDirection)
-  const paginatedPositionTrades = getPaginatedData(sortedPositionTrades, positionCurrentPage)
+  const sortedWatchlistTrades = sortTrades(watchlistTrades, watchlistSortBy, watchlistSortDirection)
+  const paginatedWatchlistTrades = getPaginatedData(sortedWatchlistTrades, watchlistCurrentPage)
 
   // Total pages
   const whaleTotalPages = getTotalPages(whaleTrades.length)
   const priceTotalPages = getTotalPages(priceRangeTrades.length)
-  const positionTotalPages = getTotalPages(sortedPositionTrades.length)
+  const watchlistTotalPages = getTotalPages(sortedWatchlistTrades.length)
 
   // Format functions
   const formatTimestamp = (timestamp: number): string => {
@@ -339,7 +364,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
     sortBy: string
     sortDirection: 'asc' | 'desc'
     onSort: (column: string) => void
-    tabType: 'whale' | 'price' | 'position'
+    tabType: 'whale' | 'price' | 'watchlist'
   }) => (
     <div className="space-y-4">
       <div className="rounded-md border">
@@ -357,8 +382,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                   {getSortIcon('timestamp', sortBy, sortDirection)}
                 </Button>
               </TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>
+              <TableHead className="w-[300px]">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -369,6 +393,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                   {getSortIcon('market', sortBy, sortDirection)}
                 </Button>
               </TableHead>
+              <TableHead className="w-[120px]">User</TableHead>
               <TableHead>Outcome</TableHead>
               <TableHead>
                 <Button
@@ -382,7 +407,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                 </Button>
               </TableHead>
               <TableHead>Size</TableHead>
-              <TableHead>
+              <TableHead className="w-[100px]">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -409,15 +434,15 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                   <TableCell className="text-xs">
                     {formatTimestamp(trade.timestamp)}
                   </TableCell>
-                  <TableCell>
-                    <span className="text-sm font-medium truncate max-w-[100px]">
-                      {trade.user.pseudonym}
-                    </span>
-                  </TableCell>
-                  <TableCell className="max-w-[200px]">
+                  <TableCell className="max-w-[300px]">
                     <div className="truncate text-sm" title={trade.market.title}>
                       {trade.market.title}
                     </div>
+                  </TableCell>
+                  <TableCell className="w-[120px]">
+                    <span className="text-sm font-medium truncate">
+                      {trade.user.pseudonym}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -441,7 +466,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                   <TableCell className="text-sm">
                     {formatSize(trade.trade.size)}
                   </TableCell>
-                  <TableCell className="text-sm font-medium">
+                  <TableCell className="text-sm font-medium w-[100px]">
                     {formatTotalValue(trade.trade.totalValue)}
                   </TableCell>
                   <TableCell>
@@ -532,9 +557,9 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
               <Target className="h-3 w-3" />
               Price Range
             </TabsTrigger>
-            <TabsTrigger value="position" className="flex items-center gap-1">
-              <User className="h-3 w-3" />
-              My Positions
+            <TabsTrigger value="watchlist" className="flex items-center gap-1">
+              <BookmarkCheck className="h-3 w-3" />
+              Watchlists
             </TabsTrigger>
           </TabsList>
 
@@ -742,8 +767,8 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
             </div>
           </TabsContent>
 
-          {/* My Position Markets Tab */}
-          <TabsContent value="position" className="flex-1 overflow-hidden">
+          {/* Watchlists Tab */}
+          <TabsContent value="watchlist" className="flex-1 overflow-hidden">
             <div className="space-y-4 h-full flex flex-col">
               <div className="space-y-3">
                 <div className="flex items-center gap-4 flex-wrap">
@@ -751,16 +776,16 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                     <label className="text-sm font-medium">Total Value Range ($):</label>
                     <Input
                       type="text"
-                      value={positionMinTotalValue}
-                      onChange={(e) => handleTotalValueChange('position', 'min', e.target.value)}
+                      value={watchlistMinTotalValue}
+                      onChange={(e) => handleTotalValueChange('watchlist', 'min', e.target.value)}
                       className="w-24"
                       placeholder="Min"
                     />
                     <span className="text-sm text-muted-foreground">to</span>
                     <Input
                       type="text"
-                      value={positionMaxTotalValue}
-                      onChange={(e) => handleTotalValueChange('position', 'max', e.target.value)}
+                      value={watchlistMaxTotalValue}
+                      onChange={(e) => handleTotalValueChange('watchlist', 'max', e.target.value)}
                       className="w-24"
                       placeholder="Max"
                     />
@@ -769,7 +794,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium">Outcome:</label>
-                    <Select value={positionOutcomeFilter} onValueChange={setPositionOutcomeFilter}>
+                    <Select value={watchlistOutcomeFilter} onValueChange={setWatchlistOutcomeFilter}>
                       <SelectTrigger className="w-24">
                         <SelectValue />
                       </SelectTrigger>
@@ -782,7 +807,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                   </div>
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium">Side:</label>
-                    <Select value={positionSideFilter} onValueChange={setPositionSideFilter}>
+                    <Select value={watchlistSideFilter} onValueChange={setWatchlistSideFilter}>
                       <SelectTrigger className="w-24">
                         <SelectValue />
                       </SelectTrigger>
@@ -795,26 +820,26 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                   </div>
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  Position tracking will be available when user authentication is implemented.
+                  {watchlistTrades.length} trades found from watchlisted markets
                 </div>
               </div>
               
               <div className="flex-1 overflow-hidden flex flex-col">
                 <ScrollArea className="flex-1">
                   <TradesTable 
-                    trades={paginatedPositionTrades}
-                    emptyMessage="No position data available. This feature requires user authentication."
-                    sortBy={positionSortBy}
-                    sortDirection={positionSortDirection}
-                    onSort={(column) => handleSort(column, 'position')}
-                    tabType="position"
+                    trades={paginatedWatchlistTrades}
+                    emptyMessage="No watchlisted markets found. Add markets to your watchlist using the ★ icon in the markets table to track their trading activity here."
+                    sortBy={watchlistSortBy}
+                    sortDirection={watchlistSortDirection}
+                    onSort={(column) => handleSort(column, 'watchlist')}
+                    tabType="watchlist"
                   />
                 </ScrollArea>
                 <PaginationControls
-                  currentPage={positionCurrentPage}
-                  totalPages={positionTotalPages}
-                  totalRecords={positionTrades.length}
-                  onPageChange={setPositionCurrentPage}
+                  currentPage={watchlistCurrentPage}
+                  totalPages={watchlistTotalPages}
+                  totalRecords={watchlistTrades.length}
+                  onPageChange={setWatchlistCurrentPage}
                 />
               </div>
             </div>

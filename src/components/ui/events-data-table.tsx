@@ -13,7 +13,7 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, ChevronRight, ExternalLink } from "lucide-react"
+import { ArrowUpDown, ChevronDown, ChevronRight, ExternalLink, Star } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Event, Market, getMarketDisplayTitle } from "@/lib/stores"
+import { Event, Market, getMarketDisplayTitle, useWatchlistStore, WatchlistMarket } from "@/lib/stores"
 
 // Helper functions
 const formatVolume = (volume: number | undefined): string => {
@@ -71,9 +71,12 @@ const formatLiquidity = (liquidity: number | undefined): string => {
 // Markets nested table component
 interface MarketsTableProps {
   markets: Market[]
+  eventTitle: string
+  eventSlug: string
 }
 
-function MarketsTable({ markets }: MarketsTableProps) {
+function MarketsTable({ markets, eventTitle, eventSlug }: MarketsTableProps) {
+  const { addToWatchlist, removeFromWatchlist, isInWatchlist } = useWatchlistStore()
   if (!markets || markets.length === 0) {
     return (
       <div className="text-center py-4 text-muted-foreground">
@@ -97,6 +100,7 @@ function MarketsTable({ markets }: MarketsTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="text-xs">Watchlist</TableHead>
               <TableHead className="text-xs">Question</TableHead>
               <TableHead className="text-xs">Yes Price</TableHead>
               <TableHead className="text-xs">No Price</TableHead>
@@ -108,6 +112,7 @@ function MarketsTable({ markets }: MarketsTableProps) {
               const yesPrice = market.outcomePrices?.[0]
               const noPrice = market.outcomePrices?.[1]
               const priceChange = market.oneHourPriceChange
+              const isWatchlisted = isInWatchlist(market.conditionId)
               
               const formatPriceChange = (change: number | undefined): string => {
                 if (change === undefined || change === null) return 'None'
@@ -115,8 +120,40 @@ function MarketsTable({ markets }: MarketsTableProps) {
                 return change >= 0 ? `+${percentage}%` : `${percentage}%`
               }
 
+              const handleWatchlistToggle = (e: React.MouseEvent) => {
+                e.stopPropagation()
+                
+                if (isWatchlisted) {
+                  removeFromWatchlist(market.conditionId)
+                } else {
+                  const watchlistMarket: WatchlistMarket = {
+                    id: market.conditionId, // Using conditionId as unique ID
+                    question: getMarketDisplayTitle(market),
+                    conditionId: market.conditionId,
+                    slug: eventSlug,
+                    eventSlug: eventSlug,
+                    eventTitle: eventTitle,
+                    addedAt: Date.now()
+                  }
+                  addToWatchlist(watchlistMarket)
+                }
+              }
+
               return (
                 <TableRow key={market.conditionId || index} className="text-xs">
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleWatchlistToggle}
+                      className="h-6 w-6 p-0 hover:bg-muted cursor-pointer"
+                      title={isWatchlisted ? "Remove from watchlist" : "Add to watchlist"}
+                    >
+                      <Star 
+                        className={`h-3 w-3 ${isWatchlisted ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground hover:text-foreground'}`} 
+                      />
+                    </Button>
+                  </TableCell>
                   <TableCell className="max-w-xs">
                     <div className="truncate" title={getMarketDisplayTitle(market)}>
                       {getMarketDisplayTitle(market)}
@@ -370,7 +407,11 @@ export function EventsDataTable({ data }: EventsDataTableProps) {
                     {isExpanded && (
                       <TableRow>
                         <TableCell colSpan={columns.length} className="p-0">
-                          <MarketsTable markets={row.original.markets} />
+                          <MarketsTable 
+                            markets={row.original.markets} 
+                            eventTitle={row.original.title}
+                            eventSlug={row.original.slug}
+                          />
                         </TableCell>
                       </TableRow>
                     )}

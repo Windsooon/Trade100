@@ -57,28 +57,43 @@ export interface Tag {
   label: string
 }
 
+// Watchlist market object interface
+export interface WatchlistMarket {
+  id: string
+  question: string
+  conditionId: string
+  slug: string
+  eventSlug: string
+  eventTitle: string
+  addedAt: number // timestamp when added to watchlist
+}
+
 interface WatchlistStore {
-  watchlistIds: string[]
-  addToWatchlist: (marketId: string) => void
-  removeFromWatchlist: (marketId: string) => void
-  isInWatchlist: (marketId: string) => boolean
+  watchlist: WatchlistMarket[]
+  addToWatchlist: (market: WatchlistMarket) => void
+  removeFromWatchlist: (conditionId: string) => void
+  isInWatchlist: (conditionId: string) => boolean
+  getWatchlistConditionIds: () => Set<string>
 }
 
 export const useWatchlistStore = create<WatchlistStore>()(
   persist(
     (set, get) => ({
-      watchlistIds: [],
-      addToWatchlist: (marketId: string) =>
+      watchlist: [],
+      addToWatchlist: (market: WatchlistMarket) =>
         set((state) => ({
-          watchlistIds: state.watchlistIds.includes(marketId)
-            ? state.watchlistIds
-            : [...state.watchlistIds, marketId],
+          watchlist: state.watchlist.some(w => w.conditionId === market.conditionId)
+            ? state.watchlist
+            : [...state.watchlist, { ...market, addedAt: Date.now() }],
         })),
-      removeFromWatchlist: (marketId: string) =>
+      removeFromWatchlist: (conditionId: string) =>
         set((state) => ({
-          watchlistIds: state.watchlistIds.filter((id) => id !== marketId),
+          watchlist: state.watchlist.filter((w) => w.conditionId !== conditionId),
         })),
-      isInWatchlist: (marketId: string) => get().watchlistIds.includes(marketId),
+      isInWatchlist: (conditionId: string) => 
+        get().watchlist.some(w => w.conditionId === conditionId),
+      getWatchlistConditionIds: () => 
+        new Set(get().watchlist.map(w => w.conditionId)),
     }),
     {
       name: 'trade100-watchlist',
