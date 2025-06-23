@@ -41,8 +41,10 @@ export default function ActivityPage() {
       const exists = prev.some(t => t.id === trade.id)
       if (exists) return prev
       
-      // Add new trade to the beginning and limit to 1000 trades total
-      return [trade, ...prev].slice(0, 1000)
+      // Add new trade to the end and limit to 100000 trades total
+      // Keep the most recent 100000 trades (remove from beginning if needed)
+      const newTrades = [...prev, trade]
+      return newTrades.slice(-100000)
     })
   }, [])
 

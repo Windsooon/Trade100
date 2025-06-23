@@ -3,9 +3,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './card'
 import { Badge } from './badge'
+import { Button } from './button'
 import { ScrollArea } from './scroll-area'
 import { Alert, AlertDescription } from './alert'
-import { Activity, Wifi, WifiOff, RefreshCw } from 'lucide-react'
+import { Activity, Wifi, WifiOff, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
@@ -43,13 +44,15 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
   const [trades, setTrades] = useState<TradeActivity[]>([])
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isUnmountingRef = useRef(false)
 
-  const maxTrades = 500
+  const maxTrades = 100000
   const maxReconnectAttempts = 5
   const reconnectDelay = 5000
+  const tradesPerPage = 10
 
   const subscriptionMessage = {
     action: "subscribe",
@@ -311,6 +314,19 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
     return `$${value.toFixed(2)}`
   }
 
+  // Pagination calculations
+  const totalPages = Math.ceil(trades.length / tradesPerPage)
+  const startIndex = (currentPage - 1) * tradesPerPage
+  const endIndex = startIndex + tradesPerPage
+  const paginatedTrades = trades.slice(startIndex, endIndex)
+
+  // Reset to first page when new trades come in
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1)
+    }
+  }, [trades.length, currentPage, totalPages])
+
   const statusDisplay = getStatusDisplay()
 
   return (
@@ -328,10 +344,13 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
         </div>
         <div className="text-sm text-muted-foreground">
           Real-time trades • {trades.length} trades loaded
+          {totalPages > 1 && (
+            <span> • Page {currentPage} of {totalPages}</span>
+          )}
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 p-0 overflow-hidden">
+      <CardContent className="flex-1 p-0 overflow-hidden flex flex-col">
         {connectionStatus === 'error' && reconnectAttempts >= maxReconnectAttempts && (
           <div className="p-3">
             <Alert variant="destructive">
@@ -349,7 +368,7 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
           </div>
         )}
 
-        <ScrollArea className="h-[600px]">
+        <ScrollArea className="flex-1">
           <div className="p-3 space-y-3">
             {trades.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
@@ -362,25 +381,25 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
                 </p>
               </div>
             ) : (
-              trades.map((trade) => (
+              paginatedTrades.map((trade) => (
                 <div
                   key={trade.id}
                   className="p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
                   onClick={() => window.open(`/events/${trade.market.eventSlug}?market=${trade.market.conditionId}`, '_blank')}
                 >
-                  {/* Header: User and timestamp */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{trade.user.pseudonym}</span>
+                  {/* Market title with timestamp on the same row */}
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-sm font-medium line-clamp-2 flex-1 pr-2">
+                      {trade.market.title}
                     </div>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground flex-shrink-0">
                       {formatTimeAgo(trade.timestamp)}
                     </span>
                   </div>
 
-                  {/* Market title */}
-                  <div className="text-sm font-medium mb-2 line-clamp-2">
-                    {trade.market.title}
+                  {/* User name - smaller text under market title */}
+                  <div className="text-xs text-muted-foreground mb-2">
+                    by {trade.user.pseudonym}
                   </div>
 
                   {/* Trade details */}
@@ -414,6 +433,38 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
             )}
           </div>
         </ScrollArea>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-3 py-2 border-t">
+            <div className="text-sm text-muted-foreground">
+              Showing {startIndex + 1}-{Math.min(endIndex, trades.length)} of {trades.length} trades
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage <= 1}
+                className="h-8 px-2"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="text-sm font-medium px-2">
+                Page {currentPage} of {totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className="h-8 px-2"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
