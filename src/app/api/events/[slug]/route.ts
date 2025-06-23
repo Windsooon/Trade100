@@ -10,10 +10,10 @@ let cacheTimestamp = 0
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { id: eventId } = await params
+    const { slug: eventSlug } = await params
 
     // Check if we need to fetch fresh data by calling the markets API
     const now = Date.now()
@@ -22,36 +22,32 @@ export async function GET(
         // Fetch from our own markets API to use the same cache
         const response = await fetch(`${request.nextUrl.origin}/api/markets?limit=9999`)
         if (response.ok) {
-          const data: { events: Event[] } = await response.json()
+          const data = await response.json()
           eventsCache = data.events || []
           cacheTimestamp = now
         }
       } catch (error) {
-        console.error('Failed to fetch fresh data:', error)
+        console.error('Failed to refresh cache:', error)
       }
     }
 
-    // Find the specific event
-    const event = eventsCache.find(e => e.id === eventId)
-
+    // Find event by slug in the cached data
+    const event = eventsCache.find(e => e.slug === eventSlug)
+    
     if (!event) {
       return NextResponse.json(
-        { error: 'Event not found' },
+        { error: `Event not found for slug: ${eventSlug}` },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({
-      event,
-      cache: {
-        lastUpdated: new Date(cacheTimestamp).toISOString(),
-      },
-    })
+    return NextResponse.json(event)
+
   } catch (error) {
-    console.error('API error:', error)
+    console.error('[API] Error fetching event by slug:', error)
     return NextResponse.json(
       { 
-        error: 'Internal server error',
+        error: 'Failed to fetch event data',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }

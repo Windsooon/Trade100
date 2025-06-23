@@ -243,7 +243,7 @@ export function EventsDataTable({ data }: EventsDataTableProps) {
             size="sm"
             onClick={(e) => {
               e.stopPropagation() // Prevent row expansion when clicking the button
-              window.open(`/events/${event.id}`, '_blank')
+              window.open(`/events/${event.slug}`, '_blank')
             }}
             className="h-8 px-3 cursor-pointer"
           >

@@ -20,6 +20,7 @@ interface Tag {
 
 interface ArbitrageOpportunity {
   eventId: string
+  eventSlug: string
   eventTitle: string
   markets: Market[]
   askSum: number
@@ -65,6 +66,7 @@ export function ArbitrageCard({ events, availableTags, tagsLoading }: ArbitrageC
         // Step 5: Opportunity Creation
         opportunities.push({
           eventId: event.id,
+          eventSlug: event.slug,
           eventTitle: event.title,
           markets: validMarkets,
           askSum,
@@ -88,8 +90,8 @@ export function ArbitrageCard({ events, availableTags, tagsLoading }: ArbitrageC
     return price.toFixed(3)
   }
 
-  const handleEventClick = (eventId: string) => {
-    window.open(`/events/${eventId}`, '_blank')
+  const handleEventClick = (eventSlug: string) => {
+    window.open(`/events/${eventSlug}`, '_blank')
   }
 
   return (
@@ -112,7 +114,7 @@ export function ArbitrageCard({ events, availableTags, tagsLoading }: ArbitrageC
                 <div
                   key={opportunity.eventId}
                   className="p-3 border rounded cursor-pointer transition-colors hover:border-primary/50 hover:bg-muted/50"
-                  onClick={() => handleEventClick(opportunity.eventId)}
+                  onClick={() => handleEventClick(opportunity.eventSlug)}
                 >
                   {/* Event title */}
                   <div className="text-sm font-medium leading-tight mb-2 line-clamp-2">

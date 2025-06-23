@@ -21,6 +21,7 @@ type TimePeriod = '1D' | '1W' | '1M'
 interface VolumeMarket {
   marketName: string
   eventId: string
+  eventSlug: string
   eventTitle: string
   yesPrice: number
   noPrice: number
@@ -86,6 +87,7 @@ export function TopVolumeCard({ events, availableTags, tagsLoading }: TopVolumeC
         allMarkets.push({
           marketName: getMarketDisplayTitle(market),
           eventId: event.id,
+          eventSlug: event.slug,
           eventTitle: event.title,
           yesPrice,
           noPrice,
@@ -115,8 +117,8 @@ export function TopVolumeCard({ events, availableTags, tagsLoading }: TopVolumeC
     return `$${price.toFixed(3)}`
   }
 
-  const handleMarketClick = (eventId: string, conditionId: string) => {
-    window.open(`/events/${eventId}?market=${conditionId}`, '_blank')
+  const handleMarketClick = (eventSlug: string, conditionId: string) => {
+    window.open(`/events/${eventSlug}?market=${conditionId}`, '_blank')
   }
 
   const handleTagChange = (value: string) => {
@@ -174,7 +176,7 @@ export function TopVolumeCard({ events, availableTags, tagsLoading }: TopVolumeC
                     <div
                       key={`${market.eventId}-${market.marketName}-${index}`}
                       className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => handleMarketClick(market.eventId, market.conditionId)}
+                      onClick={() => handleMarketClick(market.eventSlug, market.conditionId)}
                     >
                       <div className="flex-1 min-w-0 pr-3">
                         <div className="flex items-start gap-2 mb-1">

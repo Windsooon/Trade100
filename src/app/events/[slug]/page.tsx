@@ -83,17 +83,17 @@ export default async function EventDetailPage({
   params,
   searchParams
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ slug: string }>
   searchParams: Promise<{ market?: string }>
 }) {
-  const { id: eventId } = await params
+  const { slug: eventSlug } = await params
   const { market: selectedMarketId } = await searchParams
   let eventData: Event | null = null
   let error: string | null = null
 
   try {
-    // Use proxyFetch to handle proxy configuration properly
-    const url = `https://gamma-api.polymarket.com/events/${eventId}`
+    // Use slug parameter in the API call
+    const url = `https://gamma-api.polymarket.com/events?slug=${encodeURIComponent(eventSlug)}`
     
     const res = await proxyFetch(url, { 
       headers: {
@@ -105,8 +105,19 @@ export default async function EventDetailPage({
     if (!res.ok) {
       error = `Polymarket API error: ${res.status} ${res.statusText}`
     } else {
-      const rawEventData = await res.json() as RawEventData
-      eventData = transformEventData(rawEventData)
+      const responseData = await res.json()
+      
+      // The API returns an array of events when using ?slug= parameter
+      if (Array.isArray(responseData) && responseData.length > 0) {
+        const rawEventData = responseData[0] as RawEventData
+        eventData = transformEventData(rawEventData)
+      } else if (responseData && !Array.isArray(responseData)) {
+        // Handle case where API returns a single event object
+        const rawEventData = responseData as RawEventData
+        eventData = transformEventData(rawEventData)
+      } else {
+        error = `Event not found for slug: ${eventSlug}`
+      }
     }
   } catch (e: unknown) {
     console.error('[SSR] Fetch error:', e)
@@ -122,7 +133,7 @@ export default async function EventDetailPage({
             <AlertCircleIcon className="h-5 w-5" />
             <AlertTitle>Unable to load event data</AlertTitle>
             <AlertDescription>
-              {error}
+              {error || `Event not found for slug: ${eventSlug}`}
             </AlertDescription>
           </Alert>
         </div>
