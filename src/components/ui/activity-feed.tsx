@@ -320,12 +320,12 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
   const endIndex = startIndex + tradesPerPage
   const paginatedTrades = trades.slice(startIndex, endIndex)
 
-  // Reset to first page when new trades come in
+  // Reset to first page ONLY when current page becomes invalid
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1)
     }
-  }, [trades.length, currentPage, totalPages])
+  }, [totalPages, currentPage])
 
   const statusDisplay = getStatusDisplay()
 
@@ -369,7 +369,7 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
         )}
 
         <ScrollArea className="flex-1">
-          <div className="p-3 space-y-3">
+          <div className="p-3 space-y-3" style={{ overflowAnchor: 'none' }}>
             {trades.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />

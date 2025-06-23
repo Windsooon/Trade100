@@ -170,8 +170,13 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
       .slice(0, maxTradesPerTab)
     const sorted = sortTrades(filtered, whaleSortBy, whaleSortDirection)
     setWhaleTrades(sorted)
-    setWhaleCurrentPage(1) // Reset to first page when data changes
-  }, [trades, whaleThreshold, whaleOutcomeFilter, whaleMinTotalValue, whaleMaxTotalValue, whaleSideFilter, whaleSortBy, whaleSortDirection, sortTrades, applyFilters])
+    
+    // Only reset pagination if current page becomes invalid
+    const newTotalPages = Math.ceil(sorted.length / recordsPerPage)
+    if (whaleCurrentPage > newTotalPages && newTotalPages > 0) {
+      setWhaleCurrentPage(1)
+    }
+  }, [trades, whaleThreshold, whaleOutcomeFilter, whaleMinTotalValue, whaleMaxTotalValue, whaleSideFilter, whaleSortBy, whaleSortDirection, sortTrades, applyFilters, whaleCurrentPage])
 
   // Update price range trades when range, filters, or trades change
   useEffect(() => {
@@ -185,7 +190,10 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
       // If max price is less than min price, return empty results
       if (maxVal < minVal) {
         setPriceRangeTrades([])
-        setPriceCurrentPage(1)
+        const newTotalPages = 0
+        if (priceCurrentPage > newTotalPages && newTotalPages > 0) {
+          setPriceCurrentPage(1)
+        }
         return
       }
       
@@ -198,12 +206,17 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
         .slice(0, maxTradesPerTab)
       const sorted = sortTrades(filtered, priceSortBy, priceSortDirection)
       setPriceRangeTrades(sorted)
-      setPriceCurrentPage(1) // Reset to first page when data changes
+      
+      // Only reset pagination if current page becomes invalid
+      const newTotalPages = Math.ceil(sorted.length / recordsPerPage)
+      if (priceCurrentPage > newTotalPages && newTotalPages > 0) {
+        setPriceCurrentPage(1)
+      }
     } else {
       setPriceRangeTrades([])
-      setPriceCurrentPage(1)
+      setPriceCurrentPage(1) // Reset when there's an error
     }
-  }, [trades, minPrice, maxPrice, priceOutcomeFilter, priceMinTotalValue, priceMaxTotalValue, priceSideFilter, validatePriceRange, priceSortBy, priceSortDirection, sortTrades, applyFilters])
+  }, [trades, minPrice, maxPrice, priceOutcomeFilter, priceMinTotalValue, priceMaxTotalValue, priceSideFilter, validatePriceRange, priceSortBy, priceSortDirection, sortTrades, applyFilters, priceCurrentPage])
 
   // Update watchlist trades when watchlist or trades change
   useEffect(() => {
@@ -211,7 +224,10 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
     
     if (watchlistConditionIds.size === 0) {
       setWatchlistTrades([])
-      setWatchlistCurrentPage(1)
+      const newTotalPages = 0
+      if (watchlistCurrentPage > newTotalPages && newTotalPages > 0) {
+        setWatchlistCurrentPage(1)
+      }
       return
     }
     
@@ -223,18 +239,24 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
       .slice(0, maxTradesPerTab)
     const sorted = sortTrades(filtered, watchlistSortBy, watchlistSortDirection)
     setWatchlistTrades(sorted)
-    setWatchlistCurrentPage(1)
-  }, [trades, getWatchlistConditionIds, watchlistOutcomeFilter, watchlistMinTotalValue, watchlistMaxTotalValue, watchlistSideFilter, watchlistSortBy, watchlistSortDirection, sortTrades, applyFilters])
+    
+    // Only reset pagination if current page becomes invalid
+    const newTotalPages = Math.ceil(sorted.length / recordsPerPage)
+    if (watchlistCurrentPage > newTotalPages && newTotalPages > 0) {
+      setWatchlistCurrentPage(1)
+    }
+  }, [trades, getWatchlistConditionIds, watchlistOutcomeFilter, watchlistMinTotalValue, watchlistMaxTotalValue, watchlistSideFilter, watchlistSortBy, watchlistSortDirection, sortTrades, applyFilters, watchlistCurrentPage])
 
-  // Handle input changes for whale threshold
+  // Handle input changes for whale threshold - wrapper that resets pagination
   const handleWhaleThresholdChange = (value: string) => {
     // Allow only numbers and decimal point
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setWhaleThreshold(value)
+      setWhaleCurrentPage(1) // Reset to page 1 when user changes threshold
     }
   }
 
-  // Handle input changes for price range
+  // Handle input changes for price range - wrapper that resets pagination
   const handlePriceChange = (type: 'min' | 'max', value: string) => {
     // Allow only numbers and decimal point - no upper limit restriction for max price
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
@@ -243,10 +265,11 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
       } else {
         setMaxPrice(value)
       }
+      setPriceCurrentPage(1) // Reset to page 1 when user changes price range
     }
   }
 
-  // Handle input changes for total value filters
+  // Handle input changes for total value filters - wrapper that resets pagination
   const handleTotalValueChange = (tab: 'whale' | 'price' | 'watchlist', type: 'min' | 'max', value: string) => {
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       if (tab === 'whale') {
@@ -255,20 +278,55 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
         } else {
           setWhaleMaxTotalValue(value)
         }
+        setWhaleCurrentPage(1) // Reset to page 1 when user changes filter
       } else if (tab === 'price') {
         if (type === 'min') {
           setPriceMinTotalValue(value)
         } else {
           setPriceMaxTotalValue(value)
         }
+        setPriceCurrentPage(1) // Reset to page 1 when user changes filter
       } else if (tab === 'watchlist') {
         if (type === 'min') {
           setWatchlistMinTotalValue(value)
         } else {
           setWatchlistMaxTotalValue(value)
         }
+        setWatchlistCurrentPage(1) // Reset to page 1 when user changes filter
       }
     }
+  }
+
+  // Handle outcome filter changes - wrapper that resets pagination
+  const handleWhaleOutcomeFilterChange = (value: string) => {
+    setWhaleOutcomeFilter(value)
+    setWhaleCurrentPage(1) // Reset to page 1 when user changes filter
+  }
+
+  const handlePriceOutcomeFilterChange = (value: string) => {
+    setPriceOutcomeFilter(value)
+    setPriceCurrentPage(1) // Reset to page 1 when user changes filter
+  }
+
+  const handleWatchlistOutcomeFilterChange = (value: string) => {
+    setWatchlistOutcomeFilter(value)
+    setWatchlistCurrentPage(1) // Reset to page 1 when user changes filter
+  }
+
+  // Handle side filter changes - wrapper that resets pagination
+  const handleWhaleSideFilterChange = (value: string) => {
+    setWhaleSideFilter(value)
+    setWhaleCurrentPage(1) // Reset to page 1 when user changes filter
+  }
+
+  const handlePriceSideFilterChange = (value: string) => {
+    setPriceSideFilter(value)
+    setPriceCurrentPage(1) // Reset to page 1 when user changes filter
+  }
+
+  const handleWatchlistSideFilterChange = (value: string) => {
+    setWatchlistSideFilter(value)
+    setWatchlistCurrentPage(1) // Reset to page 1 when user changes filter
   }
 
   // Pagination calculations
@@ -282,7 +340,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
     return Math.ceil(dataLength / recordsPerPage)
   }
 
-  // Sort handlers
+  // Sort handlers - resets pagination when user changes sorting
   const handleSort = (column: string, tabType: 'whale' | 'price' | 'watchlist') => {
     if (tabType === 'whale') {
       if (whaleSortBy === column) {
@@ -291,6 +349,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
         setWhaleSortBy(column)
         setWhaleSortDirection('asc')
       }
+      setWhaleCurrentPage(1) // Reset to page 1 when user changes sorting
     } else if (tabType === 'price') {
       if (priceSortBy === column) {
         setPriceSortDirection(priceSortDirection === 'desc' ? 'asc' : 'desc')
@@ -298,6 +357,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
         setPriceSortBy(column)
         setPriceSortDirection('asc')
       }
+      setPriceCurrentPage(1) // Reset to page 1 when user changes sorting
     } else if (tabType === 'watchlist') {
       if (watchlistSortBy === column) {
         setWatchlistSortDirection(watchlistSortDirection === 'desc' ? 'asc' : 'desc')
@@ -305,6 +365,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
         setWatchlistSortBy(column)
         setWatchlistSortDirection('asc')
       }
+      setWatchlistCurrentPage(1) // Reset to page 1 when user changes sorting
     }
   }
 
@@ -608,7 +669,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium">Outcome:</label>
-                    <Select value={whaleOutcomeFilter} onValueChange={setWhaleOutcomeFilter}>
+                    <Select value={whaleOutcomeFilter} onValueChange={handleWhaleOutcomeFilterChange}>
                       <SelectTrigger className="w-24">
                         <SelectValue />
                       </SelectTrigger>
@@ -621,7 +682,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                   </div>
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium">Side:</label>
-                    <Select value={whaleSideFilter} onValueChange={setWhaleSideFilter}>
+                    <Select value={whaleSideFilter} onValueChange={handleWhaleSideFilterChange}>
                       <SelectTrigger className="w-24">
                         <SelectValue />
                       </SelectTrigger>
@@ -708,7 +769,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium">Outcome:</label>
-                    <Select value={priceOutcomeFilter} onValueChange={setPriceOutcomeFilter}>
+                    <Select value={priceOutcomeFilter} onValueChange={handlePriceOutcomeFilterChange}>
                       <SelectTrigger className="w-24">
                         <SelectValue />
                       </SelectTrigger>
@@ -721,7 +782,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                   </div>
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium">Side:</label>
-                    <Select value={priceSideFilter} onValueChange={setPriceSideFilter}>
+                    <Select value={priceSideFilter} onValueChange={handlePriceSideFilterChange}>
                       <SelectTrigger className="w-24">
                         <SelectValue />
                       </SelectTrigger>
@@ -794,7 +855,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium">Outcome:</label>
-                    <Select value={watchlistOutcomeFilter} onValueChange={setWatchlistOutcomeFilter}>
+                    <Select value={watchlistOutcomeFilter} onValueChange={handleWatchlistOutcomeFilterChange}>
                       <SelectTrigger className="w-24">
                         <SelectValue />
                       </SelectTrigger>
@@ -807,7 +868,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                   </div>
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium">Side:</label>
-                    <Select value={watchlistSideFilter} onValueChange={setWatchlistSideFilter}>
+                    <Select value={watchlistSideFilter} onValueChange={handleWatchlistSideFilterChange}>
                       <SelectTrigger className="w-24">
                         <SelectValue />
                       </SelectTrigger>
@@ -848,4 +909,4 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
       </CardContent>
     </Card>
   )
-} 
+}
