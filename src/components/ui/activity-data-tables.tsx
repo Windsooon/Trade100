@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs'
 import { Input } from './input'
@@ -17,7 +17,7 @@ import {
 } from './table'
 import { ScrollArea } from './scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
-import { RefreshCw, DollarSign, Target, AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, BookmarkCheck } from 'lucide-react'
+import { RefreshCw, DollarSign, Target, AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, BookmarkCheck, Volume2, VolumeX } from 'lucide-react'
 
 interface TradeActivity {
   id: string
@@ -55,6 +55,12 @@ import { useWatchlistStore } from '@/lib/stores'
 
 export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProps) {
   const { getWatchlistConditionIds } = useWatchlistStore()
+  
+  // Sound alert state
+  const [soundAlertsEnabled, setSoundAlertsEnabled] = useState(false)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const previousCountsRef = useRef({ whale: 0, price: 0, watchlist: 0 })
+
   // Whale Trades state
   const [whaleThreshold, setWhaleThreshold] = useState<string>('1000')
   const [whaleTrades, setWhaleTrades] = useState<TradeActivity[]>([])
@@ -91,6 +97,76 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
 
   const recordsPerPage = 20
   const maxTradesPerTab = 5000
+
+  // Initialize audio context
+  const initAudioContext = useCallback(() => {
+    if (!audioContextRef.current && typeof window !== 'undefined') {
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+      } catch (error) {
+        console.warn('Audio context not supported:', error)
+      }
+    }
+  }, [])
+
+  // Sound generation functions
+  const playSound = useCallback((frequency: number, duration: number, type: 'whale' | 'price' | 'watchlist') => {
+    if (!soundAlertsEnabled || !audioContextRef.current) return
+
+    try {
+      const ctx = audioContextRef.current
+      const oscillator = ctx.createOscillator()
+      const gainNode = ctx.createGain()
+
+      oscillator.connect(gainNode)
+      gainNode.connect(ctx.destination)
+
+      // Different wave types for different tabs
+      oscillator.type = type === 'whale' ? 'sine' : type === 'price' ? 'square' : 'triangle'
+      oscillator.frequency.setValueAtTime(frequency, ctx.currentTime)
+
+      // Volume envelope
+      gainNode.gain.setValueAtTime(0, ctx.currentTime)
+      gainNode.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.01)
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
+
+      oscillator.start(ctx.currentTime)
+      oscillator.stop(ctx.currentTime + duration)
+    } catch (error) {
+      console.warn('Failed to play sound:', error)
+    }
+  }, [soundAlertsEnabled])
+
+  // Sound alert functions for each tab
+  const playWhaleAlert = useCallback(() => {
+    // Deep whale sound - low frequency
+    playSound(220, 0.5, 'whale')
+  }, [playSound])
+
+  const playPriceAlert = useCallback(() => {
+    // Price change sound - medium frequency with two tones
+    playSound(440, 0.2, 'price')
+    setTimeout(() => playSound(550, 0.2, 'price'), 150)
+  }, [playSound])
+
+  const playWatchlistAlert = useCallback(() => {
+    // Watchlist sound - high frequency triple beep
+    playSound(880, 0.15, 'watchlist')
+    setTimeout(() => playSound(880, 0.15, 'watchlist'), 200)
+    setTimeout(() => playSound(880, 0.15, 'watchlist'), 400)
+  }, [playSound])
+
+  // Toggle sound alerts
+  const toggleSoundAlerts = useCallback(() => {
+    if (!soundAlertsEnabled) {
+      initAudioContext()
+      // Play a test sound to confirm it's working
+      setTimeout(() => {
+        playSound(440, 0.2, 'whale')
+      }, 100)
+    }
+    setSoundAlertsEnabled(prev => !prev)
+  }, [soundAlertsEnabled, initAudioContext, playSound])
 
   // Sorting function
   const sortTrades = useCallback((trades: TradeActivity[], sortBy: string, sortDirection: 'asc' | 'desc'): TradeActivity[] => {
@@ -131,9 +207,6 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
       return 'Prices must be non-negative'
     }
 
-    // Allow any max price value - no upper limit validation
-    // If max < min, we'll just return empty results instead of showing error
-
     return ''
   }, [])
 
@@ -171,12 +244,20 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
     const sorted = sortTrades(filtered, whaleSortBy, whaleSortDirection)
     setWhaleTrades(sorted)
     
+    // Check for new whale trades and play sound
+    const currentCount = sorted.length
+    const previousCount = previousCountsRef.current.whale
+    if (currentCount > previousCount && previousCount > 0 && soundAlertsEnabled) {
+      playWhaleAlert()
+    }
+    previousCountsRef.current.whale = currentCount
+    
     // Only reset pagination if current page becomes invalid
     const newTotalPages = Math.ceil(sorted.length / recordsPerPage)
     if (whaleCurrentPage > newTotalPages && newTotalPages > 0) {
       setWhaleCurrentPage(1)
     }
-  }, [trades, whaleThreshold, whaleOutcomeFilter, whaleMinTotalValue, whaleMaxTotalValue, whaleSideFilter, whaleSortBy, whaleSortDirection, sortTrades, applyFilters, whaleCurrentPage])
+  }, [trades, whaleThreshold, whaleOutcomeFilter, whaleMinTotalValue, whaleMaxTotalValue, whaleSideFilter, whaleSortBy, whaleSortDirection, sortTrades, applyFilters, whaleCurrentPage, soundAlertsEnabled, playWhaleAlert])
 
   // Update price range trades when range, filters, or trades change
   useEffect(() => {
@@ -207,6 +288,14 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
       const sorted = sortTrades(filtered, priceSortBy, priceSortDirection)
       setPriceRangeTrades(sorted)
       
+      // Check for new price range trades and play sound
+      const currentCount = sorted.length
+      const previousCount = previousCountsRef.current.price
+      if (currentCount > previousCount && previousCount > 0 && soundAlertsEnabled) {
+        playPriceAlert()
+      }
+      previousCountsRef.current.price = currentCount
+      
       // Only reset pagination if current page becomes invalid
       const newTotalPages = Math.ceil(sorted.length / recordsPerPage)
       if (priceCurrentPage > newTotalPages && newTotalPages > 0) {
@@ -216,7 +305,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
       setPriceRangeTrades([])
       setPriceCurrentPage(1) // Reset when there's an error
     }
-  }, [trades, minPrice, maxPrice, priceOutcomeFilter, priceMinTotalValue, priceMaxTotalValue, priceSideFilter, validatePriceRange, priceSortBy, priceSortDirection, sortTrades, applyFilters, priceCurrentPage])
+  }, [trades, minPrice, maxPrice, priceOutcomeFilter, priceMinTotalValue, priceMaxTotalValue, priceSideFilter, validatePriceRange, priceSortBy, priceSortDirection, sortTrades, applyFilters, priceCurrentPage, soundAlertsEnabled, playPriceAlert])
 
   // Update watchlist trades when watchlist or trades change
   useEffect(() => {
@@ -240,12 +329,20 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
     const sorted = sortTrades(filtered, watchlistSortBy, watchlistSortDirection)
     setWatchlistTrades(sorted)
     
+    // Check for new watchlist trades and play sound
+    const currentCount = sorted.length
+    const previousCount = previousCountsRef.current.watchlist
+    if (currentCount > previousCount && previousCount > 0 && soundAlertsEnabled) {
+      playWatchlistAlert()
+    }
+    previousCountsRef.current.watchlist = currentCount
+    
     // Only reset pagination if current page becomes invalid
     const newTotalPages = Math.ceil(sorted.length / recordsPerPage)
     if (watchlistCurrentPage > newTotalPages && newTotalPages > 0) {
       setWatchlistCurrentPage(1)
     }
-  }, [trades, getWatchlistConditionIds, watchlistOutcomeFilter, watchlistMinTotalValue, watchlistMaxTotalValue, watchlistSideFilter, watchlistSortBy, watchlistSortDirection, sortTrades, applyFilters, watchlistCurrentPage])
+  }, [trades, getWatchlistConditionIds, watchlistOutcomeFilter, watchlistMinTotalValue, watchlistMaxTotalValue, watchlistSideFilter, watchlistSortBy, watchlistSortDirection, sortTrades, applyFilters, watchlistCurrentPage, soundAlertsEnabled, playWatchlistAlert])
 
   // Handle input changes for whale threshold - wrapper that resets pagination
   const handleWhaleThresholdChange = (value: string) => {
@@ -693,6 +790,22 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium">Sound Alerts:</label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleSoundAlerts}
+                      className="h-8 w-8 p-0"
+                      title={soundAlertsEnabled ? "Disable sound alerts (Whale: low tone)" : "Enable sound alerts (Whale: low tone)"}
+                    >
+                      {soundAlertsEnabled ? (
+                        <Volume2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <VolumeX className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
               
@@ -793,6 +906,22 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium">Sound Alerts:</label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleSoundAlerts}
+                      className="h-8 w-8 p-0"
+                      title={soundAlertsEnabled ? "Disable sound alerts (Price Range: double beep)" : "Enable sound alerts (Price Range: double beep)"}
+                    >
+                      {soundAlertsEnabled ? (
+                        <Volume2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <VolumeX className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -878,6 +1007,22 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                         <SelectItem value="sell">Sell</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium">Sound Alerts:</label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleSoundAlerts}
+                      className="h-8 w-8 p-0"
+                      title={soundAlertsEnabled ? "Disable sound alerts (Watchlist: triple beep)" : "Enable sound alerts (Watchlist: triple beep)"}
+                    >
+                      {soundAlertsEnabled ? (
+                        <Volume2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <VolumeX className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
                   </div>
                 </div>
                 <div className="text-sm text-muted-foreground">
