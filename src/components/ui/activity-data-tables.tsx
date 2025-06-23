@@ -449,7 +449,7 @@ export function ActivityDataTables({ trades, onRefresh }: ActivityDataTablesProp
                       variant="outline"
                       size="sm"
                       onClick={() => window.open(`/events/${trade.market.eventSlug}?market=${trade.market.conditionId}`, '_blank')}
-                      className="h-7 px-2 text-xs"
+                      className="h-7 px-2 text-xs cursor-pointer"
                     >
                       Details
                     </Button>
