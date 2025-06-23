@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Sun, Moon, Monitor } from "lucide-react"
+import { Sun, Moon, Monitor, Github } from "lucide-react"
 import { useState, useEffect } from "react"
 import { ThemeToggle } from './theme-toggle'
 
@@ -57,8 +57,24 @@ export function Navbar() {
             </nav>
           </div>
 
-          {/* Right side - Theme Toggle */}
-          <div className="flex items-center">
+          {/* Right side - GitHub link and Theme Toggle */}
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="h-9 w-9 p-0"
+            >
+              <a
+                href="https://github.com/Windsooon/Trade100/"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="View on GitHub"
+              >
+                <Github className="h-4 w-4" />
+                <span className="sr-only">GitHub</span>
+              </a>
+            </Button>
             <ThemeToggle />
           </div>
         </div>
