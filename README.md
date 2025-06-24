@@ -49,6 +49,8 @@ Trade100 is a professional open-source trading interface for Polymarket predicti
 
 ![demo_detail](https://raw.githubusercontent.com/Windsooon/Trade100/0ef3fc284f899974016742bcac264b2a9557bd6e/imgs/demo_detail.png)
 
+![demo_activity](https://raw.githubusercontent.com/Windsooon/Trade100/0ef3fc284f899974016742bcac264b2a9557bd6e/imgs/demo_activity.png)
+
 
 
 ### Features
