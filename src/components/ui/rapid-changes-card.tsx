@@ -2,11 +2,11 @@
 
 import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react'
+import { TrendingUp, TrendingDown } from 'lucide-react'
 import { Event, Market, getMarketDisplayTitle } from '@/lib/stores'
 import { useRouter } from 'next/navigation'
 
@@ -16,7 +16,7 @@ interface RapidChangesCardProps {
   tagsLoading: boolean
 }
 
-type TimePeriod = '1D' | '1W' | '1M'
+type TimePeriod = '1H' | '1D' | '1W' | '1M'
 
 interface MarketChange {
   marketName: string
@@ -37,7 +37,7 @@ interface Tag {
 }
 
 export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidChangesCardProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1D')
+  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1H')
   const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined)
   const router = useRouter()
 
@@ -65,6 +65,9 @@ export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidCh
         // Get price change based on selected period
         let priceChange: number | undefined
         switch (selectedPeriod) {
+          case '1H':
+            priceChange = market.oneHourPriceChange
+            break
           case '1D':
             priceChange = market.oneDayPriceChange
             break
@@ -126,24 +129,15 @@ export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidCh
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" />
-          Top Changes Markets
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="1D">1D</TabsTrigger>
-            <TabsTrigger value="1W">1W</TabsTrigger>
-            <TabsTrigger value="1M">1M</TabsTrigger>
-          </TabsList>
-
-          {/* Tag Filter */}
-          <div className="mt-4 mb-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Top Changes Markets
+          </CardTitle>
+          <div className="flex items-center gap-2">
             <Select value={selectedTag || 'all'} onValueChange={handleTagChange} disabled={tagsLoading}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder={tagsLoading ? "Loading tags..." : "Filter by tag"} />
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder={tagsLoading ? "Loading..." : "All tags"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Tags</SelectItem>
@@ -154,78 +148,87 @@ export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidCh
                 ))}
               </SelectContent>
             </Select>
+            <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
+              <SelectTrigger className="w-[80px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1H">1H</SelectItem>
+                <SelectItem value="1D">1D</SelectItem>
+                <SelectItem value="1W">1W</SelectItem>
+                <SelectItem value="1M">1M</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-
-          <TabsContent value={selectedPeriod} className="mt-0">
-            {topChanges.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>
-                  {selectedTag
-                    ? `No markets found for selected tag "${selectedTag}"`
-                    : "No price change data available for this period"
-                  }
-                </p>
-              </div>
-            ) : (
-              <ScrollArea className="h-[240px]">
-                <div className="space-y-3 pr-4">
-                  {topChanges.map((change, index) => (
-                    <div
-                      key={`${change.eventId}-${change.marketName}-${index}`}
-                      className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => handleMarketClick(change.eventSlug, change.conditionId)}
-                    >
-                      <div className="flex-1 min-w-0 pr-3">
-                        <div className="flex items-start gap-2 mb-1">
-                          <span className="text-xs font-medium text-muted-foreground mt-0.5 flex-shrink-0">
-                            #{index + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm leading-tight line-clamp-2">
-                              {change.marketName}
-                            </h4>
-                          </div>
-                          <ArrowUpRight className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {change.eventTitle}
-                        </p>
-                        <div className="flex items-center gap-3 mt-2">
-                          <div className="text-xs">
-                            <span className="text-muted-foreground">YES:</span>
-                            <span className="ml-1 font-medium">{formatPrice(change.yesPrice)}</span>
-                          </div>
-                          <div className="text-xs">
-                            <span className="text-muted-foreground">NO:</span>
-                            <span className="ml-1 font-medium">{formatPrice(change.noPrice)}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <Badge
-                          variant={change.priceChange >= 0 ? "default" : "destructive"}
-                          className={`text-xs ${
-                            change.priceChange >= 0 
-                              ? "bg-green-600 hover:bg-green-700 text-white" 
-                              : "bg-red-600 hover:bg-red-700 text-white"
-                          }`}
-                        >
-                          {change.priceChange >= 0 ? (
-                            <TrendingUp className="h-3 w-3 mr-1" />
-                          ) : (
-                            <TrendingDown className="h-3 w-3 mr-1" />
-                          )}
-                          {formatPercentage(change.priceChange)}
-                        </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {topChanges.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>
+              {selectedTag
+                ? `No markets found for selected tag "${selectedTag}"`
+                : "No price change data available for this period"
+              }
+            </p>
+          </div>
+        ) : (
+          <ScrollArea className="h-[240px]">
+            <div className="space-y-3 pr-4">
+              {topChanges.map((change, index) => (
+                <div
+                  key={`${change.eventId}-${change.marketName}-${index}`}
+                  className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                  onClick={() => handleMarketClick(change.eventSlug, change.conditionId)}
+                >
+                  <div className="flex-1 min-w-0 pr-3">
+                    <div className="flex items-start gap-2 mb-1">
+                      <span className="text-xs font-medium text-muted-foreground mt-0.5 flex-shrink-0">
+                        #{index + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm leading-tight line-clamp-2">
+                          {change.marketName}
+                        </h4>
                       </div>
                     </div>
-                  ))}
+                    <p className="text-xs text-muted-foreground truncate">
+                      {change.eventTitle}
+                    </p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">YES:</span>
+                        <span className="ml-1 font-medium">{formatPrice(change.yesPrice)}</span>
+                      </div>
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">NO:</span>
+                        <span className="ml-1 font-medium">{formatPrice(change.noPrice)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <Badge
+                      variant={change.priceChange >= 0 ? "default" : "destructive"}
+                      className={`text-xs ${
+                        change.priceChange >= 0 
+                          ? "bg-green-600 hover:bg-green-700 text-white" 
+                          : "bg-red-600 hover:bg-red-700 text-white"
+                      }`}
+                    >
+                      {change.priceChange >= 0 ? (
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 mr-1" />
+                      )}
+                      {formatPercentage(change.priceChange)}
+                    </Badge>
+                  </div>
                 </div>
-              </ScrollArea>
-            )}
-          </TabsContent>
-        </Tabs>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
       </CardContent>
     </Card>
   )

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { DollarSign } from 'lucide-react'
+import { DollarSign, TrendingUp } from 'lucide-react'
 import { Event, Market } from '@/lib/stores'
 import { useRouter } from 'next/navigation'
 
@@ -95,48 +95,55 @@ export function ArbitrageCard({ events, availableTags, tagsLoading }: ArbitrageC
   }
 
   return (
-    <Card className="bg-card text-card-foreground">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <DollarSign className="h-4 w-4" />
-          Top Arbitrage Events
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Top Arbitrage Events
+          </CardTitle>
+          {/* Empty space to match other cards' header structure */}
+          <div></div>
+        </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-80">
-          <div className="space-y-3">
-            {arbitrageOpportunities.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                No arbitrage events found
-              </div>
-            ) : (
-              arbitrageOpportunities.map((opportunity) => (
+        {arbitrageOpportunities.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>No arbitrage opportunities found</p>
+          </div>
+        ) : (
+          <ScrollArea className="h-[240px]">
+            <div className="space-y-3 pr-4">
+              {arbitrageOpportunities.map((opportunity, index) => (
                 <div
                   key={opportunity.eventId}
-                  className="p-3 border rounded cursor-pointer transition-colors hover:border-primary/50 hover:bg-muted/50"
+                  className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
                   onClick={() => handleEventClick(opportunity.eventSlug)}
                 >
-                  {/* Event title */}
-                  <div className="text-sm font-medium leading-tight mb-2 line-clamp-2">
-                    {opportunity.eventTitle}
-                  </div>
-                  
-                  {/* Arbitrage metrics */}
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1">
-                        <span className="text-muted-foreground">Sum:</span>
-                        <span className="font-medium">
-                          {formatPrice(opportunity.askSum)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-muted-foreground">Markets:</span>
-                        <span className="font-medium">
-                          {opportunity.marketCount}
-                        </span>
+                  <div className="flex-1 min-w-0 pr-3">
+                    <div className="flex items-start gap-2 mb-1">
+                      <span className="text-xs font-medium text-muted-foreground mt-0.5 flex-shrink-0">
+                        #{index + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm leading-tight line-clamp-2">
+                          {opportunity.eventTitle}
+                        </h4>
                       </div>
                     </div>
+                    <div className="flex items-center gap-3 mt-2">
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Sum:</span>
+                        <span className="ml-1 font-medium">{formatPrice(opportunity.askSum)}</span>
+                      </div>
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Markets:</span>
+                        <span className="ml-1 font-medium">{opportunity.marketCount}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <Badge
                       variant="default"
                       className="text-xs bg-green-600 hover:bg-green-700 text-white"
@@ -146,10 +153,10 @@ export function ArbitrageCard({ events, availableTags, tagsLoading }: ArbitrageC
                     </Badge>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </ScrollArea>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
       </CardContent>
     </Card>
   )

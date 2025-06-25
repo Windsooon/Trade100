@@ -2,11 +2,11 @@
 
 import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { TrendingUp, ArrowUpRight } from 'lucide-react'
+import { TrendingUp } from 'lucide-react'
 import { Event, getMarketDisplayTitle } from '@/lib/stores'
 import { useRouter } from 'next/navigation'
 
@@ -128,24 +128,15 @@ export function TopVolumeCard({ events, availableTags, tagsLoading }: TopVolumeC
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" />
-          Top Volume Markets
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="1D">1D</TabsTrigger>
-            <TabsTrigger value="1W">1W</TabsTrigger>
-            <TabsTrigger value="1M">1M</TabsTrigger>
-          </TabsList>
-
-          {/* Tag Filter */}
-          <div className="mt-4 mb-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Top Volume Markets
+          </CardTitle>
+          <div className="flex items-center gap-2">
             <Select value={selectedTag || 'all'} onValueChange={handleTagChange} disabled={tagsLoading}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder={tagsLoading ? "Loading tags..." : "Filter by tag"} />
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder={tagsLoading ? "Loading..." : "All tags"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Tags</SelectItem>
@@ -156,67 +147,76 @@ export function TopVolumeCard({ events, availableTags, tagsLoading }: TopVolumeC
                 ))}
               </SelectContent>
             </Select>
+            <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
+              <SelectTrigger className="w-[80px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1D">1D</SelectItem>
+                <SelectItem value="1W">1W</SelectItem>
+                <SelectItem value="1M">1M</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+        </div>
+      </CardHeader>
+      <CardContent>
 
-          <TabsContent value={selectedPeriod} className="mt-0">
-            {topVolumeMarkets.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>
-                  {selectedTag
-                    ? `No markets found for selected tag "${selectedTag}"`
-                    : "No volume data available for this period"
-                  }
-                </p>
-              </div>
-            ) : (
-              <ScrollArea className="h-[240px]">
-                <div className="space-y-3 pr-4">
-                  {topVolumeMarkets.map((market, index) => (
-                    <div
-                      key={`${market.eventId}-${market.marketName}-${index}`}
-                      className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => handleMarketClick(market.eventSlug, market.conditionId)}
-                    >
-                      <div className="flex-1 min-w-0 pr-3">
-                        <div className="flex items-start gap-2 mb-1">
-                          <span className="text-xs font-medium text-muted-foreground mt-0.5 flex-shrink-0">
-                            #{index + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm leading-tight line-clamp-2">
-                              {market.marketName}
-                            </h4>
-                          </div>
-                          <ArrowUpRight className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {market.eventTitle}
-                        </p>
-                        <div className="flex items-center gap-3 mt-2">
-                          <div className="text-xs">
-                            <span className="text-muted-foreground">YES:</span>
-                            <span className="ml-1 font-medium">{formatPrice(market.yesPrice)}</span>
-                          </div>
-                          <div className="text-xs">
-                            <span className="text-muted-foreground">NO:</span>
-                            <span className="ml-1 font-medium">{formatPrice(market.noPrice)}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <Badge variant="secondary" className="text-xs">
-                          <TrendingUp className="h-3 w-3 mr-1" />
-                          {formatVolume(market.volume)}
-                        </Badge>
+        {topVolumeMarkets.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>
+              {selectedTag
+                ? `No markets found for selected tag "${selectedTag}"`
+                : "No volume data available for this period"
+              }
+            </p>
+          </div>
+        ) : (
+          <ScrollArea className="h-[240px]">
+            <div className="space-y-3 pr-4">
+              {topVolumeMarkets.map((market, index) => (
+                <div
+                  key={`${market.eventId}-${market.marketName}-${index}`}
+                  className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                  onClick={() => handleMarketClick(market.eventSlug, market.conditionId)}
+                >
+                  <div className="flex-1 min-w-0 pr-3">
+                    <div className="flex items-start gap-2 mb-1">
+                      <span className="text-xs font-medium text-muted-foreground mt-0.5 flex-shrink-0">
+                        #{index + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm leading-tight line-clamp-2">
+                          {market.marketName}
+                        </h4>
                       </div>
                     </div>
-                  ))}
+                    <p className="text-xs text-muted-foreground truncate">
+                      {market.eventTitle}
+                    </p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">YES:</span>
+                        <span className="ml-1 font-medium">{formatPrice(market.yesPrice)}</span>
+                      </div>
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">NO:</span>
+                        <span className="ml-1 font-medium">{formatPrice(market.noPrice)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <Badge variant="secondary" className="text-xs">
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      {formatVolume(market.volume)}
+                    </Badge>
+                  </div>
                 </div>
-              </ScrollArea>
-            )}
-          </TabsContent>
-        </Tabs>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
       </CardContent>
     </Card>
   )

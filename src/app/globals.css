@@ -79,11 +79,11 @@
 }
 
 .dark {
-  --background: oklch(0.104 0.008 252.5);
+  --background: rgb(24, 26, 32);
   --foreground: oklch(0.985 0.001 106.423);
-  --card: oklch(0.104 0.008 252.5);
+  --card: rgb(24, 26, 32);
   --card-foreground: oklch(0.985 0.001 106.423);
-  --popover: oklch(0.104 0.008 252.5);
+  --popover: rgb(24, 26, 32);
   --popover-foreground: oklch(0.985 0.001 106.423);
   --primary: oklch(0.923 0.003 48.717);
   --primary-foreground: oklch(0.216 0.006 56.043);
@@ -130,7 +130,7 @@
       max-width: 90rem;
     }
     @media (width >= 96rem) {
-      max-width: 114rem;
+      max-width: 102rem;
     }
   }
 
