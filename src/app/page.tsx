@@ -455,7 +455,7 @@ export default function Dashboard() {
                   {/* Data Latency Notice */}
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Info className="h-4 w-4" />
-                    <span>Market data may 30 seconds latency.</span>
+                    <span>30 seconds latency in Market data</span>
                   </div>
                   {/* Auto-refresh controls */}
                   <div className="flex items-center space-x-2">

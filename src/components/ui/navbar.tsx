@@ -21,12 +21,6 @@ export function Navbar() {
             
             {/* Navigation - moved to left side */}
             <nav className="hidden md:flex items-center space-x-6">
-              <Link 
-                href="/"
-                className="text-sm font-medium transition-colors hover:opacity-80 navbar-link"
-              >
-                Markets
-              </Link>
               <Link
                 href="/activity"
                 className="text-sm font-medium transition-colors hover:opacity-80 navbar-link"
