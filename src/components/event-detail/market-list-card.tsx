@@ -6,6 +6,7 @@ import { Target, ChevronDown, ChevronRight } from 'lucide-react'
 import { Market, isMarketActive, getMarketDisplayTitle } from '@/lib/stores'
 import { cn } from '@/lib/utils'
 import { useState, useMemo } from 'react'
+import { usePolymarketStatus } from '@/hooks/use-polymarket-status'
 
 interface MarketListCardProps {
   markets: Market[]
@@ -15,6 +16,7 @@ interface MarketListCardProps {
 
 export function MarketListCard({ markets, selectedMarket, onMarketSelect }: MarketListCardProps) {
   const [showInactiveMarkets, setShowInactiveMarkets] = useState(false)
+  const { statusDisplay, formattedResponseTime } = usePolymarketStatus()
 
   // Group markets by status and sort by absolute 1h change
   const { activeMarkets, resolvedMarkets } = useMemo(() => {
@@ -98,10 +100,26 @@ export function MarketListCard({ markets, selectedMarket, onMarketSelect }: Mark
   return (
     <div className="h-full flex flex-col">
       <div className="p-3 border-b">
-        <h3 className="flex items-center gap-2 font-semibold text-sm">
-          <Target className="h-4 w-4" />
-          Markets ({markets.length})
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="flex items-center gap-2 font-semibold text-sm">
+            <Target className="h-4 w-4" />
+            Markets ({markets.length})
+          </h3>
+          <div className="flex items-center gap-2 text-xs">
+            <div className={`w-2 h-2 rounded-full ${
+              statusDisplay.color === 'text-green-600' ? 'bg-green-500' :
+              statusDisplay.color === 'text-destructive' ? 'bg-red-500' :
+              statusDisplay.color === 'text-yellow-600' ? 'bg-yellow-500' :
+              'bg-gray-500'
+            }`} />
+            <span className={`font-medium ${statusDisplay.color}`}>
+              API Status: {statusDisplay.text}
+            </span>
+            <Badge variant="secondary" className="text-xs font-normal">
+              {formattedResponseTime}
+            </Badge>
+          </div>
+        </div>
       </div>
       <div className="flex-1 p-3 overflow-y-auto">
         <div className="space-y-4">

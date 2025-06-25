@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { OrderBookProvider } from '@/lib/order-book-context'
-import { EventInfoCard } from './event-info-card'
+import { EventInfoBanner } from './event-info-banner'
 import { MarketListCard } from './market-list-card'
 import { TradingChartCard } from './trading-chart-card'
 import { OperationsCard } from './operations-card'
@@ -47,43 +47,47 @@ export default function EventDetailClient({
 
   return (
     <OrderBookProvider>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Side */}
-        <div className="lg:col-span-5 space-y-6">
-          <EventInfoCard event={event} />
+      <div className="space-y-3">
+        {/* Event Info Banner - Full Width */}
+        <EventInfoBanner event={event} />
 
-          {/* Resizable Market List and Order Book */}
-          <ResizablePanelGroup direction="horizontal" className="min-h-[500px] border rounded-lg">
-            <ResizablePanel defaultSize={60}>
-              <MarketListCard
-                markets={event.markets}
-                selectedMarket={selectedMarket}
-                onMarketSelect={setSelectedMarket}
-              />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={40}>
-              <OrderBookCard
-                event={event}
-                selectedMarket={selectedMarket}
-                selectedToken={selectedToken}
-                onTokenChange={handleTokenChange}
-              />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </div>
-        {/* Right Side */}
-        <div className="lg:col-span-7 space-y-6">
-          <TradingChartCard 
-            selectedMarket={selectedMarket} 
-            selectedToken={selectedToken}
-            event={event}
-          />
-          <OperationsCard 
-            selectedMarket={selectedMarket}
-            selectedToken={selectedToken}
-            onTokenChange={handleTokenChange}
-          />
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Side */}
+          <div className="lg:col-span-5">
+            {/* Resizable Market List and Order Book */}
+            <ResizablePanelGroup direction="horizontal" className="border rounded-lg">
+              <ResizablePanel defaultSize={60}>
+                <MarketListCard
+                  markets={event.markets}
+                  selectedMarket={selectedMarket}
+                  onMarketSelect={setSelectedMarket}
+                />
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={40}>
+                <OrderBookCard
+                  event={event}
+                  selectedMarket={selectedMarket}
+                  selectedToken={selectedToken}
+                  onTokenChange={handleTokenChange}
+                />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </div>
+          {/* Right Side */}
+          <div className="lg:col-span-7 space-y-6">
+            <TradingChartCard 
+              selectedMarket={selectedMarket} 
+              selectedToken={selectedToken}
+              event={event}
+            />
+            <OperationsCard 
+              selectedMarket={selectedMarket}
+              selectedToken={selectedToken}
+              onTokenChange={handleTokenChange}
+            />
+          </div>
         </div>
       </div>
     </OrderBookProvider>

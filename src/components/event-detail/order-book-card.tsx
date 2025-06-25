@@ -392,15 +392,15 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
   const getConnectionStatusDisplay = () => {
     switch (connectionStatus) {
       case 'connected':
-        return { dot: '🟢', text: 'Connected', color: 'text-green-600' }
+        return { bgColor: 'bg-green-500', text: 'Connected', color: 'text-green-600' }
       case 'connecting':
-        return { dot: '🟡', text: 'Connecting', color: 'text-yellow-600' }
+        return { bgColor: 'bg-yellow-500', text: 'Connecting', color: 'text-yellow-600' }
       case 'error':
-        return { dot: '🔴', text: 'Error', color: 'text-red-600' }
+        return { bgColor: 'bg-red-500', text: 'Error', color: 'text-red-600' }
       case 'disconnected':
-        return { dot: '🔴', text: 'Disconnected', color: 'text-red-600' }
+        return { bgColor: 'bg-red-500', text: 'Disconnected', color: 'text-red-600' }
       default:
-        return { dot: '🔴', text: 'Disconnected', color: 'text-red-600' }
+        return { bgColor: 'bg-red-500', text: 'Disconnected', color: 'text-red-600' }
     }
   }
 
@@ -579,15 +579,13 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
       <div className="p-3 border-b flex justify-between items-center">
         <h3 className="flex items-center gap-2 font-semibold text-sm">
           Order Book
-          <span className={`text-xs ${statusDisplay.color} flex items-center gap-1`}>
-            {statusDisplay.dot} {statusDisplay.text}
+          <span className="text-xs flex items-center gap-1">
+            <div className={`w-2 h-2 rounded-full ${statusDisplay.bgColor}`} />
+            <span className={`font-medium ${statusDisplay.color}`}>
+              Websocket: {statusDisplay.text}
+            </span>
           </span>
         </h3>
-        {lastUpdated && connectionStatus === 'connected' && !loading && (
-          <Badge variant="secondary" className="text-xs font-normal">
-            {formatTimeAgo(lastUpdated)}
-          </Badge>
-        )}
       </div>
       <div className="flex-1 p-3 overflow-hidden flex flex-col">
         {connectionStatus === 'error' && (
