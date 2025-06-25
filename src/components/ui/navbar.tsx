@@ -3,32 +3,11 @@
 import * as React from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Sun, Moon, Monitor, Github } from "lucide-react"
-import { useState, useEffect } from "react"
-import { ThemeToggle } from './theme-toggle'
+import { Github } from "lucide-react"
+
 
 export function Navbar() {
-  const [theme, setTheme] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('trade100-theme') || 'dark'
-    }
-    return 'dark'
-  })
-
-  // Apply theme
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('trade100-theme', theme)
-      document.documentElement.classList.remove('light', 'dark')
-      if (theme === 'system') {
-        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-        document.documentElement.classList.add(systemTheme)
-      } else {
-        document.documentElement.classList.add(theme)
-      }
-    }
-  }, [theme])
+  // Theme is now locked to dark mode via ThemeProvider
 
   return (
     <header className="border-b">
@@ -36,7 +15,7 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           {/* Brand and Navigation - Left aligned */}
           <div className="flex items-center space-x-8">
-            <Link href="/" className="text-2xl font-bold text-primary">
+            <Link href="/" className="text-2xl font-bold navbar-brand">
               Trade100
             </Link>
             
@@ -44,13 +23,13 @@ export function Navbar() {
             <nav className="hidden md:flex items-center space-x-6">
               <Link 
                 href="/"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                className="text-sm font-medium transition-colors hover:opacity-80 navbar-link"
               >
                 Markets
               </Link>
               <Link
                 href="/activity"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                className="text-sm font-medium transition-colors hover:opacity-80 navbar-link"
               >
                 Activity
               </Link>
@@ -75,7 +54,7 @@ export function Navbar() {
                 <span className="sr-only">GitHub</span>
               </a>
             </Button>
-            <ThemeToggle />
+
           </div>
         </div>
       </div>

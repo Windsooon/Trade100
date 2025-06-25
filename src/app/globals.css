@@ -79,11 +79,11 @@
 }
 
 .dark {
-  --background: oklch(0.147 0.004 49.25);
+  --background: oklch(0.104 0.008 252.5);
   --foreground: oklch(0.985 0.001 106.423);
-  --card: oklch(0.216 0.006 56.043);
+  --card: oklch(0.104 0.008 252.5);
   --card-foreground: oklch(0.985 0.001 106.423);
-  --popover: oklch(0.216 0.006 56.043);
+  --popover: oklch(0.104 0.008 252.5);
   --popover-foreground: oklch(0.985 0.001 106.423);
   --primary: oklch(0.923 0.003 48.717);
   --primary-foreground: oklch(0.216 0.006 56.043);
@@ -132,6 +132,15 @@
     @media (width >= 96rem) {
       max-width: 114rem;
     }
+  }
+
+  /* Custom navbar colors */
+  .navbar-brand {
+    color: #f0b90b;
+  }
+
+  .navbar-link {
+    color: #eaecef;
   }
 
   @keyframes accordion-down {

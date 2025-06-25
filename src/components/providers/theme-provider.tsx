@@ -28,36 +28,21 @@ export function ThemeProvider({
   storageKey = "ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = React.useState<Theme>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem(storageKey) as Theme) || defaultTheme
-    }
-    return defaultTheme
-  })
+  // Always use dark theme, no localStorage or user preference
+  const [theme] = React.useState<Theme>("dark")
 
   React.useEffect(() => {
     const root = window.document.documentElement
 
+    // Always set dark mode
     root.classList.remove("light", "dark")
-
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light"
-
-      root.classList.add(systemTheme)
-      return
-    }
-
-    root.classList.add(theme)
-  }, [theme])
+    root.classList.add("dark")
+  }, [])
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme)
-      setTheme(theme)
+    setTheme: () => {
+      // Do nothing - theme is locked to dark mode
     },
   }
 
