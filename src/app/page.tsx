@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
-import { Slider } from '@/components/ui/slider'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RefreshCw, Filter, X, TrendingUp, Info, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
@@ -61,13 +61,51 @@ const PREDEFINED_TAGS = [
 
 export default function Dashboard() {
   const [selectedTag, setSelectedTag] = useState<string>('')
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1])
+  const [minPrice, setMinPrice] = useState<string>('')
+  const [maxPrice, setMaxPrice] = useState<string>('')
+  const [minBestAsk, setMinBestAsk] = useState<string>('')
+  const [maxBestAsk, setMaxBestAsk] = useState<string>('')
   const [sortBy, setSortBy] = useState<string>('volume24hr')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   
   // Auto-refresh state - enabled by default
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
   const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Helper functions for price range
+  const handlePriceChange = (type: 'min' | 'max', value: string) => {
+    // Allow only numbers and decimal point
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      if (type === 'min') {
+        setMinPrice(value)
+      } else {
+        setMaxPrice(value)
+      }
+    }
+  }
+
+  const getPriceRange = (): [number, number] => {
+    const min = minPrice === '' ? 0 : parseFloat(minPrice)
+    const max = maxPrice === '' ? 1 : parseFloat(maxPrice)
+    return [isNaN(min) ? 0 : min, isNaN(max) ? 1 : max]
+  }
+
+  const handleBestAskChange = (type: 'min' | 'max', value: string) => {
+    // Allow only numbers and decimal point
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      if (type === 'min') {
+        setMinBestAsk(value)
+      } else {
+        setMaxBestAsk(value)
+      }
+    }
+  }
+
+  const getBestAskRange = (): [number, number] => {
+    const min = minBestAsk === '' ? 0 : parseFloat(minBestAsk)
+    const max = maxBestAsk === '' ? 1 : parseFloat(maxBestAsk)
+    return [isNaN(min) ? 0 : min, isNaN(max) ? 1 : max]
+  }
 
   // Fetch events data - no caching
   const {
@@ -170,20 +208,47 @@ export default function Dashboard() {
 
       // Check if any market in the event has a Yes OR No price within the range
       if (event.markets && event.markets.length > 0) {
+        const [minPriceNum, maxPriceNum] = getPriceRange()
+        const [minBestAskNum, maxBestAskNum] = getBestAskRange()
+        
         const hasMatchingMarket = event.markets.some(market => {
-          if (market.outcomePrices && market.outcomePrices.length >= 2) {
-            const yesPrice = parseFloat(market.outcomePrices[0])
-            const noPrice = parseFloat(market.outcomePrices[1])
+          let priceMatch = true
+          let bestAskMatch = true
 
-            // Check if either Yes or No price is within range
-            const yesPriceInRange = !isNaN(yesPrice) && yesPrice >= priceRange[0] && yesPrice <= priceRange[1]
-            const noPriceInRange = !isNaN(noPrice) && noPrice >= priceRange[0] && noPrice <= priceRange[1]
+          // Check price range filter (if any input provided)
+          if (minPrice !== '' || maxPrice !== '') {
+            priceMatch = false
+            if (market.outcomePrices && market.outcomePrices.length >= 2) {
+              const yesPrice = parseFloat(market.outcomePrices[0])
+              const noPrice = parseFloat(market.outcomePrices[1])
 
-            return yesPriceInRange || noPriceInRange
+              // Check if either Yes or No price is within range
+              const yesPriceInRange = !isNaN(yesPrice) && yesPrice >= minPriceNum && yesPrice <= maxPriceNum
+              const noPriceInRange = !isNaN(noPrice) && noPrice >= minPriceNum && noPrice <= maxPriceNum
+
+              priceMatch = yesPriceInRange || noPriceInRange
+            }
           }
-          return false
+
+          // Check best ask filter (if any input provided)
+          if (minBestAsk !== '' || maxBestAsk !== '') {
+            bestAskMatch = false
+            if (market.bestAsk) {
+              const bestAskPrice = parseFloat(market.bestAsk)
+              if (!isNaN(bestAskPrice)) {
+                // Return false if min > max (as requested)
+                if (minBestAskNum > maxBestAskNum) {
+                  bestAskMatch = false
+                } else {
+                  bestAskMatch = bestAskPrice >= minBestAskNum && bestAskPrice <= maxBestAskNum
+                }
+              }
+            }
+          }
+
+          return priceMatch && bestAskMatch
         })
-        // If no markets match the price range, exclude this event
+        // If no markets match the filters, exclude this event
         if (!hasMatchingMarket) return false
       }
 
@@ -214,7 +279,7 @@ export default function Dashboard() {
       return sortDirection === 'desc' ? -comparison : comparison
     }) : []
 
-  const hasActiveFilters = selectedTag !== '' || priceRange[0] > 0 || priceRange[1] < 1 || sortBy !== 'volume24hr' || sortDirection !== 'desc'
+  const hasActiveFilters = selectedTag !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== 'volume24hr' || sortDirection !== 'desc'
 
   // Overall loading state
   const isLoading = eventsLoading || tagsLoading
@@ -324,7 +389,10 @@ export default function Dashboard() {
                       size="sm"
                       onClick={() => {
                         setSelectedTag('')
-                        setPriceRange([0, 1])
+                        setMinPrice('')
+                        setMaxPrice('')
+                        setMinBestAsk('')
+                        setMaxBestAsk('')
                         setSortBy('volume24hr')
                         setSortDirection('desc')
                       }}
@@ -342,9 +410,14 @@ export default function Dashboard() {
                         {selectedTag}
                       </Badge>
                     )}
-                    {(priceRange[0] > 0 || priceRange[1] < 1) && (
+                    {(minPrice !== '' || maxPrice !== '') && (
                       <Badge variant="secondary" className="text-xs">
-                        Price Range: {priceRange[0].toFixed(2)}-{priceRange[1].toFixed(2)}
+                        Price Range: {minPrice || '0'}-{maxPrice || '1'}
+                      </Badge>
+                    )}
+                    {(minBestAsk !== '' || maxBestAsk !== '') && (
+                      <Badge variant="secondary" className="text-xs">
+                        Best Ask Range: {minBestAsk || '0'}-{maxBestAsk || '1'}
                       </Badge>
                     )}
                     {(sortBy !== 'volume24hr' || sortDirection !== 'desc') && (
@@ -381,21 +454,46 @@ export default function Dashboard() {
               {/* Price Range */}
               <div className="space-y-4">
                 <label className="text-sm font-medium mb-4 block">Price Range (Yes or No)</label>
-                <div className="px-3">
-                  <Slider
-                    value={priceRange}
-                    onValueChange={(value) => {
-                      setPriceRange(value as [number, number])
-                    }}
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    className="w-full"
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    value={minPrice}
+                    onChange={(e) => handlePriceChange('min', e.target.value)}
+                    className="w-20"
+                    placeholder="0.00"
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>{priceRange[0].toFixed(2)}</span>
-                    <span>{priceRange[1].toFixed(2)}</span>
-                  </div>
+                  <span className="text-sm text-muted-foreground">to</span>
+                  <Input
+                    type="text"
+                    value={maxPrice}
+                    onChange={(e) => handlePriceChange('max', e.target.value)}
+                    className="w-20"
+                    placeholder="1.00"
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Best Asks Price Range */}
+              <div className="space-y-4">
+                <label className="text-sm font-medium mb-4 block">Best Asks Price Range</label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    value={minBestAsk}
+                    onChange={(e) => handleBestAskChange('min', e.target.value)}
+                    className="w-20"
+                    placeholder="0.00"
+                  />
+                  <span className="text-sm text-muted-foreground">to</span>
+                  <Input
+                    type="text"
+                    value={maxBestAsk}
+                    onChange={(e) => handleBestAskChange('max', e.target.value)}
+                    className="w-20"
+                    placeholder="1.00"
+                  />
                 </div>
               </div>
 

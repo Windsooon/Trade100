@@ -104,6 +104,7 @@ function MarketsTable({ markets, eventTitle, eventSlug }: MarketsTableProps) {
               <TableHead className="text-xs">Question</TableHead>
               <TableHead className="text-xs">Yes Price</TableHead>
               <TableHead className="text-xs">No Price</TableHead>
+              <TableHead className="text-xs">Best Ask</TableHead>
               <TableHead className="text-xs">1h Change</TableHead>
             </TableRow>
           </TableHeader>
@@ -161,6 +162,7 @@ function MarketsTable({ markets, eventTitle, eventSlug }: MarketsTableProps) {
                   </TableCell>
                   <TableCell>{yesPrice || 'None'}</TableCell>
                   <TableCell>{noPrice || 'None'}</TableCell>
+                  <TableCell>{market.bestAsk || 'None'}</TableCell>
                   <TableCell className={priceChange && priceChange >= 0 ? 'text-green-600' : priceChange && priceChange < 0 ? 'text-red-600' : ''}>
                     {formatPriceChange(priceChange)}
                   </TableCell>
