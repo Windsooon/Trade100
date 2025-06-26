@@ -128,15 +128,15 @@ export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidCh
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
             Top Changes Markets
           </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
             <Select value={selectedTag || 'all'} onValueChange={handleTagChange} disabled={tagsLoading}>
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-full sm:w-[120px]">
                 <SelectValue placeholder={tagsLoading ? "Loading..." : "All tags"} />
               </SelectTrigger>
               <SelectContent>
@@ -149,7 +149,7 @@ export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidCh
               </SelectContent>
             </Select>
             <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
-              <SelectTrigger className="w-[80px]">
+              <SelectTrigger className="w-full sm:w-[80px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -166,7 +166,7 @@ export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidCh
         {topChanges.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>
+            <p className="text-sm px-4">
               {selectedTag
                 ? `No markets found for selected tag "${selectedTag}"`
                 : "No price change data available for this period"
@@ -179,35 +179,35 @@ export function RapidChangesCard({ events, availableTags, tagsLoading }: RapidCh
               {topChanges.map((change, index) => (
                 <div
                   key={`${change.eventId}-${change.marketName}-${index}`}
-                  className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                  className="flex flex-col gap-2 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors sm:flex-row sm:items-start sm:justify-between"
                   onClick={() => handleMarketClick(change.eventSlug, change.conditionId)}
                 >
-                  <div className="flex-1 min-w-0 pr-3">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-2 mb-1">
                       <span className="text-xs font-medium text-muted-foreground mt-0.5 flex-shrink-0">
                         #{index + 1}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm leading-tight line-clamp-2">
+                        <h4 className="font-medium text-sm leading-tight line-clamp-2 break-words">
                           {change.marketName}
                         </h4>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="text-xs text-muted-foreground truncate mb-2 sm:mb-0">
                       {change.eventTitle}
                     </p>
-                    <div className="flex items-center gap-3 mt-2">
-                      <div className="text-xs">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
+                      <div className="flex items-center gap-1">
                         <span className="text-muted-foreground">YES:</span>
-                        <span className="ml-1 font-medium">{formatPrice(change.yesPrice)}</span>
+                        <span className="font-medium">{formatPrice(change.yesPrice)}</span>
                       </div>
-                      <div className="text-xs">
+                      <div className="flex items-center gap-1">
                         <span className="text-muted-foreground">NO:</span>
-                        <span className="ml-1 font-medium">{formatPrice(change.noPrice)}</span>
+                        <span className="font-medium">{formatPrice(change.noPrice)}</span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <div className="flex justify-end sm:flex-col sm:items-end sm:gap-1 sm:flex-shrink-0">
                     <Badge
                       variant={change.priceChange >= 0 ? "default" : "destructive"}
                       className={`text-xs ${
