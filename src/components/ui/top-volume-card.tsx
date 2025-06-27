@@ -148,7 +148,7 @@ export function TopVolumeCard({ events, availableTags, tagsLoading }: TopVolumeC
               </SelectContent>
             </Select>
             <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
-              <SelectTrigger className="w-full sm:w-[80px]">
+              <SelectTrigger className="w-full sm:w-[70px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -172,34 +172,34 @@ export function TopVolumeCard({ events, availableTags, tagsLoading }: TopVolumeC
             </p>
           </div>
         ) : (
-          <ScrollArea className="h-[240px]">
-            <div className="space-y-3 pr-4">
+          <ScrollArea className="h-[240px] w-full">
+            <div className="space-y-3 pr-4 w-full">
               {topVolumeMarkets.map((market, index) => (
                 <div
                   key={`${market.eventId}-${market.marketName}-${index}`}
-                  className="flex flex-col gap-2 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors sm:flex-row sm:items-start sm:justify-between"
+                  className="flex flex-col gap-2 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors sm:flex-row sm:items-start sm:justify-between w-full max-w-full"
                   onClick={() => handleMarketClick(market.eventSlug, market.conditionId)}
                 >
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 max-w-[18rem] overflow-hidden">
                     <div className="flex items-start gap-2 mb-1">
                       <span className="text-xs font-medium text-muted-foreground mt-0.5 flex-shrink-0">
                         #{index + 1}
                       </span>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 max-w-[18rem] overflow-hidden">
                         <h4 className="font-medium text-sm leading-tight line-clamp-2 break-words">
                           {market.marketName}
                         </h4>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate mb-2 sm:mb-0">
+                    <p className="text-xs text-muted-foreground truncate mb-2 sm:mb-0 max-w-[18rem]">
                       {market.eventTitle}
                     </p>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
-                      <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs max-w-full">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <span className="text-muted-foreground">YES:</span>
                         <span className="font-medium">{formatPrice(market.yesPrice)}</span>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <span className="text-muted-foreground">NO:</span>
                         <span className="font-medium">{formatPrice(market.noPrice)}</span>
                       </div>
