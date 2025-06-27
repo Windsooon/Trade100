@@ -15,6 +15,7 @@ interface OrderBookCardProps {
   selectedMarket: any
   selectedToken: 'yes' | 'no'
   onTokenChange: (token: 'yes' | 'no') => void
+  onOrderBookUpdate?: (data: { bids: Array<{ price: string; size: string }>; asks: Array<{ price: string; size: string }> } | null) => void
 }
 
 type BookLevel = {
@@ -48,7 +49,7 @@ type BookMessage = {
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
-export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenChange }: OrderBookCardProps) {
+export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenChange, onOrderBookUpdate }: OrderBookCardProps) {
   // Use shared order book context
   const { updateOrderBook } = useOrderBook()
   
@@ -305,6 +306,13 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
       return convertToNoOrderBook(currentOrderBook)
     }
   }, [currentOrderBook, selectedToken, convertToNoOrderBook])
+
+  // Call callback when order book data changes
+  useEffect(() => {
+    if (onOrderBookUpdate) {
+      onOrderBookUpdate(displayOrderBook)
+    }
+  }, [displayOrderBook, onOrderBookUpdate])
 
   // Effect to manage WebSocket connection
   useEffect(() => {

@@ -10,6 +10,11 @@ import { OrderBookCard } from './order-book-card'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { Event, Market } from '@/lib/stores'
 
+interface OrderBookData {
+  bids: Array<{ price: string; size: string }>
+  asks: Array<{ price: string; size: string }>
+}
+
 export default function EventDetailClient({
   event,
   selectedMarketId
@@ -19,6 +24,7 @@ export default function EventDetailClient({
 }) {
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   const [selectedToken, setSelectedToken] = useState<'yes' | 'no'>('yes')
+  const [orderBookData, setOrderBookData] = useState<OrderBookData | null>(null)
 
   useEffect(() => {
     if (event?.markets && event.markets.length > 0) {
@@ -43,6 +49,10 @@ export default function EventDetailClient({
 
   const handleTokenChange = (token: 'yes' | 'no') => {
     setSelectedToken(token)
+  }
+
+  const handleOrderBookUpdate = (data: OrderBookData | null) => {
+    setOrderBookData(data)
   }
 
   return (
@@ -71,6 +81,7 @@ export default function EventDetailClient({
                   selectedMarket={selectedMarket}
                   selectedToken={selectedToken}
                   onTokenChange={handleTokenChange}
+                  onOrderBookUpdate={handleOrderBookUpdate}
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -81,6 +92,7 @@ export default function EventDetailClient({
               selectedMarket={selectedMarket} 
               selectedToken={selectedToken}
               event={event}
+              orderBookData={orderBookData}
             />
             <OperationsCard 
               selectedMarket={selectedMarket}

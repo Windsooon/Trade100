@@ -1,10 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { proxyFetch } from '@/lib/fetch'
 
+interface PriceHistoryPoint {
+  t: number // timestamp
+  p: number // price
+}
+
+interface CandlestickData {
+  time: number
+  open: number
+  high: number
+  low: number
+  close: number
+}
+
+function transformToCandlesticks(history: PriceHistoryPoint[]): CandlestickData[] {
+  if (!history || history.length === 0) return []
+  
+  const candlesticks: CandlestickData[] = []
+  
+  for (let i = 0; i < history.length; i++) {
+    const current = history[i]
+    const previous = i > 0 ? history[i - 1] : current
+    
+    const open = previous.p
+    const close = current.p
+    const high = Math.max(open, close)
+    const low = Math.min(open, close)
+    
+    candlesticks.push({
+      time: current.t,
+      open,
+      high,
+      low,
+      close
+    })
+  }
+  
+  return candlesticks
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const market = searchParams.get('market') // token ID
   const startTs = searchParams.get('startTs') // Unix timestamp
+  const endTs = searchParams.get('endTs') // Unix timestamp
   const fidelity = searchParams.get('fidelity') || '60'
 
   if (!market) {
@@ -15,12 +55,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Build URL with startTs if provided, otherwise use 'all' interval for backward compatibility
+    // Build URL with parameters
     let url: string
-    if (startTs) {
+    if (startTs && endTs) {
+      url = `https://clob.polymarket.com/prices-history?market=${market}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
+    } else if (startTs) {
       url = `https://clob.polymarket.com/prices-history?market=${market}&startTs=${startTs}&fidelity=${fidelity}`
     } else {
-      // Fallback to 'all' interval if no startTs provided
+      // Fallback to 'all' interval if no timestamps provided
       url = `https://clob.polymarket.com/prices-history?interval=all&market=${market}&fidelity=${fidelity}`
     }
     
@@ -32,22 +74,28 @@ export async function GET(request: NextRequest) {
     })
 
     if (!response.ok) {
+      const errorText = await response.text()
       throw new Error(`CLOB API error: ${response.status} ${response.statusText}`)
     }
 
     const data = await response.json()
     
     // Transform the data to include both timestamp and price
-    const history = data.history || []
+    const history: PriceHistoryPoint[] = data.history || []
+    
+    // Convert to candlestick format
+    const candlesticks = transformToCandlesticks(history)
     
     return NextResponse.json({
       success: true,
-      data: history,
+      data: candlesticks,
+      raw: history, // Keep raw data for debugging
       meta: {
         market,
         startTs,
+        endTs,
         fidelity,
-        count: history.length
+        count: candlesticks.length
       }
     })
 
