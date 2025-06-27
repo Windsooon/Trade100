@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "Polymarket Dashboard",
@@ -18,6 +19,7 @@ export default function RootLayout({
       <body>
         <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
           <QueryProvider>{children}</QueryProvider>
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
