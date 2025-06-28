@@ -151,9 +151,9 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
     }
   }, [])
 
-  // Clean up and deduplicate real-time data - only when needed
+  // Clean up and deduplicate real-time data with sliding window approach
   const cleanupRealTimeData = useCallback(() => {
-    // Only cleanup when we have too many points
+    // Only cleanup when we reach the limit
     if (realTimeDataRef.current.length < 1000) return
     
     try {
@@ -165,16 +165,20 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
         }
       })
       
-      // Convert back to sorted array and maintain max 1000 points
-      const cleanData = Array.from(timestampMap.values())
+      // Convert back to sorted array
+      const sortedData = Array.from(timestampMap.values())
         .sort((a, b) => (a.time as number) - (b.time as number))
-        .slice(-1000)
+      
+      // Sliding window: Remove oldest 100 points, keep 900 most recent
+      // This leaves space for 100 new points before next cleanup
+      const cleanData = sortedData.slice(-900)
       
       realTimeDataRef.current = cleanData
+      
     } catch (error) {
       console.error('[Real-time] Error during cleanup:', error)
-      // Fallback: just slice the array if cleanup fails
-      realTimeDataRef.current = realTimeDataRef.current.slice(-1000)
+      // Fallback: remove oldest 100 points using simple slice
+      realTimeDataRef.current = realTimeDataRef.current.slice(-900)
     }
   }, [])
 
@@ -203,8 +207,8 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
         realTimeDataRef.current.push(newDataPoint)
       }
       
-      // Clean up data only when needed
-      if (realTimeDataRef.current.length > 1000) {
+      // Clean up data when we reach exactly 1000 points (sliding window)
+      if (realTimeDataRef.current.length >= 1000) {
         cleanupRealTimeData()
       }
       
