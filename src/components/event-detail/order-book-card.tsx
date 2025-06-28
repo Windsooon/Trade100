@@ -59,7 +59,8 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
   const wsRef = useRef<WebSocket | null>(null)
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
-  const [reconnectKey, setReconnectKey] = useState(0)
+  const [reconnectAttempts, setReconnectAttempts] = useState(0)
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isConnectingRef = useRef(false)
   const isUnmountingRef = useRef(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -67,6 +68,10 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
   const dividerRef = useRef<HTMLDivElement | null>(null)
   const userHasScrolledRef = useRef(false)
   const lastScrollTopRef = useRef(0)
+
+  // Auto-retry configuration
+  const maxReconnectAttempts = 5
+  const reconnectDelay = 5000 // 5 seconds base delay
 
   // Custom time formatting function
   const formatTimeAgo = useCallback((date: Date): string => {
@@ -314,86 +319,164 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
     }
   }, [displayOrderBook, onOrderBookUpdate])
 
-  // Effect to manage WebSocket connection
-  useEffect(() => {
-    if (!activeYesTokenIds.length || isConnectingRef.current) return
+  // WebSocket connection function with auto-retry
+  const connect = useCallback(() => {
+    if (isUnmountingRef.current || !activeYesTokenIds.length) return
     
-    isUnmountingRef.current = false
+    setConnectionStatus('connecting')
     isConnectingRef.current = true
     setLoading(true)
-    setConnectionStatus('connecting')
-    
-    const ws = new WebSocket('wss://ws-subscriptions-clob.polymarket.com/ws/market')
-    wsRef.current = ws
 
-    ws.onopen = () => {
-      setConnectionStatus('connected')
-      
-      const subscribeMessage = {
-        assets_ids: activeYesTokenIds,
-        type: 'market'
-      }
-      ws.send(JSON.stringify(subscribeMessage))
-      
-      pingIntervalRef.current = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send('PING')
-        }
-      }, 30000)
-    }
+    try {
+      const ws = new WebSocket('wss://ws-subscriptions-clob.polymarket.com/ws/market')
+      wsRef.current = ws
 
-    ws.onerror = (e) => {
-      if (!isUnmountingRef.current) {
-        setConnectionStatus('error')
-      }
-      isConnectingRef.current = false
-    }
-
-    ws.onclose = (e) => {
-      if (!isUnmountingRef.current) {
-        setConnectionStatus('disconnected')
-      }
-      isConnectingRef.current = false
-      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current)
-    }
-
-    ws.onmessage = (event) => {
-      if (event.data === 'PONG') return
-      
-      try {
-        const data = JSON.parse(event.data)
+      ws.onopen = () => {
+        if (isUnmountingRef.current) return
+        setConnectionStatus('connected')
+        setReconnectAttempts(0) // Reset attempts on successful connection
         
-        const processItem = (item: any) => {
-          if (item.event_type === 'price_change') {
-            processPriceChange(item as PriceChangeMessage)
-          } else if (item.asset_id && (item.bids || item.asks)) {
-            processBookMessage(item as BookMessage)
-            setLoading(false) // Set loading to false when we receive book data
+        const subscribeMessage = {
+          assets_ids: activeYesTokenIds,
+          type: 'market'
+        }
+        
+        try {
+          ws.send(JSON.stringify(subscribeMessage))
+        } catch (sendError) {
+          console.error('❌ Failed to send order book subscription message:', sendError)
+        }
+        
+        pingIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send('PING')
           }
-        }
-
-        if (Array.isArray(data)) {
-          data.forEach(processItem)
-        } else if (typeof data === 'object' && data !== null) {
-          processItem(data)
-        }
-      } catch (e) {
-        setConnectionStatus('error')
+        }, 30000)
       }
-    }
 
+      ws.onerror = (error) => {
+        if (isUnmountingRef.current) return
+        
+        console.error('❌ Order book WebSocket error:', {
+          error,
+          readyState: ws.readyState,
+          url: ws.url,
+          timestamp: new Date().toISOString(),
+          reconnectAttempts: reconnectAttempts
+        })
+        
+        setConnectionStatus('error')
+        isConnectingRef.current = false
+      }
+
+      ws.onclose = (event) => {
+        if (isUnmountingRef.current) return
+        
+        setConnectionStatus('disconnected')
+        isConnectingRef.current = false
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current)
+          pingIntervalRef.current = null
+        }
+        
+        // Auto-reconnect with exponential backoff
+        setReconnectAttempts(prev => {
+          const currentAttempts = prev
+          if (currentAttempts < maxReconnectAttempts) {
+            const delay = reconnectDelay * Math.pow(2, currentAttempts)
+            
+            console.log(`🔄 Order book WebSocket reconnecting in ${delay}ms (attempt ${currentAttempts + 1}/${maxReconnectAttempts})`)
+            
+            reconnectTimeoutRef.current = setTimeout(() => {
+              if (!isUnmountingRef.current) {
+                connect()
+              }
+            }, delay)
+            
+            return currentAttempts + 1
+          } else {
+            console.error('❌ Order book WebSocket max reconnection attempts reached')
+          }
+          return currentAttempts
+        })
+      }
+
+      ws.onmessage = (event) => {
+        if (event.data === 'PONG') return
+        
+        try {
+          const data = JSON.parse(event.data)
+          
+          const processItem = (item: any) => {
+            if (item.event_type === 'price_change') {
+              processPriceChange(item as PriceChangeMessage)
+            } else if (item.asset_id && (item.bids || item.asks)) {
+              processBookMessage(item as BookMessage)
+              setLoading(false) // Set loading to false when we receive book data
+            }
+          }
+
+          if (Array.isArray(data)) {
+            data.forEach(processItem)
+          } else if (typeof data === 'object' && data !== null) {
+            processItem(data)
+          }
+        } catch (error) {
+          console.error('❌ Error parsing order book WebSocket message:', error)
+          setConnectionStatus('error')
+        }
+      }
+
+    } catch (error) {
+      setConnectionStatus('error')
+      isConnectingRef.current = false
+      console.error('❌ Failed to create order book WebSocket connection:', error)
+    }
+  }, [activeYesTokenIds, reconnectAttempts, maxReconnectAttempts, reconnectDelay, processPriceChange, processBookMessage])
+
+  // Disconnect function
+  const disconnect = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
+    }
+    
+    if (wsRef.current) {
+      wsRef.current.close()
+      wsRef.current = null
+    }
+    
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current)
+      pingIntervalRef.current = null
+    }
+    
+    setConnectionStatus('disconnected')
+    setReconnectAttempts(0)
+    isConnectingRef.current = false
+  }, [])
+
+  // Effect to manage WebSocket connection
+  useEffect(() => {
+    if (!activeYesTokenIds.length) return
+    
+    isUnmountingRef.current = false
+    connect()
+    
     return () => {
       isUnmountingRef.current = true
-      isConnectingRef.current = false
-      ws.close()
-      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current)
+      disconnect()
     }
-  }, [activeYesTokenIds.join(','), reconnectKey, processPriceChange, processBookMessage])
+  }, [activeYesTokenIds.join(',')]) // Removed other dependencies to prevent unnecessary reconnections
 
   const handleManualReconnect = () => {
-    // This will trigger the useEffect to reconnect by changing state.
-    // We reset attempts to 0 and let the useEffect handle the connection.
-    setReconnectKey(prev => prev + 1); 
+    disconnect()
+    setReconnectAttempts(0)
+    setTimeout(() => {
+      if (!isUnmountingRef.current) {
+        connect()
+      }
+    }, 1000)
   }
 
   // Get connection status display
@@ -402,11 +485,14 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
       case 'connected':
         return { bgColor: 'bg-green-500', text: 'Connected', color: 'text-green-600' }
       case 'connecting':
-        return { bgColor: 'bg-yellow-500', text: 'Connecting', color: 'text-yellow-600' }
+        const connectingText = reconnectAttempts > 0 ? `Reconnecting (${reconnectAttempts}/${maxReconnectAttempts})` : 'Connecting'
+        return { bgColor: 'bg-yellow-500', text: connectingText, color: 'text-yellow-600' }
       case 'error':
-        return { bgColor: 'bg-red-500', text: 'Error', color: 'text-red-600' }
+        const errorText = reconnectAttempts >= maxReconnectAttempts ? 'Connection Failed' : 'Error'
+        return { bgColor: 'bg-red-500', text: errorText, color: 'text-red-600' }
       case 'disconnected':
-        return { bgColor: 'bg-red-500', text: 'Disconnected', color: 'text-red-600' }
+        const disconnectedText = reconnectAttempts >= maxReconnectAttempts ? 'Max Retries Reached' : 'Disconnected'
+        return { bgColor: 'bg-red-500', text: disconnectedText, color: 'text-red-600' }
       default:
         return { bgColor: 'bg-red-500', text: 'Disconnected', color: 'text-red-600' }
     }
@@ -596,10 +682,17 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
         </h3>
       </div>
       <div className="flex-1 p-3 overflow-hidden flex flex-col">
-        {connectionStatus === 'error' && (
+        {(connectionStatus === 'error' || (connectionStatus === 'disconnected' && reconnectAttempts >= maxReconnectAttempts)) && (
           <Alert variant="destructive" className="mb-4">
-            <AlertTitle>Connection Error</AlertTitle>
-            <AlertDescription>WebSocket connection failed. Order book may not update.</AlertDescription>
+            <AlertTitle>
+              {reconnectAttempts >= maxReconnectAttempts ? 'Connection Failed' : 'Connection Error'}
+            </AlertTitle>
+            <AlertDescription>
+              {reconnectAttempts >= maxReconnectAttempts 
+                ? `Failed to connect after ${maxReconnectAttempts} attempts. Order book will not update.`
+                : 'WebSocket connection failed. Order book may not update.'
+              }
+            </AlertDescription>
             <Button
               variant="secondary"
               size="sm"
@@ -607,7 +700,7 @@ export function OrderBookCard({ event, selectedMarket, selectedToken, onTokenCha
               onClick={handleManualReconnect}
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              Reconnect
+              Retry Connection
             </Button>
           </Alert>
         )}
