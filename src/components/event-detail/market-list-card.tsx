@@ -7,6 +7,7 @@ import { Market, isMarketActive, getMarketDisplayTitle } from '@/lib/stores'
 import { cn } from '@/lib/utils'
 import { useState, useMemo } from 'react'
 import { usePolymarketStatus } from '@/hooks/use-polymarket-status'
+import { useOrderBook } from '@/lib/order-book-context'
 
 interface MarketListCardProps {
   markets: Market[]
@@ -17,6 +18,7 @@ interface MarketListCardProps {
 export function MarketListCard({ markets, selectedMarket, onMarketSelect }: MarketListCardProps) {
   const [showInactiveMarkets, setShowInactiveMarkets] = useState(false)
   const { statusDisplay, formattedResponseTime } = usePolymarketStatus()
+  const { getLowestAskPrice } = useOrderBook()
 
   // Group markets by status and sort by absolute 1h change
   const { activeMarkets, resolvedMarkets } = useMemo(() => {
@@ -48,14 +50,25 @@ export function MarketListCard({ markets, selectedMarket, onMarketSelect }: Mark
   const renderMarket = (market: Market, index: number, isActive: boolean) => {
     const isSelected = selectedMarket?.conditionId === market.conditionId
     
-    // Parse outcome prices - handle string that contains JSON array
-    const getYesNoPrice = (outcomePrices: string[]): { yesPrice: number, noPrice: number } => {
+    // Get YES/NO prices from order book (lowest ask) or fall back to static prices
+    const getYesNoPrice = (market: Market): { yesPrice: number, noPrice: number } => {
+      // Try to get real-time prices from order book first
+      const orderBookYesPrice = getLowestAskPrice(market.conditionId, 'yes')
+      const orderBookNoPrice = getLowestAskPrice(market.conditionId, 'no')
+      
+      if (orderBookYesPrice !== null && orderBookNoPrice !== null) {
+        return {
+          yesPrice: orderBookYesPrice,
+          noPrice: orderBookNoPrice
+        }
+      }
+      
+      // Fall back to static prices from market data
       try {
-        // outcomePrices should be an array like ["0.459", "0.541"]
-        if (outcomePrices && Array.isArray(outcomePrices) && outcomePrices.length >= 2) {
+        if (market.outcomePrices && Array.isArray(market.outcomePrices) && market.outcomePrices.length >= 2) {
           return {
-            yesPrice: parseFloat(outcomePrices[0]) || 0,
-            noPrice: parseFloat(outcomePrices[1]) || 0
+            yesPrice: parseFloat(market.outcomePrices[0]) || 0,
+            noPrice: parseFloat(market.outcomePrices[1]) || 0
           }
         }
       } catch (error) {
@@ -63,7 +76,7 @@ export function MarketListCard({ markets, selectedMarket, onMarketSelect }: Mark
       }
       return { yesPrice: 0, noPrice: 0 }
     }
-    const { yesPrice, noPrice } = getYesNoPrice(market.outcomePrices)
+    const { yesPrice, noPrice } = getYesNoPrice(market)
     return (
       <div
         key={market.conditionId}

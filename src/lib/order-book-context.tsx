@@ -13,6 +13,7 @@ interface OrderBookContextType {
   updateOrderBook: (conditionId: string, data: OrderBookData) => void
   getOrderBook: (conditionId: string) => OrderBookData | null
   getMidpointPrice: (conditionId: string, selectedToken: 'yes' | 'no') => number | null
+  getLowestAskPrice: (conditionId: string, token: 'yes' | 'no') => number | null
 }
 
 const OrderBookContext = createContext<OrderBookContextType | null>(null)
@@ -54,11 +55,37 @@ export function OrderBookProvider({ children }: { children: React.ReactNode }) {
     }
   }, [orderBooks])
 
+  // Get lowest ask price (buyable price) for a specific token
+  const getLowestAskPrice = useCallback((conditionId: string, token: 'yes' | 'no'): number | null => {
+    const orderBook = orderBooks[conditionId]
+    
+    if (!orderBook) {
+      return null
+    }
+    
+    if (token === 'yes') {
+      // For YES token, get the lowest ask from the order book
+      // Asks are sorted high→low, so lowest is at the end
+      return orderBook.asks.length > 0 ? orderBook.asks[orderBook.asks.length - 1][0] : null
+    } else {
+      // For NO token, convert YES order book to NO order book and get lowest ask
+      // YES asks become NO bids, YES bids become NO asks
+      // NO asks = converted YES bids (sorted high→low after conversion)
+      if (orderBook.bids.length === 0) return null
+      
+      // Convert highest YES bid to NO ask price
+      const yesHighestBid = orderBook.bids[0][0]
+      const noAskPrice = 1 - yesHighestBid
+      return noAskPrice
+    }
+  }, [orderBooks])
+
   const value: OrderBookContextType = {
     orderBooks,
     updateOrderBook,
     getOrderBook,
-    getMidpointPrice
+    getMidpointPrice,
+    getLowestAskPrice
   }
 
   return (
