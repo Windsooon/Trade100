@@ -29,16 +29,16 @@ export function MarketListCard({ markets, selectedMarket, onMarketSelect }: Mark
       market.active === false || market.archived === true || market.closed === true
     )
     
-    // Sort by absolute 1h change (biggest movers first)
-    const sortByAbsoluteChange = (a: Market, b: Market) => {
-      const aChange = Math.abs(a.oneHourPriceChange || 0)
-      const bChange = Math.abs(b.oneHourPriceChange || 0)
-      return bChange - aChange
+    // Sort by market ID (smallest to largest)
+    const sortById = (a: Market, b: Market) => {
+      const aId = parseInt(a.id || '0', 10)
+      const bId = parseInt(b.id || '0', 10)
+      return aId - bId
     }
     
     return {
-      activeMarkets: active.sort(sortByAbsoluteChange),
-      resolvedMarkets: resolved.sort(sortByAbsoluteChange)
+      activeMarkets: active.sort(sortById),
+      resolvedMarkets: resolved.sort(sortById)
     }
   }, [markets])
 

@@ -51,6 +51,7 @@ function transformEventData(rawEvent: RawEventData): Event {
       }
 
         return {
+          id: market.id || '',
           question: market.question || '',
           conditionId: market.conditionId || '',
           groupItemTitle: market.groupItemTitle,

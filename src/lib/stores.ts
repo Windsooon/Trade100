@@ -20,6 +20,7 @@ export interface Event {
 
 // Simplified Market interface - only keeping necessary fields
 export interface Market {
+  id?: string
   question: string
   conditionId: string
   groupItemTitle?: string

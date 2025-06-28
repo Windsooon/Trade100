@@ -27,6 +27,7 @@ interface ApiEvent {
 }
 
 interface ApiMarket {
+  id?: string
   question: string
   conditionId: string
   groupItemTitle?: string
@@ -100,6 +101,7 @@ function transformEvent(apiEvent: ApiEvent): Event {
       const parsedOutcomePrices = parseOutcomePrices(market.outcomePrices)
       
       return {
+        id: market.id,
         question: market.question,
         conditionId: market.conditionId,
         groupItemTitle: market.groupItemTitle,
