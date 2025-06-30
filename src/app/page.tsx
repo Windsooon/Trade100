@@ -303,8 +303,10 @@ export default function HomePage() {
         case 'endingSoon':
           // Filter markets that have endDate in the future
           const now = new Date()
+          const yesterday = new Date(now);
+          yesterday.setDate(yesterday.getDate() - 1);
           const marketsWithFutureEndDate = activeMarkets.filter((market: any) => 
-            market.endDate && new Date(market.endDate) > now
+            market.endDate && new Date(market.endDate) > yesterday
           )
           if (marketsWithFutureEndDate.length === 0) {
             continue // Skip event if no future endDate

@@ -20,8 +20,10 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json()
     
-    // Filter events where endDate > current time (crypto filtering will be done in frontend)
+    // Filter events where endDate > one day before now (yesterday)
     const now = new Date()
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
     const filteredEvents = []
     const allEvents = data.data || []
     
@@ -29,11 +31,11 @@ export async function GET(request: NextRequest) {
       if (!event.endDate) continue
       const endDate = new Date(event.endDate)
       
-      if (endDate > now) {
+      if (endDate > yesterday) {
         filteredEvents.push(event)
         
         // Stop once we have enough events
-        if (filteredEvents.length >= 100) break
+        if (filteredEvents.length >= 10) break
       }
     }
     
