@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
 import { Market, Event } from '@/lib/stores'
-import { createChart, IChartApi, ISeriesApi, CandlestickData, ColorType, CandlestickSeries, LogicalRange, LineSeries, LineData } from 'lightweight-charts'
+import { createChart, IChartApi, ISeriesApi, CandlestickData, ColorType, CandlestickSeries, LogicalRange, LineSeries, LineData, HistogramSeries, HistogramData } from 'lightweight-charts'
 
 
 
@@ -32,21 +32,33 @@ interface ApiCandlestickData {
   close: number
 }
 
+interface VolumeData {
+  timestamp: number
+  totalSize: number
+  totalDollarVolume: number
+}
+
+type VolumeType = 'totalSize' | 'totalDollarVolume'
+
 export function TradingChartCard({ selectedMarket, selectedToken, event, orderBookData }: TradingChartCardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1h')
   const [isLiveMode, setIsLiveMode] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingHistorical, setLoadingHistorical] = useState(false)
+  const [volumeType, setVolumeType] = useState<VolumeType>('totalDollarVolume')
+  const [volumeError, setVolumeError] = useState<string | null>(null)
   
   // Chart refs
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> | null>(null)
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   
   // Data refs
   const allDataRef = useRef<CandlestickData[]>([])
   const realTimeDataRef = useRef<LineData[]>([])
+  const volumeDataRef = useRef<VolumeData[]>([])
   
   // State tracking refs - simplified into single state object
   const stateRef = useRef({
@@ -76,6 +88,16 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
       case '1d': return 1440
       default: return 1440
     }
+  }, [])
+
+  const formatVolume = useCallback((value: number, isDollar: boolean = false): string => {
+    const prefix = isDollar ? '$' : ''
+    if (value >= 1000000) {
+      return `${prefix}${(value / 1000000).toFixed(1)}M`
+    } else if (value >= 1000) {
+      return `${prefix}${(value / 1000).toFixed(1)}K`
+    }
+    return `${prefix}${value.toFixed(0)}`
   }, [])
 
   // Calculate time range with period-specific candle counts
@@ -229,7 +251,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
         updateRealTimePrice(midpointPrice)
       }
     }
-  }, [isLiveMode, orderBookData]) // Removed function dependencies
+  }, [isLiveMode, orderBookData, calculateMidpointPrice, updateRealTimePrice])
 
   // Handle mode switching
   const switchToLiveMode = useCallback(() => {
@@ -424,10 +446,10 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
       const newData: ApiCandlestickData[] = result.data
 
       // Validate and transform data
-      const chartData: CandlestickData[] = []
+      let chartData: CandlestickData[] = []
       let invalidDataCount = 0
       
-      newData.forEach((item, index) => {
+      newData.forEach((item: ApiCandlestickData, index: number) => {
         try {
           // Validate required fields
           if (typeof item.time !== 'number' || item.time <= 0) {
@@ -467,17 +489,20 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
 
       // Filter out any data that overlaps with existing data
       const existingTimestamps = new Set(allDataRef.current.map(d => d.time as number))
-      const newUniqueData = chartData.filter(d => !existingTimestamps.has(d.time as number))
+      chartData = chartData.filter((d) => {
+        if (existingTimestamps.has(d.time as number)) return false
+        return true
+      })
 
-      if (newUniqueData.length > 0) {
+      if (chartData.length > 0) {
         // Merge and sort all data
-        const mergedData = [...newUniqueData, ...allDataRef.current]
+        const mergedData = [...chartData, ...allDataRef.current]
         mergedData.sort((a, b) => (a.time as number) - (b.time as number))
         
         allDataRef.current = mergedData
         state.oldestLoadedTimestamp = Math.min(
           state.oldestLoadedTimestamp || Infinity,
-          ...newUniqueData.map(d => d.time as number)
+          ...chartData.map(d => d.time as number)
         )
 
         // Update the series with all data - but only if we're still in historical mode
@@ -559,9 +584,35 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
         wickUpColor: '#26a69a',
         wickDownColor: '#ef5350',
       })
+      
+      // Position price series to take 70% of chart height
+      candlestickSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.4,
+        },
+      })
+
+      // Add volume series (histogram)
+      const volumeSeries = chart.addSeries(HistogramSeries, {
+        color: '#26a69a',
+        priceFormat: {
+          type: 'volume',
+        },
+        priceScaleId: '', // overlay
+      })
+      
+      // Configure volume price scale
+      volumeSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.7, // volume takes bottom 30%
+          bottom: 0,
+        },
+      })
 
       chartRef.current = chart
       seriesRef.current = candlestickSeries
+      volumeSeriesRef.current = volumeSeries
 
       // Set up time scale restrictions and panning behavior
       const timeScale = chart.timeScale()
@@ -637,7 +688,9 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
       }
       chartRef.current = null
       seriesRef.current = null
+      volumeSeriesRef.current = null
       allDataRef.current = []
+      volumeDataRef.current = []
       stateRef.current.oldestLoadedTimestamp = null
     }
   }, []) // Remove all dependencies to prevent re-initialization
@@ -778,128 +831,74 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
     }
   }, [isLiveMode, selectedToken]) // Re-setup tooltip when mode or token changes
 
-  // Fetch data when dependencies change
-  useEffect(() => {
-    if (selectedMarket?.conditionId && isCurrentMarketActive && !stateRef.current.isLiveMode) {
-      fetchChartData()
-    }
-  }, [selectedMarket?.conditionId, selectedToken, selectedPeriod, isCurrentMarketActive, stateRef.current.isLiveMode])
-
   // Fetch and update chart data
   const fetchChartData = useCallback(async () => {
-
     if (!selectedMarket?.clobTokenIds) {
       setError('No market selected or market data unavailable')
       return
     }
-    
     if (!isCurrentMarketActive) {
       setError('Selected market is not currently active')
       return
     }
-      
     let tokenId: string | null = null
     try {
       const clobTokenIds = selectedMarket.clobTokenIds.trim()
       if (!clobTokenIds) {
         throw new Error('Empty token IDs string')
       }
-      
       const ids = JSON.parse(clobTokenIds)
       if (!Array.isArray(ids) || ids.length < 2) {
         throw new Error('Invalid token IDs format - expected array with at least 2 elements')
       }
-      
       tokenId = selectedToken === 'yes' ? ids[0] : ids[1]
-      
       if (!tokenId || typeof tokenId !== 'string') {
         throw new Error(`Invalid ${selectedToken} token ID`)
       }
-      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown parsing error'
       setError(`Failed to parse market token IDs: ${errorMessage}`)
       return
     }
-
     setLoading(true)
     setError(null)
-
+    setVolumeError(null)
+    // Start both fetches in parallel
+    const fidelityValue = getFidelity(selectedPeriod)
+    const candleCount = {
+      '1m': 200,  
+      '1h': 200,  
+      '6h': 60,   
+      '1d': 14,   
+    }[selectedPeriod] || 50
+    const secondsPerCandle = fidelityValue * 60
+    const totalSeconds = candleCount * secondsPerCandle
+    const startTs = Math.floor(Date.now() / 1000) - totalSeconds
+    const endTs = Math.floor(Date.now() / 1000)
+    const priceUrl = `/api/prices-history?market=${encodeURIComponent(tokenId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelityValue}`
+    const volumeUrl = `https://poly-trade-edge.vercel.app/api/volumes-history?market=${encodeURIComponent(tokenId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelityValue.toString()}`
+    // Start fetches
+    const pricePromise = fetch(priceUrl).then(r => r.json()).catch(() => null)
+    const volumePromise = fetch(volumeUrl).then(r => r.json()).catch(() => null)
     try {
-      // Update current time reference
-      stateRef.current.currentTime = Math.floor(Date.now() / 1000)
-      
-      // Calculate time range manually to avoid dependency
-      const fidelityValue = getFidelity(selectedPeriod)
-      const candleCount = {
-        '1m': 200,  
-        '1h': 200,  
-        '6h': 60,   
-        '1d': 14,   
-      }[selectedPeriod] || 50
-      
-      const secondsPerCandle = fidelityValue * 60
-      const totalSeconds = candleCount * secondsPerCandle
-      const startTs = stateRef.current.currentTime - totalSeconds
-      const endTs = stateRef.current.currentTime
-      
-      // Validate time range
-      if (startTs >= endTs) {
-        throw new Error('Invalid time range configuration')
-      }
-        
-      const url = `/api/prices-history?market=${encodeURIComponent(tokenId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelityValue}`
-        
-      const response = await fetch(url)
-      
-      if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}`
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.error || errorMessage
-        } catch {
-          errorMessage = response.statusText || errorMessage
-        }
-        throw new Error(`Failed to fetch chart data: ${errorMessage}`)
-      }
-        
-      const result = await response.json()
-      
-      if (!result.success) {
-        const errorMessage = result.error || 'Unknown API error'
-        throw new Error(`API error: ${errorMessage}`)
-      }
-
-      const data: ApiCandlestickData[] = result.data || []
-      
-      if (data.length === 0) {
+      // 1. Await price data first
+      const priceResult = await pricePromise
+      if (!priceResult || !priceResult.success || !priceResult.data?.length) {
         setError('No price data available for this period. Try a different time range.')
+        setLoading(false)
         return
       }
-
       // Validate and transform data for lightweight-charts
       let chartData: CandlestickData[] = []
       let invalidDataCount = 0
-      
-      data.forEach((item, index) => {
+      priceResult.data.forEach((item: ApiCandlestickData, index: number) => {
         try {
-          // Validate required fields
-          if (typeof item.time !== 'number' || item.time <= 0) {
-            throw new Error(`Invalid time at index ${index}`)
-          }
-          
+          if (typeof item.time !== 'number' || item.time <= 0) throw new Error(`Invalid time at index ${index}`)
           const ohlc = [item.open, item.high, item.low, item.close]
-          if (ohlc.some(val => typeof val !== 'number' || isNaN(val) || val < 0 || val > 1)) {
-            throw new Error(`Invalid OHLC values at index ${index}`)
-          }
-          
-          // Basic OHLC validation
-          if (item.high < Math.max(item.open, item.close) || item.low > Math.min(item.open, item.close)) {
-            throw new Error(`Invalid OHLC relationship at index ${index}`)
-          }
-          
+          if (ohlc.some(val => typeof val !== 'number' || isNaN(val) || val < 0 || val > 1)) throw new Error(`Invalid OHLC values at index ${index}`)
+          if (item.high < Math.max(item.open, item.close) || item.low > Math.min(item.open, item.close)) throw new Error(`Invalid OHLC relationship at index ${index}`)
           chartData.push({
-            time: item.time as any, // lightweight-charts expects Time type
+            time: item.time as any,
             open: item.open,
             high: item.high,
             low: item.low,
@@ -907,94 +906,116 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
           })
         } catch (error) {
           invalidDataCount++
-          if (invalidDataCount === 1) {
-          }
         }
       })
-      
-      if (invalidDataCount > 0) {
-      }
-      
       if (chartData.length === 0) {
         setError('All received data points were invalid. Please try a different period.')
+        setLoading(false)
         return
       }
-      
-      // Sort by time and remove duplicates (lightweight-charts requires strict ascending order)
+      // Sort and deduplicate
       chartData.sort((a, b) => (a.time as number) - (b.time as number))
-      
-      // Remove duplicate timestamps by keeping the last occurrence
-      const uniqueData: CandlestickData[] = []
       const seen = new Set<number>()
-      
-      // Process in reverse to keep the last occurrence of each timestamp
-      for (let i = chartData.length - 1; i >= 0; i--) {
-        const timestamp = chartData[i].time as number
-        if (!seen.has(timestamp)) {
-          seen.add(timestamp)
-          uniqueData.unshift(chartData[i]) // Add to beginning to maintain order
-        }
-      }
-      
-      chartData = uniqueData
-      
-      // Store the data and set oldest timestamp reference
+      chartData = chartData.filter((d) => {
+        if (seen.has(d.time as number)) return false
+        seen.add(d.time as number)
+        return true
+      })
       allDataRef.current = chartData
-      stateRef.current.oldestLoadedTimestamp = chartData.length > 0 ? 
-        Math.min(...chartData.map(d => d.time as number)) : null
-      
-      // Validate data is properly sorted (debugging aid)
-      let isValidOrder = true
-      for (let i = 1; i < chartData.length; i++) {
-        if ((chartData[i].time as number) <= (chartData[i-1].time as number)) {
-          isValidOrder = false
-        }
-      }
-      
-      if (!isValidOrder) {
-        throw new Error('Chart data is not properly ordered by time')
-      }
-
-      // Only update chart if we have valid data
+      stateRef.current.oldestLoadedTimestamp = chartData.length > 0 ? Math.min(...chartData.map(d => d.time as number)) as any : null
+      // Render price chart immediately
       if (seriesRef.current && chartData.length > 0) {
         seriesRef.current.setData(chartData)
-        
-        if (chartRef.current) {
-          const timeScale = chartRef.current.timeScale()
-          
-          // Set visible range to show most recent data exactly at the right edge
-          const totalBars = chartData.length
-          const visibleBars = Math.min(totalBars, 100) // Show last 50 bars or all if less
-          
-          timeScale.setVisibleLogicalRange({
-            from: Math.max(0, totalBars - visibleBars),
-            to: totalBars - 1 // No padding - most recent data at right edge
+      }
+      setLoading(false) // Price chart is ready
+      // 2. Await volume data (may still be loading)
+      const volumeResult = await volumePromise
+      let volumeHistogramData = []
+      if (volumeResult && Array.isArray(volumeResult)) {
+        // Clean up volume data based on price history timestamps
+        let cleanedVolumeData = volumeResult
+        if (chartData.length > 0) {
+          const t1 = chartData[0].time
+          const startIndex = volumeResult.findIndex(volumeRecord => volumeRecord.timestamp > t1)
+          if (startIndex !== -1) {
+            cleanedVolumeData = volumeResult.slice(startIndex)
+          }
+          const lastPriceTimestamp = chartData[chartData.length - 1].time
+          cleanedVolumeData.push({
+            timestamp: lastPriceTimestamp,
+            totalSize: 0,
+            totalDollarVolume: 0
           })
-          
+        }
+        volumeHistogramData = chartData.map((priceCandle, index) => {
+          const volumeData = cleanedVolumeData[index]
+          const isGreen = priceCandle.close >= priceCandle.open
+          const color = isGreen ? '#26a69a' : '#ef5350'
+          const volumeValue = volumeData ? (volumeType === 'totalDollarVolume' ? volumeData.totalDollarVolume : volumeData.totalSize) : 0
+          return {
+            time: priceCandle.time,
+            value: volumeValue || 0,
+            color: color
+          }
+        })
+        volumeDataRef.current = cleanedVolumeData
+        if (volumeSeriesRef.current && volumeHistogramData.length > 0) {
+          volumeSeriesRef.current.setData(volumeHistogramData)
         }
       } else {
-        setError('Chart initialization error. Please refresh the page.')
+        setVolumeError('Volume data unavailable')
       }
-
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-      
-      // Set user-friendly error messages
-      if (errorMessage.includes('Failed to fetch')) {
-        setError('Network error: Unable to load chart data. Please check your connection.')
-      } else if (errorMessage.includes('HTTP 4')) {
-        setError('Chart data not available for the selected period and market.')
-      } else if (errorMessage.includes('HTTP 5')) {
-        setError('Server error: Please try again later.')
-      } else if (errorMessage.includes('Invalid token IDs')) {
-        setError('Market configuration error. Please select a different market.')
-      } else {
-        setError(`Error loading chart: ${errorMessage}`)
-      }
+      setError(`Error loading chart: ${errorMessage}`)
     } finally {
       setLoading(false)
     }
-  }, [selectedMarket?.clobTokenIds, selectedToken, selectedPeriod, isCurrentMarketActive])
+  }, [selectedMarket?.clobTokenIds, selectedToken, selectedPeriod, isCurrentMarketActive, getFidelity, volumeType])
+
+  // Fetch data when dependencies change
+  useEffect(() => {
+    if (selectedMarket?.conditionId && isCurrentMarketActive && !isLiveMode) {
+      fetchChartData()
+    }
+  }, [selectedMarket?.conditionId, selectedToken, selectedPeriod, isCurrentMarketActive, isLiveMode, fetchChartData])
+
+  // Update volume series when volume type changes
+  useEffect(() => {
+    if (!volumeSeriesRef.current || !volumeDataRef.current.length || !allDataRef.current.length) return
+    
+    try {
+      const updatedVolumeData = allDataRef.current.map((priceCandle, index) => {
+        const volumeData = volumeDataRef.current[index]
+        
+        // Determine color based on price movement (close vs open)
+        const isGreen = priceCandle.close >= priceCandle.open
+        const color = isGreen ? '#26a69a' : '#ef5350'
+        
+        // Get volume value based on selected type
+        const volumeValue = volumeData ? 
+          (volumeType === 'totalDollarVolume' ? volumeData.totalDollarVolume : volumeData.totalSize) : 0
+        
+        return {
+          time: priceCandle.time as any,
+          value: volumeValue || 0,
+          color: color
+        }
+      })
+      
+      volumeSeriesRef.current.setData(updatedVolumeData)
+      
+      // Update price format based on volume type
+      volumeSeriesRef.current.applyOptions({
+        priceFormat: {
+          type: 'volume',
+          precision: volumeType === 'totalDollarVolume' ? 2 : 0,
+        },
+      })
+    } catch (error) {
+      console.error('Error updating volume series:', error)
+    }
+  }, [volumeType])
 
   const chartTitle = `${selectedToken.toUpperCase()} Token Price Chart ${stateRef.current.isLiveMode ? '(Live)' : '(Historical)'}`
 
@@ -1037,6 +1058,29 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
               ))}
             </div>
           </div>
+          <div>
+            <div className="text-xs text-muted-foreground mb-2 font-medium">Volume Display</div>
+            <div className="flex gap-1">
+              <Button
+                variant={volumeType === 'totalDollarVolume' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setVolumeType('totalDollarVolume')}
+                disabled={loading}
+                className="text-xs px-2 py-1 h-7"
+              >
+                Volume ($)
+              </Button>
+              <Button
+                variant={volumeType === 'totalSize' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setVolumeType('totalSize')}
+                disabled={loading}
+                className="text-xs px-2 py-1 h-7"
+              >
+                Volume (Shares)
+              </Button>
+            </div>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -1044,6 +1088,13 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        {volumeError && (
+          <Alert variant="default" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{volumeError}</AlertDescription>
           </Alert>
         )}
         
@@ -1071,6 +1122,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
                 `${realTimeDataRef.current.length} live data points` : 
                 `${allDataRef.current.length} historical data points loaded`
               }
+              {volumeDataRef.current.length > 0 && ` • ${volumeDataRef.current.length} volume data points`}
               {stateRef.current.loadingHistorical && " • Loading historical data..."}
             </div>
           </div>
