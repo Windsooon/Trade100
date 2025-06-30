@@ -124,15 +124,6 @@
 }
 
 @layer utilities {
-  /* Custom container overrides in utilities layer - loads after Tailwind base */
-  .container {
-    @media (width >= 80rem) {
-      max-width: 90rem;
-    }
-    @media (width >= 96rem) {
-      max-width: 102rem;
-    }
-  }
 
   /* Custom navbar colors */
   .navbar-brand {
@@ -141,6 +132,15 @@
 
   .navbar-link {
     color: #eaecef;
+  }
+
+  /* Market price change colors */
+  .text-price-positive {
+    color: #2EBD85;
+  }
+
+  .text-price-negative {
+    color: #F6465D;
   }
 
   @keyframes accordion-down {

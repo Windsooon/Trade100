@@ -1,605 +1,631 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
+import { Navbar } from '@/components/ui/navbar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
-import { Checkbox } from '@/components/ui/checkbox'
-import { RefreshCw, Filter, X, TrendingUp, Info, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { RefreshCw, TrendingUp, Clock, DollarSign, Flame } from 'lucide-react'
 import { Event } from '@/lib/stores'
-import { Navbar } from '@/components/ui/navbar'
-import { EventsDataTable } from '@/components/ui/events-data-table'
-import { RapidChangesCard } from '@/components/ui/rapid-changes-card'
-import { ArbitrageCard } from '@/components/ui/arbitrage-card'
-import { TopVolumeCard } from '@/components/ui/top-volume-card'
+import Link from 'next/link'
 
-interface FetchLog {
-  stage: string
-  message: string
-  isError: boolean
-}
-
-interface EventsResponse {
+interface HomeCardProps {
+  title: string
+  icon: React.ReactNode
   events: Event[]
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    totalPages: number
+  loading: boolean
+  error: string | null
+}
+
+function HomeCard({ title, icon, events, loading, error }: HomeCardProps) {
+  return (
+    <Card className="bg-card text-card-foreground flex flex-col rounded-xl border shadow-sm">
+      <CardHeader className="pb-0">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          {icon}
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex-1">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        ) : events.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">No events available</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {events.map((event) => (
+              <Link key={event.id} href={`/events/${event.slug}`} target="_blank" rel="noopener noreferrer">
+                <div className="flex cursor-pointer items-stretch justify-between rounded-md p-2 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    {/* Event Icon */}
+                    <div className="flex-shrink-0 mt-0.5">
+                      {event.icon ? (
+                        <img
+                          src={event.icon}
+                          alt={`${event.title} icon`}
+                          className="w-4 h-4 rounded-full"
+                          onError={(e) => {
+                            // Hide image if it fails to load
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      ) : (
+                        <div className="w-4 h-4 rounded-full bg-muted flex-shrink-0" />
+                      )}
+                    </div>
+                    
+                    {/* Event Content */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium truncate">{event.title}</h3>
+                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                        <span>Vol: {formatVolume(event.volume24hr)}</span>
+                        <span>Liq: {formatVolume(event.liquidity)}</span>
+                        <span>Ends: {formatDate(event.endDate)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// Market display interface
+interface MarketDisplay {
+  marketId: string
+  question: string  
+  conditionId: string
+  eventSlug: string
+  icon: string
+  yesPrice: number
+  noPrice: number  
+  priceChange: number
+  endDate: string
+}
+
+// Market Card Component
+function MarketCard({ market }: { market: MarketDisplay }) {
+  const formatPrice = (price: number): string => {
+    return price.toFixed(3)
   }
-  logs: FetchLog[]
-  cache: {
-    totalEvents: number
-    lastUpdated: string
-  }
-}
-
-interface Tag {
-  id: string
-  label: string
-  slug: string
-}
-
-interface TagsResponse {
-  tags: Tag[]
-  success: boolean
-  count: number
-  error?: string
-  fallback?: boolean
-}
-
-// Predefined tags list
-const PREDEFINED_TAGS = [
-  'Politics', 'Sports', 'Crypto', 'Tech', 'Culture', 
-  'World', 'Economy', 'Trump', 'Elections', 'Mentions'
-]
-
-export default function Dashboard() {
-  const [selectedTag, setSelectedTag] = useState<string>('')
-  const [minPrice, setMinPrice] = useState<string>('')
-  const [maxPrice, setMaxPrice] = useState<string>('')
-  const [minBestAsk, setMinBestAsk] = useState<string>('')
-  const [maxBestAsk, setMaxBestAsk] = useState<string>('')
-  const [sortBy, setSortBy] = useState<string>('volume24hr')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   
-  // Auto-refresh state - enabled by default
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
-  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const formatPriceChange = (change: number): string => {
+    const sign = change >= 0 ? '+' : ''
+    return `${sign}${(change * 100).toFixed(2)}%`
+  }
+  
+  const getPriceChangeColor = (change: number): string => {
+    return change >= 0 ? 'text-price-positive' : 'text-price-negative'
+  }
+  
+  return (
+    <Link href={`/events/${market.eventSlug}?market=${market.conditionId}`} target="_blank" rel="noopener noreferrer">
+      <div className="flex cursor-pointer items-center justify-between rounded-md p-3 hover:bg-muted/50 transition-colors">
+        <div className="flex items-center gap-3 w-96">
+          {/* Market Icon */}
+          <div className="flex-shrink-0">
+            {market.icon ? (
+              <img
+                src={market.icon}
+                alt={`${market.question} icon`}
+                className="w-6 h-6 rounded-full"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-muted flex-shrink-0" />
+            )}
+          </div>
+          
+          {/* Market Question */}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-medium truncate">{market.question}</h3>
+            <div className="text-xs text-muted-foreground">
+              Ends: {formatDate(market.endDate)}
+            </div>
+          </div>
+        </div>
+        
+        {/* Prices and Change */}
+        <div className="flex items-center gap-6 text-sm">
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Yes</div>
+            <div className="font-medium">{formatPrice(market.yesPrice)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">No</div>
+            <div className="font-medium">{formatPrice(market.noPrice)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">24h</div>
+            <div className={`font-medium ${getPriceChangeColor(market.priceChange)}`}>
+              {formatPriceChange(market.priceChange)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+}
 
-  // Helper functions for price range
-  const handlePriceChange = (type: 'min' | 'max', value: string) => {
-    // Allow only numbers and decimal point
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      if (type === 'min') {
-        setMinPrice(value)
-      } else {
-        setMaxPrice(value)
+// Helper functions
+const formatVolume = (volume: number | undefined): string => {
+  if (typeof volume !== 'number' || volume === 0) return 'N/A'
+  if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`
+  if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`
+  return `$${volume.toFixed(0)}`
+}
+
+const formatDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInMs = date.getTime() - now.getTime()
+    const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24))
+    
+    if (diffInDays < 1) return 'Today'
+    if (diffInDays === 1) return '1 day'
+    if (diffInDays < 7) return `${diffInDays} days`
+    if (diffInDays < 30) return `${Math.ceil(diffInDays / 7)} weeks`
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  } catch {
+    return 'Invalid date'
+  }
+}
+
+export default function HomePage() {
+  // Store full event data for both cards and market processing
+  const [allNewest, setAllNewest] = useState<any[]>([])
+  const [allTopVolume, setAllTopVolume] = useState<any[]>([])
+  const [allEndingSoon, setAllEndingSoon] = useState<any[]>([])
+  const [allLiquidity, setAllLiquidity] = useState<any[]>([])
+  
+  // Display data for cards (top 3)
+  const [newest, setNewest] = useState<Event[]>([])
+  const [topVolume, setTopVolume] = useState<Event[]>([])
+  const [endingSoon, setEndingSoon] = useState<Event[]>([])
+  const [liquidity, setLiquidity] = useState<Event[]>([])
+  
+  // Market data for tabs
+  const [marketData, setMarketData] = useState({
+    newest: [] as MarketDisplay[],
+    volume: [] as MarketDisplay[],
+    liquidity: [] as MarketDisplay[],
+    endingSoon: [] as MarketDisplay[],
+  })
+  
+  const [loading, setLoading] = useState({
+    newest: true,
+    topVolume: true,
+    endingSoon: true,
+    liquidity: true,
+  })
+  
+  const [errors, setErrors] = useState({
+    newest: null as string | null,
+    topVolume: null as string | null,
+    endingSoon: null as string | null,
+    liquidity: null as string | null,
+  })
+
+  useEffect(() => {
+    // Fetch all data in parallel
+    Promise.all([
+      fetchNewest(),
+      fetchTopVolume(),
+      fetchEndingSoon(),
+      fetchLiquidity(),
+    ])
+  }, [])
+
+  // Market processing functions
+  const processMarketsFromEvents = (events: any[], type: 'newest' | 'volume' | 'liquidity' | 'endingSoon'): MarketDisplay[] => {
+    const markets: MarketDisplay[] = []
+    
+    for (let eventIndex = 0; eventIndex < events.length; eventIndex++) {
+      const event = events[eventIndex]
+      
+      if (!event.markets || event.markets.length === 0) {
+        continue
       }
-    }
-  }
-
-  const getPriceRange = (): [number, number] => {
-    const min = minPrice === '' ? 0 : parseFloat(minPrice)
-    const max = maxPrice === '' ? 1 : parseFloat(maxPrice)
-    return [isNaN(min) ? 0 : min, isNaN(max) ? 1 : max]
-  }
-
-  const handleBestAskChange = (type: 'min' | 'max', value: string) => {
-    // Allow only numbers and decimal point
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      if (type === 'min') {
-        setMinBestAsk(value)
-      } else {
-        setMaxBestAsk(value)
+      
+      // Filter active markets
+      const activeMarkets = event.markets.filter((market: any) => 
+        market.active === true && market.archived === false && market.closed === false
+      )
+      
+      if (activeMarkets.length === 0) {
+        continue
       }
-    }
-  }
-
-  const getBestAskRange = (): [number, number] => {
-    const min = minBestAsk === '' ? 0 : parseFloat(minBestAsk)
-    const max = maxBestAsk === '' ? 1 : parseFloat(maxBestAsk)
-    return [isNaN(min) ? 0 : min, isNaN(max) ? 1 : max]
-  }
-
-  // Fetch events data - no caching
-  const {
-    data: allEventsData,
-    isLoading: eventsLoading,
-    isError: eventsError,
-    error: eventsErrorDetails,
-    refetch: refetchEvents,
-  } = useQuery<EventsResponse>({
-    queryKey: ['all-events'],
-    queryFn: async () => {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
+      // Select best market based on type with proper fallback handling
+      let selectedMarket: any = null
+      
+      switch (type) {
+        case 'volume':
+          // Filter markets that have volume24hr data
+          const marketsWithVolume = activeMarkets.filter((market: any) => 
+            market.volume24hr !== undefined && market.volume24hr !== null && market.volume24hr > 0
+          )
+          if (marketsWithVolume.length === 0) {
+            continue // Skip event if no volume data
+          }
+          
+          selectedMarket = marketsWithVolume.reduce((best: any, current: any) => 
+            current.volume24hr > best.volume24hr ? current : best
+          )
+          break
+          
+        case 'liquidity':
+          // Filter markets that have liquidity data
+          const marketsWithLiquidity = activeMarkets.filter((market: any) => {
+            const liquidity = market.liquidityNum || market.liquidity || 0
+            return liquidity > 0
+          })
+          if (marketsWithLiquidity.length === 0) {
+            continue // Skip event if no liquidity data
+          }
+          
+          selectedMarket = marketsWithLiquidity.reduce((best: any, current: any) => {
+            const currentLiquidity = current.liquidityNum || current.liquidity || 0
+            const bestLiquidity = best.liquidityNum || best.liquidity || 0
+            return currentLiquidity > bestLiquidity ? current : best
+          })
+          break
+          
+        case 'newest':
+          // Filter markets that have startDate data
+          const marketsWithStartDate = activeMarkets.filter((market: any) => 
+            market.startDate
+          )
+          if (marketsWithStartDate.length === 0) {
+            continue // Skip event if no startDate data
+          }
+          
+          selectedMarket = marketsWithStartDate.reduce((best: any, current: any) => 
+            new Date(current.startDate) > new Date(best.startDate) ? current : best
+          )
+          break
+          
+        case 'endingSoon':
+          // Filter markets that have endDate in the future
+          const now = new Date()
+          const marketsWithFutureEndDate = activeMarkets.filter((market: any) => 
+            market.endDate && new Date(market.endDate) > now
+          )
+          if (marketsWithFutureEndDate.length === 0) {
+            continue // Skip event if no future endDate
+          }
+          
+          selectedMarket = marketsWithFutureEndDate.reduce((best: any, current: any) => 
+            new Date(current.endDate) < new Date(best.endDate) ? current : best
+          )
+          break
+      }
+      
+      // Skip if no market selected or missing required data
+      if (!selectedMarket || !selectedMarket.outcomePrices || selectedMarket.oneDayPriceChange === undefined) {
+        continue
+      }
       
       try {
-        const response = await fetch('/api/markets?limit=9999', {
-          signal: controller.signal,
-        })
-        
-        clearTimeout(timeoutId)
-        
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to fetch events')
+        // Parse outcome prices
+        const outcomePrices = JSON.parse(selectedMarket.outcomePrices)
+        if (!Array.isArray(outcomePrices) || outcomePrices.length < 2) {
+          continue
         }
-
-        const data = await response.json()
-        return data
+        
+        const marketDisplay: MarketDisplay = {
+          marketId: selectedMarket.id || selectedMarket.conditionId,
+          question: selectedMarket.question || event.title,
+          conditionId: selectedMarket.conditionId,
+          eventSlug: event.slug,
+          icon: selectedMarket.icon || event.icon || '',
+          yesPrice: parseFloat(outcomePrices[0]),
+          noPrice: parseFloat(outcomePrices[1]),
+          priceChange: selectedMarket.oneDayPriceChange,
+          endDate: selectedMarket.endDate || event.endDate,
+        }
+        
+        markets.push(marketDisplay)
+        
+        // Stop at 10 markets (one per event)
+        if (markets.length >= 10) break
+        
       } catch (error) {
-        clearTimeout(timeoutId)
-        if (error instanceof Error && error.name === 'AbortError') {
-          throw new Error('Request timed out after 30 seconds')
-        }
-        throw error
-      }
-    },
-    retry: 1,
-    staleTime: 30 * 1000, // 30 seconds client-side cache (matches server cache)
-    gcTime: 60 * 1000, // 1 minute garbage collection time
-  })
-
-  // Fetch tags data with 1-hour caching
-  const {
-    data: tagsData,
-    isLoading: tagsLoading,
-    isError: tagsError,
-    refetch: refetchTags,
-  } = useQuery<TagsResponse>({
-    queryKey: ['tags'],
-    queryFn: async () => {
-      const response = await fetch('/api/tags')
-      if (!response.ok) {
-        throw new Error('Failed to fetch tags')
-      }
-      return response.json()
-    },
-    retry: 1,
-    staleTime: 60 * 60 * 1000, // 1 hour
-    gcTime: 2 * 60 * 60 * 1000, // 2 hours
-  })
-
-  // Auto-refresh logic
-  useEffect(() => {
-    if (autoRefreshEnabled) {
-      // Set up the auto-refresh interval
-      autoRefreshIntervalRef.current = setInterval(() => {
-        refetchEvents()
-      }, 10 * 60 * 1000) // 10 minutes
-    } else {
-      // Clean up intervals
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current)
-        autoRefreshIntervalRef.current = null
+        continue
       }
     }
-
-    // Cleanup on unmount
-    return () => {
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current)
-      }
-    }
-  }, [autoRefreshEnabled, refetchEvents])
-
-  const handleAutoRefreshToggle = (checked: boolean) => {
-    setAutoRefreshEnabled(checked)
+    
+    return markets
   }
 
-  // Client-side filtering and sorting
-  const filteredAndSortedEvents = allEventsData?.events ? [...allEventsData.events]
-    .filter(event => {
-
-      if (selectedTag !== '') {
-        const eventTagLabels = event.tags.map(tag => tag.label)
-        const hasMatchingTag = eventTagLabels.some(eventTag => 
-          eventTag.toLowerCase().includes(selectedTag.toLowerCase())
-        )
-        if (!hasMatchingTag) return false
-      }
-
-      // Check if any market in the event has a Yes OR No price within the range
-      if (event.markets && event.markets.length > 0) {
-        const [minPriceNum, maxPriceNum] = getPriceRange()
-        const [minBestAskNum, maxBestAskNum] = getBestAskRange()
+  const fetchNewest = async () => {
+    try {
+      const response = await fetch('/api/newest')
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json()
+      if (data.success) {
+        // 1. Get all events from API
+        const allEvents = data.data || []
         
-        const hasMatchingMarket = event.markets.some(market => {
-          let priceMatch = true
-          let bestAskMatch = true
-
-          // Check price range filter (if any input provided)
-          if (minPrice !== '' || maxPrice !== '') {
-            priceMatch = false
-            if (market.outcomePrices && market.outcomePrices.length >= 2) {
-              const yesPrice = parseFloat(market.outcomePrices[0])
-              const noPrice = parseFloat(market.outcomePrices[1])
-
-              // Check if either Yes or No price is within range
-              const yesPriceInRange = !isNaN(yesPrice) && yesPrice >= minPriceNum && yesPrice <= maxPriceNum
-              const noPriceInRange = !isNaN(noPrice) && noPrice >= minPriceNum && noPrice <= maxPriceNum
-
-              priceMatch = yesPriceInRange || noPriceInRange
-            }
+        // 2. Filter events to exclude crypto tags (id="21" and id="100639")
+        const filteredEvents = []
+        for (const event of allEvents) {
+          const hasExcludedTag = event.tags && event.tags.some((tag: any) => 
+            tag.id === "21" || tag.id === "100639"
+          )
+          
+          if (!hasExcludedTag) {
+            filteredEvents.push(event)
           }
+        }
+        setAllNewest(filteredEvents)
+        
+        // 3. Display top 3 events in cards (regardless of markets)
+        const top3Events = filteredEvents.slice(0, 3)
+        setNewest(transformApiEvents(top3Events))
+        
+        // 4. Process ALL filtered events to find 10 markets
+        const markets = processMarketsFromEvents(filteredEvents, 'newest')
+        setMarketData(prev => ({ ...prev, newest: markets }))
+      } else {
+        throw new Error(data.error || 'Failed to fetch newest events')
+      }
+    } catch (error) {
+      setErrors(prev => ({ ...prev, newest: 'Failed to load newest events' }))
+    } finally {
+      setLoading(prev => ({ ...prev, newest: false }))
+    }
+  }
 
-          // Check best ask filter (if any input provided)
-          if (minBestAsk !== '' || maxBestAsk !== '') {
-            bestAskMatch = false
-            if (market.bestAsk) {
-              const bestAskPrice = parseFloat(market.bestAsk)
-              if (!isNaN(bestAskPrice)) {
-                // Return false if min > max (as requested)
-                if (minBestAskNum > maxBestAskNum) {
-                  bestAskMatch = false
-                } else {
-                  bestAskMatch = bestAskPrice >= minBestAskNum && bestAskPrice <= maxBestAskNum
-                }
-              }
-            }
+  const fetchTopVolume = async () => {
+    try {
+      const response = await fetch('/api/top-volume')
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json()
+      if (data.success) {
+        // 1. Get all events from API (already sorted by volume24hr desc)
+        const allEvents = data.data || []
+        
+        // 2. No tag filtering needed for volume tab
+        setAllTopVolume(allEvents)
+        
+        // 3. Display top 3 events in cards (regardless of markets)
+        const top3Events = allEvents.slice(0, 3)
+        setTopVolume(transformApiEvents(top3Events))
+        
+        // 4. Process ALL events to find 10 markets
+        const markets = processMarketsFromEvents(allEvents, 'volume')
+        setMarketData(prev => ({ ...prev, volume: markets }))
+      } else {
+        throw new Error(data.error || 'Failed to fetch top volume events')
+      }
+    } catch (error) {
+      setErrors(prev => ({ ...prev, topVolume: 'Failed to load top volume events' }))
+    } finally {
+      setLoading(prev => ({ ...prev, topVolume: false }))
+    }
+  }
+
+  const fetchEndingSoon = async () => {
+    try {
+      const response = await fetch('/api/ending-soon')
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json()
+      if (data.success) {
+        // 1. Get all events from API, already filtered for endDate > now
+        const allEvents = data.data || []
+        
+        // 2. Filter events to exclude crypto tags (id="21" and id="100639")
+        const filteredEvents = []
+        for (const event of allEvents) {
+          const hasExcludedTag = event.tags && event.tags.some((tag: any) => 
+            tag.id === "21" || tag.id === "100639"
+          )
+          
+          if (!hasExcludedTag) {
+            filteredEvents.push(event)
           }
-
-          return priceMatch && bestAskMatch
-        })
-        // If no markets match the filters, exclude this event
-        if (!hasMatchingMarket) return false
+        }
+        setAllEndingSoon(filteredEvents)
+        
+        // 3. Display top 3 events in cards (regardless of markets)
+        const top3Events = filteredEvents.slice(0, 3)
+        setEndingSoon(transformApiEvents(top3Events))
+        
+        // 4. Process ALL filtered events to find 10 markets
+        const markets = processMarketsFromEvents(filteredEvents, 'endingSoon')
+        setMarketData(prev => ({ ...prev, endingSoon: markets }))
+      } else {
+        throw new Error(data.error || 'Failed to fetch ending soon events')
       }
+    } catch (error) {
+      setErrors(prev => ({ ...prev, endingSoon: 'Failed to load ending soon events' }))
+    } finally {
+      setLoading(prev => ({ ...prev, endingSoon: false }))
+    }
+  }
 
-      return true
-    })
-    .sort((a, b) => {
-      let comparison = 0
-
-      switch (sortBy) {
-        case 'volume24hr':
-          comparison = (a.volume24hr || 0) - (b.volume24hr || 0)
-          break
-        case 'volume1wk':
-          comparison = (a.volume1wk || 0) - (b.volume1wk || 0)
-          break
-        case 'volume':
-          comparison = (a.liquidity || 0) - (b.liquidity || 0)
-          break
-        case 'title':
-          comparison = a.title.localeCompare(b.title)
-          break
-        case 'endDate':
-          comparison = new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
-          break
-        default:
-          return 0
+  const fetchLiquidity = async () => {
+    try {
+      const response = await fetch('/api/top-liquidity')
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json()
+      if (data.success) {
+        // 1. Get all events from API (already sorted by liquidity desc)
+        const allEvents = data.data || []
+        
+        // 2. No tag filtering needed for liquidity tab
+        setAllLiquidity(allEvents)
+        
+        // 3. Display top 3 events in cards (regardless of markets)
+        const top3Events = allEvents.slice(0, 3)
+        setLiquidity(transformApiEvents(top3Events))
+        
+        // 4. Process ALL events to find 10 markets
+        const markets = processMarketsFromEvents(allEvents, 'liquidity')
+        setMarketData(prev => ({ ...prev, liquidity: markets }))
+      } else {
+        throw new Error(data.error || 'Failed to fetch liquidity events')
       }
-      return sortDirection === 'desc' ? -comparison : comparison
-    }) : []
+    } catch (error) {
+      setErrors(prev => ({ ...prev, liquidity: 'Failed to load liquidity events' }))
+    } finally {
+      setLoading(prev => ({ ...prev, liquidity: false }))
+    }
+  }
 
-  const hasActiveFilters = selectedTag !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== 'volume24hr' || sortDirection !== 'desc'
-
-  // Overall loading state
-  const isLoading = eventsLoading || tagsLoading
-  const isError = eventsError || tagsError
+  const transformApiEvents = (apiEvents: any[]): Event[] => {
+    return apiEvents.map((apiEvent: any) => ({
+      id: apiEvent.id,
+      title: apiEvent.title,
+      slug: apiEvent.slug || apiEvent.id,
+      startDate: apiEvent.startDate || new Date().toISOString(),
+      endDate: apiEvent.endDate || new Date().toISOString(),
+      volume: apiEvent.volume,
+      volume24hr: apiEvent.volume24hr,
+      volume1wk: apiEvent.volume1wk,
+      volume1mo: apiEvent.volume1mo,
+      liquidity: apiEvent.liquidity,
+      markets: [], // Not needed for home page display
+      tags: apiEvent.tags || [],
+      negRisk: apiEvent.negRisk,
+      icon: apiEvent.icon,
+    }))
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navbar */}
       <Navbar />
+      
+      <div className="container mx-auto px-4 py-6">
+        
+        {/* Cards Grid - 2x2 on mobile, 4 columns on desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <HomeCard
+            title="Newest"
+            icon={<Flame className="h-5 w-5" />}
+            events={newest}
+            loading={loading.newest}
+            error={errors.newest}
+          />
+          
+          <HomeCard
+            title="24h Volume"
+            icon={<TrendingUp className="h-5 w-5" />}
+            events={topVolume}
+            loading={loading.topVolume}
+            error={errors.topVolume}
+          />
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Top Row: Rapid Changes + Arbitrage + Top Volume Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Rapid Changes Card */}
-          {allEventsData?.events ? (
-            <RapidChangesCard 
-              events={allEventsData.events} 
-              availableTags={tagsData?.tags || []}
-              tagsLoading={tagsLoading}
-            />
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Rapid Changes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center text-muted-foreground py-8">
-                  {eventsLoading ? 'Loading market data...' : 'No data available'}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <HomeCard
+            title="Liquidity"
+            icon={<DollarSign className="h-5 w-5" />}
+            events={liquidity}
+            loading={loading.liquidity}
+            error={errors.liquidity}
+          />
 
-          {/* Top Volume Markets Card */}
-          {allEventsData?.events ? (
-            <TopVolumeCard 
-              events={allEventsData.events} 
-              availableTags={tagsData?.tags || []}
-              tagsLoading={tagsLoading}
-            />
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Top Volume Markets
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center text-muted-foreground py-8">
-                  {eventsLoading ? 'Loading market data...' : 'No data available'}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Top Arbitrage Events Card */}
-          {allEventsData?.events ? (
-            <ArbitrageCard
-              events={allEventsData.events}
-              availableTags={tagsData?.tags || []}
-              tagsLoading={tagsLoading}
-            />
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Top Arbitrage Events
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center text-muted-foreground py-8">
-                  {eventsLoading ? 'Loading market data...' : 'No data available'}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <HomeCard
+            title="Ending Soon"
+            icon={<Clock className="h-5 w-5" />}
+            events={endingSoon}
+            loading={loading.endingSoon}
+            error={errors.endingSoon}
+          />
         </div>
-
-        {/* Filters and Table */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Filters Card */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Filter className="h-5 w-5" />
-                  Filters
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Active Filters Display - Always visible with fixed height to prevent layout shifts */}
-              <div className="space-y-2 min-h-[4.5rem]">
-                <div className="flex items-center justify-between min-h-[2rem]">
-                  <div className="text-sm font-medium">
-                    {hasActiveFilters ? 'Active Filters:' : 'No active filters'}
+        
+        {/* Market List with Tabs */}
+        <div className="mt-8 max-w-4xl mx-auto">
+          <Tabs defaultValue="volume" className="w-full">
+            <TabsList className="grid w-full grid-cols-4 bg-transparent">
+              <TabsTrigger value="newest">Newest</TabsTrigger>
+              <TabsTrigger value="volume">24h Volume</TabsTrigger>
+              <TabsTrigger value="liquidity">Liquidity</TabsTrigger>
+              <TabsTrigger value="endingSoon">Ending Soon</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="newest" className="mt-6">
+              <div className="space-y-3">
+                {marketData.newest.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-muted-foreground">No markets available</p>
                   </div>
-                  {hasActiveFilters && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedTag('')
-                        setMinPrice('')
-                        setMaxPrice('')
-                        setMinBestAsk('')
-                        setMaxBestAsk('')
-                        setSortBy('volume24hr')
-                        setSortDirection('desc')
-                      }}
-                      className="h-8 px-2"
-                    >
-                      <X className="h-4 w-4" />
-                      Clear
-                    </Button>
-                  )}
-                </div>
-                {hasActiveFilters && (
-                  <div className="flex flex-wrap gap-1 min-h-[1.5rem]">
-                    {selectedTag !== '' && (
-                      <Badge variant="secondary" className="text-xs">
-                        {selectedTag}
-                      </Badge>
-                    )}
-                    {(minPrice !== '' || maxPrice !== '') && (
-                      <Badge variant="secondary" className="text-xs">
-                        Price Range: {minPrice || '0'}-{maxPrice || '1'}
-                      </Badge>
-                    )}
-                    {(minBestAsk !== '' || maxBestAsk !== '') && (
-                      <Badge variant="secondary" className="text-xs">
-                        Best Ask Range: {minBestAsk || '0'}-{maxBestAsk || '1'}
-                      </Badge>
-                    )}
-                    {(sortBy !== 'volume24hr' || sortDirection !== 'desc') && (
-                      <Badge variant="secondary" className="text-xs">
-                        Sort: {sortBy} ({sortDirection})
-                      </Badge>
-                    )}
-                  </div>
+                ) : (
+                  marketData.newest.map((market) => (
+                    <MarketCard key={market.conditionId} market={market} />
+                  ))
                 )}
               </div>
-
-              <Separator />
-
-              {/* Tags Filter - one per row */}
-              <div className="space-y-4">
-                <label className="text-sm font-medium mb-4 block">Tags</label>
-                <div className="space-y-2">
-                  {PREDEFINED_TAGS.map((tag) => (
-                    <Button
-                      key={tag}
-                      variant={selectedTag === tag ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setSelectedTag(tag)}
-                      className="w-full justify-start text-left h-8 cursor-pointer"
-                    >
-                      {tag}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Price Range */}
-              <div className="space-y-4">
-                <label className="text-sm font-medium mb-4 block">Price Range (Yes or No)</label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="text"
-                    value={minPrice}
-                    onChange={(e) => handlePriceChange('min', e.target.value)}
-                    className="w-20"
-                    placeholder="0.00"
-                  />
-                  <span className="text-sm text-muted-foreground">to</span>
-                  <Input
-                    type="text"
-                    value={maxPrice}
-                    onChange={(e) => handlePriceChange('max', e.target.value)}
-                    className="w-20"
-                    placeholder="1.00"
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Best Asks Price Range */}
-              <div className="space-y-4">
-                <label className="text-sm font-medium mb-4 block">Best Asks Price Range</label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="text"
-                    value={minBestAsk}
-                    onChange={(e) => handleBestAskChange('min', e.target.value)}
-                    className="w-20"
-                    placeholder="0.00"
-                  />
-                  <span className="text-sm text-muted-foreground">to</span>
-                  <Input
-                    type="text"
-                    value={maxBestAsk}
-                    onChange={(e) => handleBestAskChange('max', e.target.value)}
-                    className="w-20"
-                    placeholder="1.00"
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Sort By with Direction Toggle */}
-              <div className="space-y-4">
-                <label className="text-sm font-medium mb-4 block">Sort By</label>
-                <div className="flex gap-2">
-                  <Select value={sortBy} onValueChange={(value) => {
-                    setSortBy(value)
-                  }}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="volume24hr">Volume (24h)</SelectItem>
-                      <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
-                      <SelectItem value="volume">Liquidity</SelectItem>
-                      <SelectItem value="title">Title (A-Z)</SelectItem>
-                      <SelectItem value="endDate">End Date</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {/* Compact Sort Direction Toggle */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
-                    className="px-2 h-9 flex-shrink-0"
-                    title={sortDirection === 'desc' ? 'Descending (High to Low)' : 'Ascending (Low to High)'}
-                  >
-                    {sortDirection === 'desc' ? (
-                      <ArrowDown className="h-4 w-4" />
-                    ) : (
-                      <ArrowUp className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Results Summary */}
-              <div className="pt-4 border-t">
-                <div className="text-sm text-muted-foreground">
-                  Showing {filteredAndSortedEvents.length} events
-                  {allEventsData && ` (${allEventsData.cache.totalEvents} total)`}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Events DataTable */}
-          <Card className="lg:col-span-3">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Events</CardTitle>
-                <div className="flex items-center gap-4">
-                  {/* Data Latency Notice */}
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Info className="h-4 w-4" />
-                    <span>30 seconds latency in Market data</span>
+            </TabsContent>
+            
+            <TabsContent value="volume" className="mt-6">
+              <div className="space-y-3">
+                {marketData.volume.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-muted-foreground">No markets available</p>
                   </div>
-                  {/* Auto-refresh controls */}
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="auto-refresh"
-                      checked={autoRefreshEnabled}
-                      onCheckedChange={handleAutoRefreshToggle}
-                    />
-                    <label
-                      htmlFor="auto-refresh"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      Auto-refresh (10min)
-                    </label>
-                  </div>
-                </div>
+                ) : (
+                  marketData.volume.map((market) => (
+                    <MarketCard key={market.conditionId} market={market} />
+                  ))
+                )}
               </div>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="text-center space-y-2">
-                    <RefreshCw className="h-8 w-8 animate-spin mx-auto" />
-                    <p className="text-muted-foreground">To improve performance for sorting and filtering, it may take about 30s to load all events.</p>
+            </TabsContent>
+            
+            <TabsContent value="liquidity" className="mt-6">
+              <div className="space-y-3">
+                {marketData.liquidity.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-muted-foreground">No markets available</p>
                   </div>
-                </div>
-              ) : isError ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="text-center space-y-4">
-                    <p className="text-destructive">Failed to load events</p>
-                    <p className="text-sm text-muted-foreground">
-                      {eventsErrorDetails instanceof Error ? eventsErrorDetails.message : 'Unknown error'}
-                    </p>
+                ) : (
+                  marketData.liquidity.map((market) => (
+                    <MarketCard key={market.conditionId} market={market} />
+                  ))
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="endingSoon" className="mt-6">
+              <div className="space-y-3">
+                {marketData.endingSoon.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-muted-foreground">No markets available</p>
                   </div>
-                </div>
-              ) : filteredAndSortedEvents.length === 0 ? (
-                <div className="flex items-center justify-center h-64">
-                  <p className="text-muted-foreground">No events found</p>
-                </div>
-              ) : (
-                <EventsDataTable data={filteredAndSortedEvents} />
-              )}
-            </CardContent>
-          </Card>
+                ) : (
+                  marketData.endingSoon.map((market) => (
+                    <MarketCard key={market.conditionId} market={market} />
+                  ))
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+                    
+        {/* View All Markets Button */}
+        <div className="mt-8 text-center">
+          <Link href="/markets">
+            <Button size="lg" className="cursor-pointer px-8">
+              View All Markets
+            </Button>
+          </Link>
         </div>
       </div>
     </div>
   )
-}
+} 
