@@ -177,24 +177,24 @@ export function TopVolumeCard({ events, availableTags, tagsLoading }: TopVolumeC
               {topVolumeMarkets.map((market, index) => (
                 <div
                   key={`${market.eventId}-${market.marketName}-${index}`}
-                  className="flex flex-col gap-2 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors sm:flex-row sm:items-start sm:justify-between w-full max-w-full"
+                  className="flex flex-col gap-2 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors sm:flex-row sm:items-start sm:justify-between w-full"
                   onClick={() => handleMarketClick(market.eventSlug, market.conditionId)}
                 >
-                  <div className="flex-1 min-w-0 max-w-[18rem] overflow-hidden">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-2 mb-1">
                       <span className="text-xs font-medium text-muted-foreground mt-0.5 flex-shrink-0">
                         #{index + 1}
                       </span>
-                      <div className="flex-1 min-w-0 max-w-[18rem] overflow-hidden">
+                      <div className="flex-1 min-w-0">
                         <h4 className="font-medium text-sm leading-tight line-clamp-2 break-words">
                           {market.marketName}
                         </h4>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate mb-2 sm:mb-0 max-w-[18rem]">
+                    <p className="text-xs text-muted-foreground truncate mb-2 sm:mb-0">
                       {market.eventTitle}
                     </p>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs max-w-full">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <span className="text-muted-foreground">YES:</span>
                         <span className="font-medium">{formatPrice(market.yesPrice)}</span>

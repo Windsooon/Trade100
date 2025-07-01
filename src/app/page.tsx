@@ -5,7 +5,7 @@ import { Navbar } from '@/components/ui/navbar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { RefreshCw, TrendingUp, Clock, DollarSign, Flame } from 'lucide-react'
+import { RefreshCw, TrendingUp, Clock, DollarSign, Flame, ChevronUp, ChevronDown } from 'lucide-react'
 import { Event } from '@/lib/stores'
 import Link from 'next/link'
 
@@ -15,9 +15,10 @@ interface HomeCardProps {
   events: Event[]
   loading: boolean
   error: string | null
+  isExpanded: boolean
 }
 
-function HomeCard({ title, icon, events, loading, error }: HomeCardProps) {
+function HomeCard({ title, icon, events, loading, error, isExpanded }: HomeCardProps) {
   return (
     <Card className="bg-card text-card-foreground flex flex-col rounded-xl border shadow-sm">
       <CardHeader className="pb-0">
@@ -113,7 +114,7 @@ function MarketCard({ market }: { market: MarketDisplay }) {
   return (
     <Link href={`/events/${market.eventSlug}?market=${market.conditionId}`} target="_blank" rel="noopener noreferrer">
       <div className="flex cursor-pointer items-center justify-between rounded-md p-3 hover:bg-muted/50 transition-colors">
-        <div className="flex items-center gap-3 w-96">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Market Icon */}
           <div className="flex-shrink-0">
             {market.icon ? (
@@ -140,7 +141,7 @@ function MarketCard({ market }: { market: MarketDisplay }) {
         </div>
         
         {/* Prices and Change */}
-        <div className="flex items-center gap-6 text-sm">
+        <div className="flex items-center gap-3 text-sm ml-4 flex-shrink-0">
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">Yes</div>
             <div className="font-medium">{formatPrice(market.yesPrice)}</div>
@@ -192,6 +193,7 @@ export default function HomePage() {
   const [allTopVolume, setAllTopVolume] = useState<any[]>([])
   const [allEndingSoon, setAllEndingSoon] = useState<any[]>([])
   const [allLiquidity, setAllLiquidity] = useState<any[]>([])
+  const [isExpanded, setIsExpanded] = useState(false)
   
   // Display data for cards (top 3)
   const [newest, setNewest] = useState<Event[]>([])
@@ -515,15 +517,42 @@ export default function HomePage() {
       <Navbar />
       
       <div className="container mx-auto px-4 py-6">
+        {/* Expand/Collapse Control - Only visible on mobile */}
+        <div className="flex items-center justify-between mb-4 sm:hidden">
+          <h2 className="text-lg font-semibold">Market Overview</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-2"
+          >
+            {isExpanded ? (
+              <>
+                Collapse All
+                <ChevronUp className="h-4 w-4" />
+              </>
+            ) : (
+              <>
+                Expand All
+                <ChevronDown className="h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </div>
         
-        {/* Cards Grid - 2x2 on mobile, 4 columns on desktop */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Cards Grid - Hidden on mobile when collapsed */}
+        <div className={`
+          grid gap-4
+          sm:grid-cols-2 lg:grid-cols-4
+          ${isExpanded ? 'grid-cols-1' : 'hidden sm:grid'}
+        `}>
           <HomeCard
             title="Newest"
             icon={<Flame className="h-5 w-5" />}
             events={newest}
             loading={loading.newest}
             error={errors.newest}
+            isExpanded={isExpanded}
           />
           
           <HomeCard
@@ -532,6 +561,7 @@ export default function HomePage() {
             events={topVolume}
             loading={loading.topVolume}
             error={errors.topVolume}
+            isExpanded={isExpanded}
           />
 
           <HomeCard
@@ -540,6 +570,7 @@ export default function HomePage() {
             events={liquidity}
             loading={loading.liquidity}
             error={errors.liquidity}
+            isExpanded={isExpanded}
           />
 
           <HomeCard
@@ -548,6 +579,7 @@ export default function HomePage() {
             events={endingSoon}
             loading={loading.endingSoon}
             error={errors.endingSoon}
+            isExpanded={isExpanded}
           />
         </div>
         
