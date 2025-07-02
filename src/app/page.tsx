@@ -92,7 +92,7 @@ interface MarketDisplay {
   icon: string
   yesPrice: number
   noPrice: number  
-  priceChange: number
+  priceChange: number | null
   endDate: string
 }
 
@@ -102,12 +102,14 @@ function MarketCard({ market }: { market: MarketDisplay }) {
     return price.toFixed(3)
   }
   
-  const formatPriceChange = (change: number): string => {
+  const formatPriceChange = (change: number | null): string => {
+    if (change === null) return '-'
     const sign = change >= 0 ? '+' : ''
     return `${sign}${(change * 100).toFixed(2)}%`
   }
   
-  const getPriceChangeColor = (change: number): string => {
+  const getPriceChangeColor = (change: number | null): string => {
+    if (change === null) return ''
     return change >= 0 ? 'text-price-positive' : 'text-price-negative'
   }
   
@@ -263,7 +265,7 @@ export default function HomePage() {
             market.volume24hr !== undefined && market.volume24hr !== null && market.volume24hr > 0
           )
           if (marketsWithVolume.length === 0) {
-            continue // Skip event if no volume data
+            continue
           }
           
           selectedMarket = marketsWithVolume.reduce((best: any, current: any) => 
@@ -278,7 +280,7 @@ export default function HomePage() {
             return liquidity > 0
           })
           if (marketsWithLiquidity.length === 0) {
-            continue // Skip event if no liquidity data
+            continue
           }
           
           selectedMarket = marketsWithLiquidity.reduce((best: any, current: any) => {
@@ -294,7 +296,7 @@ export default function HomePage() {
             market.startDate
           )
           if (marketsWithStartDate.length === 0) {
-            continue // Skip event if no startDate data
+            continue
           }
           
           selectedMarket = marketsWithStartDate.reduce((best: any, current: any) => 
@@ -311,7 +313,7 @@ export default function HomePage() {
             market.endDate && new Date(market.endDate) > yesterday
           )
           if (marketsWithFutureEndDate.length === 0) {
-            continue // Skip event if no future endDate
+            continue
           }
           
           selectedMarket = marketsWithFutureEndDate.reduce((best: any, current: any) => 
@@ -320,8 +322,18 @@ export default function HomePage() {
           break
       }
       
-      // Skip if no market selected or missing required data
-      if (!selectedMarket || !selectedMarket.outcomePrices || selectedMarket.oneDayPriceChange === undefined) {
+      // Skip if no market selected
+      if (!selectedMarket) {
+        continue
+      }
+      
+      // For non-newest markets, require oneDayPriceChange
+      if (type !== 'newest' && selectedMarket.oneDayPriceChange === undefined) {
+        continue
+      }
+      
+      // Always require outcomePrices
+      if (!selectedMarket.outcomePrices) {
         continue
       }
       
@@ -340,7 +352,7 @@ export default function HomePage() {
           icon: selectedMarket.icon || event.icon || '',
           yesPrice: parseFloat(outcomePrices[0]),
           noPrice: parseFloat(outcomePrices[1]),
-          priceChange: selectedMarket.oneDayPriceChange,
+          priceChange: type === 'newest' ? (selectedMarket.oneDayPriceChange ?? null) : selectedMarket.oneDayPriceChange,
           endDate: selectedMarket.endDate || event.endDate,
         }
         
