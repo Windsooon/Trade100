@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Navbar } from '@/components/ui/navbar'
+import { Footer } from '@/components/ui/footer'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { TrendingUp, Clock, DollarSign, ChevronUp, ChevronDown, BarChart3, Activity, RefreshCw } from 'lucide-react'
+import { TrendingUp, Clock, DollarSign, BarChart3, Activity, RefreshCw } from 'lucide-react'
 import { Event } from '@/lib/stores'
 import Link from 'next/link'
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
@@ -277,7 +278,7 @@ function MarketCard({ market }: { market: MarketDisplay }) {
         </div>
         
         {/* Prices and Change */}
-        <div className="flex items-center gap-3 text-sm ml-4 flex-shrink-0">
+        <div className="flex items-center gap-6 text-sm ml-4 flex-shrink-0">
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">Yes</div>
             <div className="font-medium">{formatPrice(market.yesPrice)}</div>
@@ -329,7 +330,7 @@ export default function HomePage() {
   const [allTopVolume, setAllTopVolume] = useState<any[]>([])
   const [allEndingSoon, setAllEndingSoon] = useState<any[]>([])
   const [allLiquidity, setAllLiquidity] = useState<any[]>([])
-  const [isExpanded, setIsExpanded] = useState(false)
+
   
   // Loading states for market tabs
   const [isLoading, setIsLoading] = useState({
@@ -645,46 +646,20 @@ export default function HomePage() {
       <Navbar />
       
       <div className="container mx-auto px-4 py-6">
-        {/* Expand/Collapse Control - Only visible on mobile */}
-        <div className="flex items-center justify-between mb-4 sm:hidden">
-          <h2 className="text-lg font-semibold">Market Overview</h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-2"
-          >
-            {isExpanded ? (
-              <>
-                Collapse All
-                <ChevronUp className="h-4 w-4" />
-              </>
-            ) : (
-              <>
-                Expand All
-                <ChevronDown className="h-4 w-4" />
-              </>
-            )}
-          </Button>
-        </div>
-        
-        {/* Cards Grid - 12 column layout: 2 empty, 4 card1, 4 card2, 2 empty */}
-        <div className={`
-          grid grid-cols-12 gap-4
-          ${isExpanded ? 'grid-cols-1' : 'hidden sm:grid'}
-        `}>
-          <div className="col-span-2"></div>
-          <div className="col-span-4">
+        {/* Cards Grid - Mobile: 2 cards side by side, Desktop: centered with margins */}
+        <div className="grid grid-cols-2 sm:grid-cols-12 gap-4">
+          <div className="hidden sm:block sm:col-span-2"></div>
+          <div className="col-span-1 sm:col-span-4">
             <TradeCountCard />
           </div>
-          <div className="col-span-4">
+          <div className="col-span-1 sm:col-span-4">
             <TradingVolumeCard />
           </div>
-          <div className="col-span-2"></div>
+          <div className="hidden sm:block sm:col-span-2"></div>
         </div>
         
         {/* Market List with Tabs */}
-        <div className="mt-8 max-w-4xl mx-auto">
+        <div className="mt-8 max-w-[1200px] mx-auto">
           <Tabs defaultValue="volume" className="w-full">
             <TabsList className="grid w-full grid-cols-4 bg-transparent">
               <TabsTrigger value="newest">Newest</TabsTrigger>
@@ -780,6 +755,8 @@ export default function HomePage() {
           </Link>
         </div>
       </div>
+      
+      <Footer />
     </div>
   )
 } 

@@ -1,4 +1,5 @@
 import { Navbar } from '@/components/ui/navbar'
+import { Footer } from '@/components/ui/footer'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { AlertCircleIcon } from 'lucide-react'
 import EventDetailClient from '@/components/event-detail/event-detail-client'
@@ -138,6 +139,7 @@ export default async function EventDetailPage({
             </AlertDescription>
           </Alert>
         </div>
+        <Footer />
       </div>
     )
   }
@@ -148,6 +150,7 @@ export default async function EventDetailPage({
       <div className="container mx-auto px-4 py-6 flex-1">
         <EventDetailClient event={eventData} selectedMarketId={selectedMarketId} />
       </div>
+      <Footer />
     </div>
   )
 } 

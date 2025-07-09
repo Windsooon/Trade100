@@ -12,6 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { RefreshCw, Filter, X, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react'
 import { Event, Market } from '@/lib/stores'
 import { Navbar } from '@/components/ui/navbar'
+import { Footer } from '@/components/ui/footer'
 import Link from 'next/link'
 
 interface FetchLog {
@@ -514,7 +515,7 @@ export default function MarketsPage() {
 
       {/* Horizontal Tag Navigation */}
       <div className="border-b bg-background">
-        <div className="container mx-auto px-4 max-w-4xl">
+        <div className="container mx-auto px-4 max-w-[1200px]">
           <div className="flex items-center gap-6 py-3 overflow-x-auto scrollbar-hide">
             <Button
               variant={selectedTag === 'all' ? 'default' : 'ghost'}
@@ -539,7 +540,7 @@ export default function MarketsPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6 max-w-4xl">
+      <div className="container mx-auto px-4 py-6 space-y-6 max-w-[1200px]">
         {/* Top Filter Bar */}
         <Card>
           <CardHeader>
@@ -780,6 +781,8 @@ export default function MarketsPage() {
           </div>
         )}
       </div>
+      
+      <Footer />
     </div>
   )
 }

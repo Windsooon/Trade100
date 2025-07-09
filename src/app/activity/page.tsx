@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { Navbar } from '@/components/ui/navbar'
+import { Footer } from '@/components/ui/footer'
 import { ActivityFeed } from '@/components/ui/activity-feed'
 import { ActivityDataTables } from '@/components/ui/activity-data-tables'
 
@@ -85,6 +86,8 @@ export default function ActivityPage() {
           </div>
         </div>
       </div>
+      
+      <Footer />
     </div>
   )
 } 
