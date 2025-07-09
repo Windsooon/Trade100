@@ -1,87 +1,221 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Navbar } from '@/components/ui/navbar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { RefreshCw, TrendingUp, Clock, DollarSign, Flame, ChevronUp, ChevronDown } from 'lucide-react'
+import { TrendingUp, Clock, DollarSign, ChevronUp, ChevronDown, BarChart3, Activity, RefreshCw } from 'lucide-react'
 import { Event } from '@/lib/stores'
 import Link from 'next/link'
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart"
 
-interface HomeCardProps {
-  title: string
-  icon: React.ReactNode
-  events: Event[]
-  loading: boolean
-  error: string | null
-  isExpanded: boolean
+// Interface for Trade API response
+interface TradeApiResponse {
+  hour_start: number
+  trade_count: number
+  total_volume: number
 }
 
-function HomeCard({ title, icon, events, loading, error, isExpanded }: HomeCardProps) {
+// Transform API data for chart
+const transformTradeData = (apiData: TradeApiResponse[]) => {
+  return apiData.map(item => ({
+    hour: new Date(item.hour_start * 1000).toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    }),
+    trades: item.trade_count
+  }))
+}
+
+// Transform API data for volume chart
+const transformVolumeData = (apiData: TradeApiResponse[]) => {
+  return apiData.map(item => ({
+    hour: new Date(item.hour_start * 1000).toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    }),
+    volume: item.total_volume
+  }))
+}
+
+// Format volume for display
+const formatVolumeDisplay = (volume: number): string => {
+  if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`
+  if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`
+  return `$${volume.toFixed(0)}`
+}
+
+const chartConfig = {
+  trades: {
+    label: "Trades",
+    color: "var(--chart-1)",
+  },
+  volume: {
+    label: "Volume",
+    color: "var(--chart-2)",
+  },
+} satisfies ChartConfig
+
+function TradeCountCard() {
+  // Fetch trade data from API
+  const { data: tradeData, isLoading, isError } = useQuery<TradeApiResponse[]>({
+    queryKey: ['trade-stats'],
+    queryFn: async () => {
+      const response = await fetch('https://poly-trade-edge.vercel.app/api/trade?hour=24')
+      if (!response.ok) {
+        throw new Error('Failed to fetch trade data')
+      }
+      return response.json()
+    },
+    staleTime: 60 * 1000, // 1 minute
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  const transformedData = tradeData ? transformTradeData(tradeData) : []
+  const totalTrades = tradeData ? tradeData.reduce((sum, item) => sum + item.trade_count, 0) : 0
+  
   return (
-    <Card className="bg-card text-card-foreground flex flex-col rounded-xl border shadow-sm">
-      <CardHeader className="pb-0">
+    <Card className="bg-card text-card-foreground rounded-xl border shadow-sm">
+      <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-lg">
-          {icon}
-          {title}
+          <BarChart3 className="h-5 w-5" />
+          Last 24h Trade Count
         </CardTitle>
+        <CardDescription className="text-sm text-muted-foreground">
+          {isLoading ? 'Loading...' : isError ? 'Error loading data' : 'All Markets'}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="flex-1">
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+      <CardContent>
+        <div className="mb-4">
+          <div className="text-3xl font-bold">
+            {isLoading ? '--' : isError ? 'Error' : totalTrades.toLocaleString()}
           </div>
-        ) : error ? (
-          <div className="text-center py-8">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
-        ) : events.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-sm text-muted-foreground">No events available</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {events.map((event) => (
-              <Link key={event.id} href={`/events/${event.slug}`} target="_blank" rel="noopener noreferrer">
-                <div className="flex cursor-pointer items-stretch justify-between rounded-md p-2 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-start gap-2 flex-1 min-w-0">
-                    {/* Event Icon */}
-                    <div className="flex-shrink-0 mt-0.5">
-                      {event.icon ? (
-                        <img
-                          src={event.icon}
-                          alt={`${event.title} icon`}
-                          className="w-4 h-4 rounded-full"
-                          onError={(e) => {
-                            // Hide image if it fails to load
-                            e.currentTarget.style.display = 'none'
-                          }}
-                        />
-                      ) : (
-                        <div className="w-4 h-4 rounded-full bg-muted flex-shrink-0" />
-                      )}
-                    </div>
-                    
-                    {/* Event Content */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium truncate">{event.title}</h3>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                        <span>Vol: {formatVolume(event.volume24hr)}</span>
-                        <span>Liq: {formatVolume(event.liquidity)}</span>
-                        <span>Ends: {formatDate(event.endDate)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+        </div>
+        <div className="h-[120px]">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : isError ? (
+            <div className="flex items-center justify-center h-full">
+              <span className="text-sm text-muted-foreground">Failed to load chart</span>
+            </div>
+          ) : (
+            <ChartContainer config={chartConfig} className="h-full w-full">
+              <BarChart data={transformedData}>
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="hour"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  minTickGap={32}
+                  tickFormatter={(value) => value.slice(0, 2)}
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      className="w-[150px]"
+                      labelFormatter={(value) => `${value}`}
+                    />
+                  }
+                />
+                <Bar dataKey="trades" fill="var(--color-trades)" />
+              </BarChart>
+            </ChartContainer>
+          )}
+        </div>
       </CardContent>
     </Card>
   )
 }
+
+function TradingVolumeCard() {
+  // Fetch trade data from API
+  const { data: tradeData, isLoading, isError } = useQuery<TradeApiResponse[]>({
+    queryKey: ['trade-stats'],
+    queryFn: async () => {
+      const response = await fetch('https://poly-trade-edge.vercel.app/api/trade?hour=24')
+      if (!response.ok) {
+        throw new Error('Failed to fetch trade data')
+      }
+      return response.json()
+    },
+    staleTime: 60 * 1000, // 1 minute
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  const transformedVolumeData = tradeData ? transformVolumeData(tradeData) : []
+  const totalVolume = tradeData ? tradeData.reduce((sum, item) => sum + item.total_volume, 0) : 0
+  
+  return (
+    <Card className="bg-card text-card-foreground rounded-xl border shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <DollarSign className="h-5 w-5" />
+          Last 24h Volume
+        </CardTitle>
+        <CardDescription className="text-sm text-muted-foreground">
+          {isLoading ? 'Loading...' : isError ? 'Error loading data' : 'All Markets'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4">
+          <div className="text-3xl font-bold">
+            {isLoading ? '--' : isError ? 'Error' : formatVolumeDisplay(totalVolume)}
+          </div>
+        </div>
+        <div className="h-[120px]">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : isError ? (
+            <div className="flex items-center justify-center h-full">
+              <span className="text-sm text-muted-foreground">Failed to load chart</span>
+            </div>
+          ) : (
+            <ChartContainer config={chartConfig} className="h-full w-full">
+              <BarChart data={transformedVolumeData}>
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="hour"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  minTickGap={32}
+                  tickFormatter={(value) => value.slice(0, 2)}
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      className="w-[150px]"
+                      labelFormatter={(value) => `${value}`}
+                      formatter={(value) => [formatVolumeDisplay(Number(value)), "Volume"]}
+                    />
+                  }
+                />
+                <Bar dataKey="volume" fill="var(--color-volume)" />
+              </BarChart>
+            </ChartContainer>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+
 
 // Market display interface
 interface MarketDisplay {
@@ -197,32 +331,20 @@ export default function HomePage() {
   const [allLiquidity, setAllLiquidity] = useState<any[]>([])
   const [isExpanded, setIsExpanded] = useState(false)
   
-  // Display data for cards (top 3)
-  const [newest, setNewest] = useState<Event[]>([])
-  const [topVolume, setTopVolume] = useState<Event[]>([])
-  const [endingSoon, setEndingSoon] = useState<Event[]>([])
-  const [liquidity, setLiquidity] = useState<Event[]>([])
+  // Loading states for market tabs
+  const [isLoading, setIsLoading] = useState({
+    newest: true,
+    volume: true,
+    liquidity: true,
+    endingSoon: true,
+  })
   
-  // Market data for tabs
+  // Market data for tabs (cards now use mock data)
   const [marketData, setMarketData] = useState({
     newest: [] as MarketDisplay[],
     volume: [] as MarketDisplay[],
     liquidity: [] as MarketDisplay[],
     endingSoon: [] as MarketDisplay[],
-  })
-  
-  const [loading, setLoading] = useState({
-    newest: true,
-    topVolume: true,
-    endingSoon: true,
-    liquidity: true,
-  })
-  
-  const [errors, setErrors] = useState({
-    newest: null as string | null,
-    topVolume: null as string | null,
-    endingSoon: null as string | null,
-    liquidity: null as string | null,
   })
 
   useEffect(() => {
@@ -305,13 +427,15 @@ export default function HomePage() {
           break
           
         case 'endingSoon':
-          // Filter markets that have endDate in the future
+          // Filter markets that have endDate in the future (2 days ago threshold)
           const now = new Date()
-          const yesterday = new Date(now);
-          yesterday.setDate(yesterday.getDate() - 1);
-          const marketsWithFutureEndDate = activeMarkets.filter((market: any) => 
-            market.endDate && new Date(market.endDate) > yesterday
-          )
+          const twoDaysAgo = new Date(now);
+          twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+          
+          const marketsWithFutureEndDate = activeMarkets.filter((market: any) => {
+            return market.endDate && new Date(market.endDate) > twoDaysAgo
+          })
+          
           if (marketsWithFutureEndDate.length === 0) {
             continue
           }
@@ -340,6 +464,7 @@ export default function HomePage() {
       try {
         // Parse outcome prices
         const outcomePrices = JSON.parse(selectedMarket.outcomePrices)
+        
         if (!Array.isArray(outcomePrices) || outcomePrices.length < 2) {
           continue
         }
@@ -371,6 +496,7 @@ export default function HomePage() {
 
   const fetchNewest = async () => {
     try {
+      setIsLoading(prev => ({ ...prev, newest: true }))
       const response = await fetch('/api/newest')
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
@@ -391,25 +517,22 @@ export default function HomePage() {
         }
         setAllNewest(filteredEvents)
         
-        // 3. Display top 3 events in cards (regardless of markets)
-        const top3Events = filteredEvents.slice(0, 3)
-        setNewest(transformApiEvents(top3Events))
-        
-        // 4. Process ALL filtered events to find 10 markets
+        // 3. Process ALL filtered events to find 10 markets for tabs
         const markets = processMarketsFromEvents(filteredEvents, 'newest')
         setMarketData(prev => ({ ...prev, newest: markets }))
       } else {
         throw new Error(data.error || 'Failed to fetch newest events')
       }
     } catch (error) {
-      setErrors(prev => ({ ...prev, newest: 'Failed to load newest events' }))
+      console.error('Failed to load newest events:', error)
     } finally {
-      setLoading(prev => ({ ...prev, newest: false }))
+      setIsLoading(prev => ({ ...prev, newest: false }))
     }
   }
 
   const fetchTopVolume = async () => {
     try {
+      setIsLoading(prev => ({ ...prev, volume: true }))
       const response = await fetch('/api/top-volume')
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
@@ -420,25 +543,22 @@ export default function HomePage() {
         // 2. No tag filtering needed for volume tab
         setAllTopVolume(allEvents)
         
-        // 3. Display top 3 events in cards (regardless of markets)
-        const top3Events = allEvents.slice(0, 3)
-        setTopVolume(transformApiEvents(top3Events))
-        
-        // 4. Process ALL events to find 10 markets
+        // 3. Process ALL events to find 10 markets for tabs
         const markets = processMarketsFromEvents(allEvents, 'volume')
         setMarketData(prev => ({ ...prev, volume: markets }))
       } else {
         throw new Error(data.error || 'Failed to fetch top volume events')
       }
     } catch (error) {
-      setErrors(prev => ({ ...prev, topVolume: 'Failed to load top volume events' }))
+      console.error('Failed to load top volume events:', error)
     } finally {
-      setLoading(prev => ({ ...prev, topVolume: false }))
+      setIsLoading(prev => ({ ...prev, volume: false }))
     }
   }
 
   const fetchEndingSoon = async () => {
     try {
+      setIsLoading(prev => ({ ...prev, endingSoon: true }))
       const response = await fetch('/api/ending-soon')
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
@@ -449,7 +569,9 @@ export default function HomePage() {
         // 2. Filter events to exclude crypto tags (id="21" and id="100639")
         const filteredEvents = []
         for (const event of allEvents) {
-          const hasExcludedTag = event.tags && event.tags.some((tag: any) => 
+          const eventTags = event.tags || []
+          
+          const hasExcludedTag = eventTags.some((tag: any) => 
             tag.id === "21" || tag.id === "100639"
           )
           
@@ -457,27 +579,25 @@ export default function HomePage() {
             filteredEvents.push(event)
           }
         }
+        
         setAllEndingSoon(filteredEvents)
         
-        // 3. Display top 3 events in cards (regardless of markets)
-        const top3Events = filteredEvents.slice(0, 3)
-        setEndingSoon(transformApiEvents(top3Events))
-        
-        // 4. Process ALL filtered events to find 10 markets
+        // 3. Process ALL filtered events to find 10 markets for tabs
         const markets = processMarketsFromEvents(filteredEvents, 'endingSoon')
         setMarketData(prev => ({ ...prev, endingSoon: markets }))
       } else {
         throw new Error(data.error || 'Failed to fetch ending soon events')
       }
     } catch (error) {
-      setErrors(prev => ({ ...prev, endingSoon: 'Failed to load ending soon events' }))
+      console.error('Failed to load ending soon events:', error)
     } finally {
-      setLoading(prev => ({ ...prev, endingSoon: false }))
+      setIsLoading(prev => ({ ...prev, endingSoon: false }))
     }
   }
 
   const fetchLiquidity = async () => {
     try {
+      setIsLoading(prev => ({ ...prev, liquidity: true }))
       const response = await fetch('/api/top-liquidity')
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
@@ -488,20 +608,16 @@ export default function HomePage() {
         // 2. No tag filtering needed for liquidity tab
         setAllLiquidity(allEvents)
         
-        // 3. Display top 3 events in cards (regardless of markets)
-        const top3Events = allEvents.slice(0, 3)
-        setLiquidity(transformApiEvents(top3Events))
-        
-        // 4. Process ALL events to find 10 markets
+        // 3. Process ALL events to find 10 markets for tabs
         const markets = processMarketsFromEvents(allEvents, 'liquidity')
         setMarketData(prev => ({ ...prev, liquidity: markets }))
       } else {
         throw new Error(data.error || 'Failed to fetch liquidity events')
       }
     } catch (error) {
-      setErrors(prev => ({ ...prev, liquidity: 'Failed to load liquidity events' }))
+      console.error('Failed to load liquidity events:', error)
     } finally {
-      setLoading(prev => ({ ...prev, liquidity: false }))
+      setIsLoading(prev => ({ ...prev, liquidity: false }))
     }
   }
 
@@ -552,47 +668,19 @@ export default function HomePage() {
           </Button>
         </div>
         
-        {/* Cards Grid - Hidden on mobile when collapsed */}
+        {/* Cards Grid - 12 column layout: 2 empty, 4 card1, 4 card2, 2 empty */}
         <div className={`
-          grid gap-4
-          sm:grid-cols-2 lg:grid-cols-4
+          grid grid-cols-12 gap-4
           ${isExpanded ? 'grid-cols-1' : 'hidden sm:grid'}
         `}>
-          <HomeCard
-            title="Newest"
-            icon={<Flame className="h-5 w-5" />}
-            events={newest}
-            loading={loading.newest}
-            error={errors.newest}
-            isExpanded={isExpanded}
-          />
-          
-          <HomeCard
-            title="24h Volume"
-            icon={<TrendingUp className="h-5 w-5" />}
-            events={topVolume}
-            loading={loading.topVolume}
-            error={errors.topVolume}
-            isExpanded={isExpanded}
-          />
-
-          <HomeCard
-            title="Liquidity"
-            icon={<DollarSign className="h-5 w-5" />}
-            events={liquidity}
-            loading={loading.liquidity}
-            error={errors.liquidity}
-            isExpanded={isExpanded}
-          />
-
-          <HomeCard
-            title="Ending Soon"
-            icon={<Clock className="h-5 w-5" />}
-            events={endingSoon}
-            loading={loading.endingSoon}
-            error={errors.endingSoon}
-            isExpanded={isExpanded}
-          />
+          <div className="col-span-2"></div>
+          <div className="col-span-4">
+            <TradeCountCard />
+          </div>
+          <div className="col-span-4">
+            <TradingVolumeCard />
+          </div>
+          <div className="col-span-2"></div>
         </div>
         
         {/* Market List with Tabs */}
@@ -607,7 +695,12 @@ export default function HomePage() {
             
             <TabsContent value="newest" className="mt-6">
               <div className="space-y-3">
-                {marketData.newest.length === 0 ? (
+                {isLoading.newest ? (
+                  <div className="text-center py-8">
+                    <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Loading markets...</p>
+                  </div>
+                ) : marketData.newest.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-muted-foreground">No markets available</p>
                   </div>
@@ -621,7 +714,12 @@ export default function HomePage() {
             
             <TabsContent value="volume" className="mt-6">
               <div className="space-y-3">
-                {marketData.volume.length === 0 ? (
+                {isLoading.volume ? (
+                  <div className="text-center py-8">
+                    <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Loading markets...</p>
+                  </div>
+                ) : marketData.volume.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-muted-foreground">No markets available</p>
                   </div>
@@ -635,7 +733,12 @@ export default function HomePage() {
             
             <TabsContent value="liquidity" className="mt-6">
               <div className="space-y-3">
-                {marketData.liquidity.length === 0 ? (
+                {isLoading.liquidity ? (
+                  <div className="text-center py-8">
+                    <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Loading markets...</p>
+                  </div>
+                ) : marketData.liquidity.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-muted-foreground">No markets available</p>
                   </div>
@@ -649,7 +752,12 @@ export default function HomePage() {
             
             <TabsContent value="endingSoon" className="mt-6">
               <div className="space-y-3">
-                {marketData.endingSoon.length === 0 ? (
+                {isLoading.endingSoon ? (
+                  <div className="text-center py-8">
+                    <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Loading markets...</p>
+                  </div>
+                ) : marketData.endingSoon.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-muted-foreground">No markets available</p>
                   </div>
@@ -662,11 +770,11 @@ export default function HomePage() {
             </TabsContent>
           </Tabs>
         </div>
-                    
+        
         {/* View All Markets Button */}
         <div className="mt-8 text-center">
           <Link href="/markets">
-            <Button size="lg" className="cursor-pointer px-8">
+            <Button variant="outline" className="bg-muted/50 hover:bg-muted border-border/50">
               View All Markets
             </Button>
           </Link>

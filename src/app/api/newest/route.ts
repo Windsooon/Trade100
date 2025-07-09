@@ -5,7 +5,7 @@ const POLYMARKET_API_URL = process.env.NEXT_PUBLIC_POLYMARKET_API_URL || 'https:
 
 export async function GET(request: NextRequest) {
   try {
-    const url = `${POLYMARKET_API_URL}/events/pagination?limit=150&active=true&archived=false&closed=false&order=startDate&ascending=false&offset=0`
+    const url = `${POLYMARKET_API_URL}/events/pagination?limit=200&active=true&archived=false&closed=false&order=startDate&ascending=false&offset=0`
     
     const response = await proxyFetch(url, {
       headers: {
