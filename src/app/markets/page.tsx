@@ -1,20 +1,18 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
-import { RefreshCw, Filter, X, TrendingUp, Info, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { Event } from '@/lib/stores'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { RefreshCw, Filter, X, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react'
+import { Event, Market } from '@/lib/stores'
 import { Navbar } from '@/components/ui/navbar'
-import { EventsDataTable } from '@/components/ui/events-data-table'
-
+import Link from 'next/link'
 
 interface FetchLog {
   stage: string
@@ -51,28 +49,258 @@ interface TagsResponse {
   fallback?: boolean
 }
 
-// Predefined tags list
+// Predefined tags list (matching the navigation style)
 const PREDEFINED_TAGS = [
-  'Politics', 'Sports', 'Crypto', 'Tech', 'Culture', 
-  'World', 'Economy', 'Trump', 'Elections', 'Mentions'
+  'Trending', 'New', 'Politics', 'Middle East', 'Sports', 'Crypto', 
+  'Tech', 'Culture', 'World', 'Economy', 'Trump', 'Elections', 'Mentions'
 ]
 
-export default function Dashboard() {
-  const [selectedTag, setSelectedTag] = useState<string>('')
+// Market Card Component (for inside event cards)
+function MarketCard({ market, eventSlug }: { market: Market; eventSlug: string }) {
+  const formatPrice = (price: number): string => {
+    return price.toFixed(3)
+  }
+  
+  const formatPriceChange = (change: number | null): string => {
+    if (change === null) return '-'
+    const sign = change >= 0 ? '+' : ''
+    return `${sign}${(change * 100).toFixed(2)}%`
+  }
+  
+  const getPriceChangeColor = (change: number | null): string => {
+    if (change === null) return ''
+    return change >= 0 ? 'text-green-500' : 'text-red-500'
+  }
+
+  const formatVolume = (volume: number | null): string => {
+    if (!volume || volume === 0) return 'N/A'
+    if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`
+    if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`
+    return `$${volume.toFixed(0)}`
+  }
+
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString)
+      const now = new Date()
+      const diffInMs = date.getTime() - now.getTime()
+      const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24))
+      
+      if (diffInDays < 1) return 'Today'
+      if (diffInDays === 1) return '1 day'
+      if (diffInDays < 7) return `${diffInDays} days`
+      if (diffInDays < 30) return `${Math.ceil(diffInDays / 7)} weeks`
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    } catch {
+      return 'Invalid date'
+    }
+  }
+
+  let yesPrice = 0
+  let noPrice = 0
+  
+  try {
+    if (market.outcomePrices && market.outcomePrices.length >= 2) {
+      yesPrice = parseFloat(market.outcomePrices[0])
+      noPrice = parseFloat(market.outcomePrices[1])
+    }
+  } catch (error) {
+    // Skip invalid markets
+    return null
+  }
+  
+  return (
+    <Link href={`/events/${eventSlug}?market=${market.conditionId}`} target="_blank" rel="noopener noreferrer">
+      <div className="flex cursor-pointer items-center justify-between rounded-md p-3 hover:bg-muted/30 transition-colors">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {/* Market Question */}
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-medium leading-tight">{market.question}</h4>
+          </div>
+        </div>
+        
+        {/* Prices and Metrics */}
+        <div className="flex items-center gap-4 text-sm ml-4 flex-shrink-0">
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Yes</div>
+            <div className="font-medium">{formatPrice(yesPrice)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">No</div>
+            <div className="font-medium">{formatPrice(noPrice)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">24h</div>
+            <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
+              {formatPriceChange(market.oneDayPriceChange || null)}
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Volume</div>
+            <div className="font-medium">{formatVolume(market.volume24hr || null)}</div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+// Event Card Component (main cards with collapsible markets)
+function EventCard({ event }: { event: Event }) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const formatVolume = (volume: number | null): string => {
+    if (!volume || volume === 0) return 'N/A'
+    if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`
+    if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`
+    return `$${volume.toFixed(0)}`
+  }
+
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString)
+      const now = new Date()
+      const diffInMs = date.getTime() - now.getTime()
+      const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24))
+      
+      if (diffInDays < 1) return 'Today'
+      if (diffInDays === 1) return '1 day'
+      if (diffInDays < 7) return `${diffInDays} days`
+      if (diffInDays < 30) return `${Math.ceil(diffInDays / 7)} weeks`
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    } catch {
+      return 'Invalid date'
+    }
+  }
+
+  // Filter active markets
+  const activeMarkets = event.markets.filter(market => 
+    market.active && !market.archived && !market.closed
+  )
+
+  const totalVolume = activeMarkets.reduce((sum, market) => 
+    sum + (market.volume24hr || 0), 0
+  )
+
+  const totalLiquidity = activeMarkets.reduce((sum, market) => 
+    sum + (market.liquidityNum || market.liquidity || 0), 0
+  )
+  
+  return (
+    <Card className="bg-card text-card-foreground">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CardContent className="p-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              {/* Event Icon */}
+              <div className="flex-shrink-0 mt-0.5">
+                {event.icon ? (
+                  <>
+                    <img
+                      src={event.icon}
+                      alt={`${event.title} icon`}
+                      className="w-10 h-10 rounded-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                        const fallback = e.currentTarget.nextElementSibling as HTMLElement
+                        if (fallback) fallback.style.display = 'flex'
+                      }}
+                    />
+                    <div 
+                      className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0" 
+                      style={{ display: 'none' }}
+                    >
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {event.title.slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {event.title.slice(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Event Info */}
+              <div className="flex-1 min-w-0">
+                {/* Event Title and Collapsible Trigger */}
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    <h2 className="text-lg font-bold leading-tight text-foreground flex-1">{event.title}</h2>
+                    {/* Collapsible Trigger right next to title */}
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="p-1 h-6 w-6">
+                        <ChevronsUpDown className="h-4 w-4" />
+                        <span className="sr-only">Toggle markets</span>
+                      </Button>
+                    </CollapsibleTrigger>
+                  </div>
+                  
+                  {/* Metrics on the right */}
+                  <div className="flex items-center gap-4 text-sm ml-4 flex-shrink-0">
+                    <div className="text-center">
+                      <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
+                      <div className="font-medium">{formatVolume(totalVolume)}</div>
+                    </div>
+
+                    <div className="text-center">
+                      <div className="text-xs text-muted-foreground mb-1">Ends</div>
+                      <div className="font-medium">{formatDate(event.endDate)}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Tags */}
+                <div className="flex flex-wrap gap-1">
+                  {event.tags.slice(0, 4).map((tag) => (
+                    <Badge key={tag.id} variant="secondary" className="text-xs">
+                      {tag.label}
+                    </Badge>
+                  ))}
+                  {event.tags.length > 4 && (
+                    <Badge variant="secondary" className="text-xs">
+                      +{event.tags.length - 4}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Collapsible Markets */}
+          <CollapsibleContent className="mt-4">
+            <div className="space-y-2 border-t pt-4">
+              <div className="text-sm font-medium text-muted-foreground mb-3">
+                Markets ({activeMarkets.length})
+              </div>
+              {activeMarkets.map((market) => (
+                <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} />
+              ))}
+            </div>
+          </CollapsibleContent>
+        </CardContent>
+      </Collapsible>
+    </Card>
+  )
+}
+
+export default function MarketsPage() {
+  const [selectedTag, setSelectedTag] = useState<string>('all')
   const [minPrice, setMinPrice] = useState<string>('')
   const [maxPrice, setMaxPrice] = useState<string>('')
   const [minBestAsk, setMinBestAsk] = useState<string>('')
   const [maxBestAsk, setMaxBestAsk] = useState<string>('')
   const [sortBy, setSortBy] = useState<string>('volume24hr')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
-  
-  // Auto-refresh state - enabled by default
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
-  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState<number>(1)
+  const itemsPerPage = 20
 
   // Helper functions for price range
   const handlePriceChange = (type: 'min' | 'max', value: string) => {
-    // Allow only numbers and decimal point
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       if (type === 'min') {
         setMinPrice(value)
@@ -89,7 +317,6 @@ export default function Dashboard() {
   }
 
   const handleBestAskChange = (type: 'min' | 'max', value: string) => {
-    // Allow only numbers and decimal point
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       if (type === 'min') {
         setMinBestAsk(value)
@@ -105,18 +332,17 @@ export default function Dashboard() {
     return [isNaN(min) ? 0 : min, isNaN(max) ? 1 : max]
   }
 
-  // Fetch events data - no caching
+  // Fetch events data
   const {
     data: allEventsData,
     isLoading: eventsLoading,
     isError: eventsError,
     error: eventsErrorDetails,
-    refetch: refetchEvents,
   } = useQuery<EventsResponse>({
     queryKey: ['all-events'],
     queryFn: async () => {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
       
       try {
         const response = await fetch('/api/markets?limit=9999', {
@@ -141,392 +367,418 @@ export default function Dashboard() {
       }
     },
     retry: 1,
-    staleTime: 30 * 1000, // 30 seconds client-side cache (matches server cache)
-    gcTime: 60 * 1000, // 1 minute garbage collection time
+    staleTime: 30 * 1000,
+    gcTime: 60 * 1000,
   })
 
-  // Fetch tags data with 1-hour caching
-  const {
-    data: tagsData,
-    isLoading: tagsLoading,
-    isError: tagsError,
-    refetch: refetchTags,
-  } = useQuery<TagsResponse>({
-    queryKey: ['tags'],
-    queryFn: async () => {
-      const response = await fetch('/api/tags')
-      if (!response.ok) {
-        throw new Error('Failed to fetch tags')
-      }
-      return response.json()
-    },
-    retry: 1,
-    staleTime: 60 * 60 * 1000, // 1 hour
-    gcTime: 2 * 60 * 60 * 1000, // 2 hours
-  })
+  // Client-side filtering and sorting for events
+  const filteredAndSortedEvents = allEventsData?.events ? 
+    allEventsData.events
+      .filter(event => {
+        // Only include events with active markets
+        const activeMarkets = event.markets.filter(market => 
+          market.active && !market.archived && !market.closed
+        )
+        if (activeMarkets.length === 0) return false
 
-  // Auto-refresh logic
-  useEffect(() => {
-    if (autoRefreshEnabled) {
-      // Set up the auto-refresh interval
-      autoRefreshIntervalRef.current = setInterval(() => {
-        refetchEvents()
-      }, 10 * 60 * 1000) // 10 minutes
-    } else {
-      // Clean up intervals
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current)
-        autoRefreshIntervalRef.current = null
-      }
-    }
+        // Tag filter
+        if (selectedTag !== 'all') {
+          const eventTagLabels = event.tags.map(tag => tag.label)
+          const hasMatchingTag = eventTagLabels.some(eventTag => 
+            eventTag.toLowerCase().includes(selectedTag.toLowerCase())
+          )
+          if (!hasMatchingTag) return false
+        }
 
-    // Cleanup on unmount
-    return () => {
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current)
-      }
-    }
-  }, [autoRefreshEnabled, refetchEvents])
+        // Price range filter - check if any market has prices in range
+        if (minPrice !== '' || maxPrice !== '') {
+          const [minPriceNum, maxPriceNum] = getPriceRange()
+          const hasMatchingMarket = activeMarkets.some(market => {
+            let yesPrice = 0
+            let noPrice = 0
+            
+            try {
+              if (market.outcomePrices && market.outcomePrices.length >= 2) {
+                yesPrice = parseFloat(market.outcomePrices[0])
+                noPrice = parseFloat(market.outcomePrices[1])
+              }
+            } catch (error) {
+              return false
+            }
+            
+            const yesPriceInRange = yesPrice >= minPriceNum && yesPrice <= maxPriceNum
+            const noPriceInRange = noPrice >= minPriceNum && noPrice <= maxPriceNum
+            return yesPriceInRange || noPriceInRange
+          })
+          if (!hasMatchingMarket) return false
+        }
 
-  const handleAutoRefreshToggle = (checked: boolean) => {
-    setAutoRefreshEnabled(checked)
+        // Best ask filter - using yes price as proxy
+        if (minBestAsk !== '' || maxBestAsk !== '') {
+          const [minBestAskNum, maxBestAskNum] = getBestAskRange()
+          if (minBestAskNum > maxBestAskNum) return false
+          
+          const hasMatchingMarket = activeMarkets.some(market => {
+            let yesPrice = 0
+            
+            try {
+              if (market.outcomePrices && market.outcomePrices.length >= 2) {
+                yesPrice = parseFloat(market.outcomePrices[0])
+              }
+            } catch (error) {
+              return false
+            }
+            
+            return yesPrice >= minBestAskNum && yesPrice <= maxBestAskNum
+          })
+          if (!hasMatchingMarket) return false
+        }
+
+        return true
+      })
+      .sort((a, b) => {
+        let comparison = 0
+
+        // Calculate aggregate values for sorting
+        const getEventVolume24hr = (event: Event) => {
+          const activeMarkets = event.markets.filter(market => 
+            market.active && !market.archived && !market.closed
+          )
+          return activeMarkets.reduce((sum, market) => sum + (market.volume24hr || 0), 0)
+        }
+
+        const getEventVolume1wk = (event: Event) => {
+          const activeMarkets = event.markets.filter(market => 
+            market.active && !market.archived && !market.closed
+          )
+          return activeMarkets.reduce((sum, market) => sum + (market.volume1wk || 0), 0)
+        }
+
+        const getEventLiquidity = (event: Event) => {
+          const activeMarkets = event.markets.filter(market => 
+            market.active && !market.archived && !market.closed
+          )
+          return activeMarkets.reduce((sum, market) => sum + (market.liquidityNum || market.liquidity || 0), 0)
+        }
+
+        switch (sortBy) {
+          case 'volume24hr':
+            comparison = getEventVolume24hr(a) - getEventVolume24hr(b)
+            break
+          case 'volume1wk':
+            comparison = getEventVolume1wk(a) - getEventVolume1wk(b)
+            break
+          case 'liquidity':
+            comparison = getEventLiquidity(a) - getEventLiquidity(b)
+            break
+          case 'question':
+            comparison = a.title.localeCompare(b.title)
+            break
+          case 'endDate':
+            comparison = new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
+            break
+          default:
+            return 0
+        }
+        return sortDirection === 'desc' ? -comparison : comparison
+      })
+    : []
+
+  // Pagination
+  const totalPages = Math.ceil(filteredAndSortedEvents.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedEvents = filteredAndSortedEvents.slice(startIndex, endIndex)
+
+  const hasActiveFilters = minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== 'volume24hr' || sortDirection !== 'desc'
+
+  const clearAllFilters = () => {
+    setSelectedTag('all')
+    setMinPrice('')
+    setMaxPrice('')
+    setMinBestAsk('')
+    setMaxBestAsk('')
+    setSortBy('volume24hr')
+    setSortDirection('desc')
+    setCurrentPage(1)
   }
 
-  // Client-side filtering and sorting
-  const filteredAndSortedEvents = allEventsData?.events ? [...allEventsData.events]
-    .filter(event => {
-
-      if (selectedTag !== '') {
-        const eventTagLabels = event.tags.map(tag => tag.label)
-        const hasMatchingTag = eventTagLabels.some(eventTag => 
-          eventTag.toLowerCase().includes(selectedTag.toLowerCase())
-        )
-        if (!hasMatchingTag) return false
-      }
-
-      // Check if any market in the event has a Yes OR No price within the range
-      if (event.markets && event.markets.length > 0) {
-        const [minPriceNum, maxPriceNum] = getPriceRange()
-        const [minBestAskNum, maxBestAskNum] = getBestAskRange()
-        
-        const hasMatchingMarket = event.markets.some(market => {
-          let priceMatch = true
-          let bestAskMatch = true
-
-          // Check price range filter (if any input provided)
-          if (minPrice !== '' || maxPrice !== '') {
-            priceMatch = false
-            if (market.outcomePrices && market.outcomePrices.length >= 2) {
-              const yesPrice = parseFloat(market.outcomePrices[0])
-              const noPrice = parseFloat(market.outcomePrices[1])
-
-              // Check if either Yes or No price is within range
-              const yesPriceInRange = !isNaN(yesPrice) && yesPrice >= minPriceNum && yesPrice <= maxPriceNum
-              const noPriceInRange = !isNaN(noPrice) && noPrice >= minPriceNum && noPrice <= maxPriceNum
-
-              priceMatch = yesPriceInRange || noPriceInRange
-            }
-          }
-
-          // Check best ask filter (if any input provided)
-          if (minBestAsk !== '' || maxBestAsk !== '') {
-            bestAskMatch = false
-            if (market.bestAsk) {
-              const bestAskPrice = parseFloat(market.bestAsk)
-              if (!isNaN(bestAskPrice)) {
-                // Return false if min > max (as requested)
-                if (minBestAskNum > maxBestAskNum) {
-                  bestAskMatch = false
-                } else {
-                  bestAskMatch = bestAskPrice >= minBestAskNum && bestAskPrice <= maxBestAskNum
-                }
-              }
-            }
-          }
-
-          return priceMatch && bestAskMatch
-        })
-        // If no markets match the filters, exclude this event
-        if (!hasMatchingMarket) return false
-      }
-
-      return true
-    })
-    .sort((a, b) => {
-      let comparison = 0
-
-      switch (sortBy) {
-        case 'volume24hr':
-          comparison = (a.volume24hr || 0) - (b.volume24hr || 0)
-          break
-        case 'volume1wk':
-          comparison = (a.volume1wk || 0) - (b.volume1wk || 0)
-          break
-        case 'volume':
-          comparison = (a.liquidity || 0) - (b.liquidity || 0)
-          break
-        case 'title':
-          comparison = a.title.localeCompare(b.title)
-          break
-        case 'endDate':
-          comparison = new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
-          break
-        default:
-          return 0
-      }
-      return sortDirection === 'desc' ? -comparison : comparison
-    }) : []
-
-  const hasActiveFilters = selectedTag !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== 'volume24hr' || sortDirection !== 'desc'
-
-  // Overall loading state
-  const isLoading = eventsLoading || tagsLoading
-  const isError = eventsError || tagsError
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navbar */}
       <Navbar />
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      {/* Horizontal Tag Navigation */}
+      <div className="border-b bg-background">
+        <div className="container mx-auto px-4 max-w-4xl">
+          <div className="flex items-center gap-6 py-3 overflow-x-auto scrollbar-hide">
+            <Button
+              variant={selectedTag === 'all' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setSelectedTag('all')}
+              className="whitespace-nowrap"
+            >
+              All
+            </Button>
+            {PREDEFINED_TAGS.map((tag) => (
+              <Button
+                key={tag}
+                variant={selectedTag === tag ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setSelectedTag(tag)}
+                className="whitespace-nowrap"
+              >
+                {tag}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
 
-
-        {/* Filters and Table */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Filters Card */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Filter className="h-5 w-5" />
-                  Filters
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Active Filters Display - Always visible with fixed height to prevent layout shifts */}
-              <div className="space-y-2 min-h-[4.5rem]">
-                <div className="flex items-center justify-between min-h-[2rem]">
-                  <div className="text-sm font-medium">
-                    {hasActiveFilters ? 'Active Filters:' : 'No active filters'}
-                  </div>
-                  {hasActiveFilters && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedTag('')
-                        setMinPrice('')
-                        setMaxPrice('')
-                        setMinBestAsk('')
-                        setMaxBestAsk('')
-                        setSortBy('volume24hr')
-                        setSortDirection('desc')
-                      }}
-                      className="h-8 px-2"
-                    >
-                      <X className="h-4 w-4" />
-                      Clear
-                    </Button>
-                  )}
-                </div>
+      <div className="container mx-auto px-4 py-6 space-y-6 max-w-4xl">
+        {/* Top Filter Bar */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filters & Sorting
+              </CardTitle>
+              {/* Mobile collapse trigger */}
+              <div className="flex items-center gap-2">
                 {hasActiveFilters && (
-                  <div className="flex flex-wrap gap-1 min-h-[1.5rem]">
-                    {selectedTag !== '' && (
-                      <Badge variant="secondary" className="text-xs">
-                        {selectedTag}
-                      </Badge>
-                    )}
-                    {(minPrice !== '' || maxPrice !== '') && (
-                      <Badge variant="secondary" className="text-xs">
-                        Price Range: {minPrice || '0'}-{maxPrice || '1'}
-                      </Badge>
-                    )}
-                    {(minBestAsk !== '' || maxBestAsk !== '') && (
-                      <Badge variant="secondary" className="text-xs">
-                        Best Ask Range: {minBestAsk || '0'}-{maxBestAsk || '1'}
-                      </Badge>
-                    )}
-                    {(sortBy !== 'volume24hr' || sortDirection !== 'desc') && (
-                      <Badge variant="secondary" className="text-xs">
-                        Sort: {sortBy} ({sortDirection})
-                      </Badge>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <Separator />
-
-              {/* Tags Filter - one per row */}
-              <div className="space-y-4">
-                <label className="text-sm font-medium mb-4 block">Tags</label>
-                <div className="space-y-2">
-                  {PREDEFINED_TAGS.map((tag) => (
-                    <Button
-                      key={tag}
-                      variant={selectedTag === tag ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setSelectedTag(tag)}
-                      className="w-full justify-start text-left h-8 cursor-pointer"
-                    >
-                      {tag}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Price Range */}
-              <div className="space-y-4">
-                <label className="text-sm font-medium mb-4 block">Price Range (Yes or No)</label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="text"
-                    value={minPrice}
-                    onChange={(e) => handlePriceChange('min', e.target.value)}
-                    className="w-20"
-                    placeholder="0.00"
-                  />
-                  <span className="text-sm text-muted-foreground">to</span>
-                  <Input
-                    type="text"
-                    value={maxPrice}
-                    onChange={(e) => handlePriceChange('max', e.target.value)}
-                    className="w-20"
-                    placeholder="1.00"
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Best Asks Price Range */}
-              <div className="space-y-4">
-                <label className="text-sm font-medium mb-4 block">Best Asks Price Range</label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="text"
-                    value={minBestAsk}
-                    onChange={(e) => handleBestAskChange('min', e.target.value)}
-                    className="w-20"
-                    placeholder="0.00"
-                  />
-                  <span className="text-sm text-muted-foreground">to</span>
-                  <Input
-                    type="text"
-                    value={maxBestAsk}
-                    onChange={(e) => handleBestAskChange('max', e.target.value)}
-                    className="w-20"
-                    placeholder="1.00"
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Sort By with Direction Toggle */}
-              <div className="space-y-4">
-                <label className="text-sm font-medium mb-4 block">Sort By</label>
-                <div className="flex gap-2">
-                  <Select value={sortBy} onValueChange={(value) => {
-                    setSortBy(value)
-                  }}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="volume24hr">Volume (24h)</SelectItem>
-                      <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
-                      <SelectItem value="volume">Liquidity</SelectItem>
-                      <SelectItem value="title">Title (A-Z)</SelectItem>
-                      <SelectItem value="endDate">End Date</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {/* Compact Sort Direction Toggle */}
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
-                    className="px-2 h-9 flex-shrink-0"
-                    title={sortDirection === 'desc' ? 'Descending (High to Low)' : 'Ascending (Low to High)'}
+                    onClick={clearAllFilters}
+                    className="hidden sm:flex"
                   >
-                    {sortDirection === 'desc' ? (
-                      <ArrowDown className="h-4 w-4" />
-                    ) : (
-                      <ArrowUp className="h-4 w-4" />
-                    )}
+                    <X className="h-4 w-4 mr-2" />
+                    Clear All
                   </Button>
+                )}
+                <Collapsible open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="sm:hidden">
+                      {isFiltersOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                </Collapsible>
+              </div>
+            </div>
+          </CardHeader>
+          
+          {/* Always visible on desktop, collapsible on mobile */}
+          <div className="hidden sm:block">
+            <CardContent className="space-y-4">
+              {/* Active Filters Display */}
+              {hasActiveFilters && (
+                <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                  <span className="text-sm font-medium">Active:</span>
+                  {(minPrice || maxPrice) && <Badge variant="secondary">Price: {minPrice || '0'}-{maxPrice || '1'}</Badge>}
+                  {(minBestAsk || maxBestAsk) && <Badge variant="secondary">Ask: {minBestAsk || '0'}-{maxBestAsk || '1'}</Badge>}
+                  {(sortBy !== 'volume24hr' || sortDirection !== 'desc') && <Badge variant="secondary">Sort: {sortBy} ({sortDirection})</Badge>}
+                  <Button variant="ghost" size="sm" onClick={clearAllFilters}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              {/* Filter Controls */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Price Filters Group */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">PRICE FILTERS</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="text"
+                        value={minPrice}
+                        onChange={(e) => handlePriceChange('min', e.target.value)}
+                        className="w-full"
+                        placeholder="Min price (0.00)"
+                      />
+                      <span className="text-sm text-muted-foreground">to</span>
+                      <Input
+                        type="text"
+                        value={maxPrice}
+                        onChange={(e) => handlePriceChange('max', e.target.value)}
+                        className="w-full"
+                        placeholder="Max price (1.00)"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="text"
+                        value={minBestAsk}
+                        onChange={(e) => handleBestAskChange('min', e.target.value)}
+                        className="w-full"
+                        placeholder="Min ask (0.00)"
+                      />
+                      <span className="text-sm text-muted-foreground">to</span>
+                      <Input
+                        type="text"
+                        value={maxBestAsk}
+                        onChange={(e) => handleBestAskChange('max', e.target.value)}
+                        className="w-full"
+                        placeholder="Max ask (1.00)"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sort Options Group */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">SORT OPTIONS</h3>
+                  <div className="flex gap-2">
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="volume24hr">Volume (24h)</SelectItem>
+                        <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
+                        <SelectItem value="liquidity">Liquidity</SelectItem>
+                        <SelectItem value="question">Title (A-Z)</SelectItem>
+                        <SelectItem value="endDate">End Date</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+                      className="px-3"
+                    >
+                      {sortDirection === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
               </div>
 
               {/* Results Summary */}
-              <div className="pt-4 border-t">
-                <div className="text-sm text-muted-foreground">
-                  Showing {filteredAndSortedEvents.length} events
-                  {allEventsData && ` (${allEventsData.cache.totalEvents} total)`}
-                </div>
+              <div className="text-sm text-muted-foreground pt-2 border-t">
+                Showing {startIndex + 1}-{Math.min(endIndex, filteredAndSortedEvents.length)} of {filteredAndSortedEvents.length} events
+                {allEventsData && ` (${allEventsData.events.length} total)`}
               </div>
             </CardContent>
-          </Card>
+          </div>
 
-          {/* Events DataTable */}
-          <Card className="lg:col-span-3">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Events</CardTitle>
-                <div className="flex items-center gap-4">
-                  {/* Data Latency Notice */}
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Info className="h-4 w-4" />
-                    <span>30 seconds latency in Market data</span>
-                  </div>
-                  {/* Auto-refresh controls */}
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="auto-refresh"
-                      checked={autoRefreshEnabled}
-                      onCheckedChange={handleAutoRefreshToggle}
-                    />
-                    <label
-                      htmlFor="auto-refresh"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          {/* Mobile collapsible content */}
+          <Collapsible open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
+            <CollapsibleContent className="sm:hidden">
+              <CardContent className="space-y-4">
+                {/* Mobile filters - simplified */}
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="volume24hr">Volume (24h)</SelectItem>
+                        <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
+                        <SelectItem value="liquidity">Liquidity</SelectItem>
+                        <SelectItem value="question">Title (A-Z)</SelectItem>
+                        <SelectItem value="endDate">End Date</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+                      className="px-3"
                     >
-                      Auto-refresh (10min)
-                    </label>
+                      {sortDirection === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+                    </Button>
                   </div>
+
+                  {hasActiveFilters && (
+                    <Button variant="outline" size="sm" onClick={clearAllFilters} className="w-full">
+                      <X className="h-4 w-4 mr-2" />
+                      Clear All Filters
+                    </Button>
+                  )}
                 </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        {/* Events List */}
+        <div className="space-y-4">
+          {eventsLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center space-y-2">
+                <RefreshCw className="h-8 w-8 animate-spin mx-auto" />
+                <p className="text-muted-foreground">Loading events...</p>
               </div>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="text-center space-y-2">
-                    <RefreshCw className="h-8 w-8 animate-spin mx-auto" />
-                    <p className="text-muted-foreground">To improve performance for sorting and filtering, it may take about 30s to load all events.</p>
-                  </div>
-                </div>
-              ) : isError ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="text-center space-y-4">
-                    <p className="text-destructive">Failed to load events</p>
-                    <p className="text-sm text-muted-foreground">
-                      {eventsErrorDetails instanceof Error ? eventsErrorDetails.message : 'Unknown error'}
-                    </p>
-                  </div>
-                </div>
-              ) : filteredAndSortedEvents.length === 0 ? (
-                <div className="flex items-center justify-center h-64">
-                  <p className="text-muted-foreground">No events found</p>
-                </div>
-              ) : (
-                <EventsDataTable data={filteredAndSortedEvents} />
-              )}
-            </CardContent>
-          </Card>
+            </div>
+          ) : eventsError ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center space-y-4">
+                <p className="text-destructive">Failed to load events</p>
+                <p className="text-sm text-muted-foreground">
+                  {eventsErrorDetails instanceof Error ? eventsErrorDetails.message : 'Unknown error'}
+                </p>
+              </div>
+            </div>
+          ) : filteredAndSortedEvents.length === 0 ? (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-muted-foreground">No events found</p>
+            </div>
+          ) : (
+            paginatedEvents.map((event) => (
+              <EventCard key={event.id} event={event} />
+            ))
+          )}
         </div>
+
+        {/* Pagination */}
+        {!eventsLoading && !eventsError && filteredAndSortedEvents.length > 0 && (
+          <div className="flex items-center justify-between border-t pt-4">
+            <div className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
+                  if (pageNum > totalPages) return null
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={pageNum === currentPage ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                    >
+                      {pageNum}
+                    </Button>
+                  )
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
