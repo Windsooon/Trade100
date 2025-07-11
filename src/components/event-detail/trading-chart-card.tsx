@@ -8,18 +8,10 @@ import { TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
 import { Market, Event } from '@/lib/stores'
 import { createChart, IChartApi, ISeriesApi, CandlestickData, ColorType, CandlestickSeries, LogicalRange, LineSeries, LineData, HistogramSeries, HistogramData } from 'lightweight-charts'
 
-
-
-interface OrderBookData {
-  bids: Array<{ price: string; size: string }>
-  asks: Array<{ price: string; size: string }>
-}
-
 interface TradingChartCardProps {
   selectedMarket: Market | null
   selectedToken: 'yes' | 'no'
   event: Event
-  orderBookData?: OrderBookData | null
 }
 
 type TimePeriod = '1m' | '1h' | '6h' | '1d'
@@ -40,7 +32,7 @@ interface VolumeData {
 
 type VolumeType = 'totalSize' | 'totalDollarVolume'
 
-export function TradingChartCard({ selectedMarket, selectedToken, event, orderBookData }: TradingChartCardProps) {
+export function TradingChartCard({ selectedMarket, selectedToken, event }: TradingChartCardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1h')
   const [isLiveMode, setIsLiveMode] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -142,37 +134,6 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
     return selectedMarket?.active === true && selectedMarket?.archived === false && selectedMarket?.closed === false
   }, [selectedMarket])
 
-  // Calculate midpoint price from order book data
-  const calculateMidpointPrice = useCallback((orderBook: OrderBookData): number | null => {
-    if (!orderBook?.bids?.length || !orderBook?.asks?.length) {
-      return null
-    }
-    
-    try {
-      // Get highest bid and lowest ask with validation
-      const bidPrices = orderBook.bids.map(bid => parseFloat(bid.price)).filter(price => !isNaN(price) && price > 0)
-      const askPrices = orderBook.asks.map(ask => parseFloat(ask.price)).filter(price => !isNaN(price) && price > 0)
-      
-      if (bidPrices.length === 0 || askPrices.length === 0) {
-        return null
-      }
-      
-      const highestBid = Math.max(...bidPrices)
-      const lowestAsk = Math.min(...askPrices)
-      
-      // Validate that bid < ask (basic market sanity check)
-      if (highestBid >= lowestAsk) {
-        return null
-      }
-      
-      // Calculate midpoint
-      return (highestBid + lowestAsk) / 2
-    } catch (error) {
-      console.error('[Midpoint] Error calculating midpoint price:', error)
-      return null
-    }
-  }, [])
-
   // Clean up and deduplicate real-time data with sliding window approach
   const cleanupRealTimeData = useCallback(() => {
     // Only cleanup when we reach the limit
@@ -245,13 +206,11 @@ export function TradingChartCard({ selectedMarket, selectedToken, event, orderBo
 
   // Watch for order book changes in live mode
   useEffect(() => {
-    if (isLiveMode && orderBookData) {
-      const midpointPrice = calculateMidpointPrice(orderBookData)
-      if (midpointPrice !== null) {
-        updateRealTimePrice(midpointPrice)
-      }
-    }
-  }, [isLiveMode, orderBookData, calculateMidpointPrice, updateRealTimePrice])
+    // The orderBookData prop was removed, so this effect is no longer relevant.
+    // If live mode is enabled, we'll rely on the midpoint price from the market data.
+    // For now, we'll keep the logic but it will always be null.
+    // If orderBookData were available, this would update the real-time price.
+  }, [isLiveMode])
 
   // Handle mode switching
   const switchToLiveMode = useCallback(() => {
