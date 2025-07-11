@@ -184,9 +184,9 @@ function EventCard({ event }: { event: Event }) {
   return (
     <Card className="bg-card text-card-foreground">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardContent className="p-3">
+        <CardContent className="p-2.5">
           <div className="flex items-start justify-between">
-            <div className="flex items-start gap-3 flex-1 min-w-0">
+            <div className="flex items-start gap-2.5 flex-1 min-w-0">
               {/* Event Icon */}
               <div className="flex-shrink-0 mt-0.5">
                 {event.icon ? (
@@ -194,7 +194,7 @@ function EventCard({ event }: { event: Event }) {
                     <img
                       src={event.icon}
                       alt={`${event.title} icon`}
-                      className="w-10 h-10 rounded-full object-cover"
+                      className="w-8 h-8 rounded-full object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none'
                         const fallback = e.currentTarget.nextElementSibling as HTMLElement
@@ -202,7 +202,7 @@ function EventCard({ event }: { event: Event }) {
                       }}
                     />
                     <div 
-                      className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0" 
+                      className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0" 
                       style={{ display: 'none' }}
                     >
                       <span className="text-xs font-medium text-muted-foreground">
@@ -211,7 +211,7 @@ function EventCard({ event }: { event: Event }) {
                     </div>
                   </>
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
                     <span className="text-xs font-medium text-muted-foreground">
                       {event.title.slice(0, 2).toUpperCase()}
                     </span>
@@ -222,9 +222,9 @@ function EventCard({ event }: { event: Event }) {
               {/* Event Info */}
               <div className="flex-1 min-w-0">
                 {/* Event Title and Collapsible Trigger */}
-                <div className="flex items-start justify-between mb-2">
+                <div className="flex items-start justify-between mb-1">
                   <div className="flex items-start gap-2 flex-1 min-w-0">
-                    <h2 className="text-lg font-bold leading-tight text-foreground flex-1">{event.title}</h2>
+                    <h2 className="text-base font-bold leading-tight text-foreground flex-1">{event.title}</h2>
                     {/* Collapsible Trigger right next to title */}
                     <CollapsibleTrigger asChild>
                       <Button variant="ghost" size="sm" className="p-1 h-6 w-6">
@@ -251,12 +251,12 @@ function EventCard({ event }: { event: Event }) {
                 {/* Tags */}
                 <div className="flex flex-wrap gap-1">
                   {event.tags.slice(0, 4).map((tag) => (
-                    <Badge key={tag.id} variant="secondary" className="text-xs">
+                    <Badge key={tag.id} variant="secondary" className="text-xs py-0 px-1.5 h-5">
                       {tag.label}
                     </Badge>
                   ))}
                   {event.tags.length > 4 && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs py-0 px-1.5 h-5">
                       +{event.tags.length - 4}
                     </Badge>
                   )}
