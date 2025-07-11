@@ -226,7 +226,6 @@ interface MarketDisplay {
   eventSlug: string
   icon: string
   yesPrice: number
-  noPrice: number  
   priceChange: number | null
   endDate: string
 }
@@ -282,10 +281,6 @@ function MarketCard({ market }: { market: MarketDisplay }) {
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">Yes</div>
             <div className="font-medium">{formatPrice(market.yesPrice)}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">No</div>
-            <div className="font-medium">{formatPrice(market.noPrice)}</div>
           </div>
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
@@ -477,7 +472,6 @@ export default function HomePage() {
           eventSlug: event.slug,
           icon: selectedMarket.icon || event.icon || '',
           yesPrice: parseFloat(outcomePrices[0]),
-          noPrice: parseFloat(outcomePrices[1]),
           priceChange: type === 'newest' ? (selectedMarket.oneDayPriceChange ?? null) : selectedMarket.oneDayPriceChange,
           endDate: selectedMarket.endDate || event.endDate,
         }
