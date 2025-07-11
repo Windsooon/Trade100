@@ -214,6 +214,11 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
 
   // Handle mode switching
   const switchToLiveMode = useCallback(() => {
+    // Only allow live mode for active markets
+    if (!isCurrentMarketActive) {
+      return
+    }
+    
     setIsLiveMode(true)
     
     if (chartRef.current && seriesRef.current) {
@@ -259,7 +264,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
         })
       }
     }
-  }, []) // No dependencies needed - all refs are stable
+  }, [isCurrentMarketActive]) // Add dependency to check market status
 
   const switchToHistoricalMode = useCallback((period: TimePeriod) => {
     setIsLiveMode(false)
@@ -796,10 +801,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
       setError('No market selected or market data unavailable')
       return
     }
-    if (!isCurrentMarketActive) {
-      setError('Selected market is not currently active')
-      return
-    }
+    
     let tokenId: string | null = null
     try {
       const clobTokenIds = selectedMarket.clobTokenIds.trim()
@@ -819,9 +821,11 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
       setError(`Failed to parse market token IDs: ${errorMessage}`)
       return
     }
+    
     setLoading(true)
     setError(null)
     setVolumeError(null)
+    
     // Start both fetches in parallel
     const fidelityValue = getFidelity(selectedPeriod)
     const candleCount = {
@@ -836,9 +840,11 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
     const endTs = Math.floor(Date.now() / 1000)
     const priceUrl = `/api/prices-history?market=${encodeURIComponent(tokenId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelityValue}`
     const volumeUrl = `https://poly-trade-edge.vercel.app/api/volumes-history?market=${encodeURIComponent(tokenId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelityValue.toString()}`
+    
     // Start fetches
     const pricePromise = fetch(priceUrl).then(r => r.json()).catch(() => null)
     const volumePromise = fetch(volumeUrl).then(r => r.json()).catch(() => null)
+    
     try {
       // 1. Await price data first
       const priceResult = await pricePromise
@@ -847,6 +853,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
         setLoading(false)
         return
       }
+      
       // Validate and transform data for lightweight-charts
       let chartData: CandlestickData[] = []
       let invalidDataCount = 0
@@ -867,11 +874,13 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
           invalidDataCount++
         }
       })
+      
       if (chartData.length === 0) {
         setError('All received data points were invalid. Please try a different period.')
         setLoading(false)
         return
       }
+      
       // Sort and deduplicate
       chartData.sort((a, b) => (a.time as number) - (b.time as number))
       const seen = new Set<number>()
@@ -880,13 +889,17 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
         seen.add(d.time as number)
         return true
       })
+      
       allDataRef.current = chartData
       stateRef.current.oldestLoadedTimestamp = chartData.length > 0 ? Math.min(...chartData.map(d => d.time as number)) as any : null
+      
       // Render price chart immediately
       if (seriesRef.current && chartData.length > 0) {
         seriesRef.current.setData(chartData)
       }
+      
       setLoading(false) // Price chart is ready
+      
       // 2. Await volume data (may still be loading)
       const volumeResult = await volumePromise
       let volumeHistogramData = []
@@ -930,14 +943,14 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
     } finally {
       setLoading(false)
     }
-  }, [selectedMarket?.clobTokenIds, selectedToken, selectedPeriod, isCurrentMarketActive, getFidelity, volumeType])
+  }, [selectedMarket?.clobTokenIds, selectedToken, selectedPeriod, getFidelity, volumeType])
 
-  // Fetch data when dependencies change
+  // Fetch data when dependencies change - removed isCurrentMarketActive check
   useEffect(() => {
-    if (selectedMarket?.conditionId && isCurrentMarketActive && !isLiveMode) {
+    if (selectedMarket?.conditionId && !isLiveMode) {
       fetchChartData()
     }
-  }, [selectedMarket?.conditionId, selectedToken, selectedPeriod, isCurrentMarketActive, isLiveMode, fetchChartData])
+  }, [selectedMarket?.conditionId, selectedToken, selectedPeriod, isLiveMode, fetchChartData])
 
   // Update volume series when volume type changes
   useEffect(() => {
@@ -994,22 +1007,25 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
           <div>
             <div className="text-xs text-muted-foreground mb-2 font-medium">Time Period</div>
             <div className="flex gap-1">
-              <Button
-                variant={stateRef.current.isLiveMode ? 'default' : 'outline'}
-                size="sm"
-                onClick={switchToLiveMode}
-                disabled={loading || !isCurrentMarketActive}
-                className="text-xs px-2 py-1 h-7"
-              >
-                Live
-              </Button>
+              {/* Only show Live button for active markets */}
+              {isCurrentMarketActive && (
+                <Button
+                  variant={stateRef.current.isLiveMode ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={switchToLiveMode}
+                  disabled={loading}
+                  className="text-xs px-2 py-1 h-7"
+                >
+                  Live
+                </Button>
+              )}
               {(['1m', '1h', '6h', '1d'] as TimePeriod[]).map((period) => (
                 <Button
                   key={period}
                   variant={!stateRef.current.isLiveMode && selectedPeriod === period ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => switchToHistoricalMode(period)}
-                  disabled={loading || !isCurrentMarketActive || isPeriodDisabled(period)}
+                  disabled={loading || isPeriodDisabled(period)}
                   className="text-xs px-2 py-1 h-7"
                 >
                   {period}
@@ -1057,35 +1073,26 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
           </Alert>
         )}
         
-        {!isCurrentMarketActive ? (
-          <div className="flex items-center justify-center h-96 text-muted-foreground">
-            <div className="text-center">
-              <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Price chart not available for inactive markets</p>
+        <div className="relative">
+          {loading && (
+            <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
+              <Loader2 className="animate-spin h-8 w-8 text-muted-foreground" />
             </div>
+          )}
+          <div 
+            ref={chartContainerRef} 
+            className="h-96 w-full"
+          />
+          {/* Debug info */}
+          <div className="text-xs text-muted-foreground mt-2">
+            Chart: {stateRef.current.isLiveMode ? 
+              `${realTimeDataRef.current.length} live data points` : 
+              `${allDataRef.current.length} historical data points loaded`
+            }
+            {volumeDataRef.current.length > 0 && ` • ${volumeDataRef.current.length} volume data points`}
+            {stateRef.current.loadingHistorical && " • Loading historical data..."}
           </div>
-        ) : (
-          <div className="relative">
-            {loading && (
-              <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
-            <Loader2 className="animate-spin h-8 w-8 text-muted-foreground" />
-          </div>
-            )}
-            <div 
-              ref={chartContainerRef} 
-              className="h-96 w-full"
-            />
-            {/* Debug info */}
-            <div className="text-xs text-muted-foreground mt-2">
-              Chart: {stateRef.current.isLiveMode ? 
-                `${realTimeDataRef.current.length} live data points` : 
-                `${allDataRef.current.length} historical data points loaded`
-              }
-              {volumeDataRef.current.length > 0 && ` • ${volumeDataRef.current.length} volume data points`}
-              {stateRef.current.loadingHistorical && " • Loading historical data..."}
-            </div>
-          </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   )
