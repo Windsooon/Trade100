@@ -56,15 +56,6 @@ export default function EventDetailClient({
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Mobile: Trading Chart First */}
-          <div className="block lg:hidden">
-            <TradingChartCard 
-              selectedMarket={selectedMarket} 
-              selectedToken={selectedToken}
-              event={event}
-            />
-          </div>
-
           {/* Left Side - Market List */}
           <div className="lg:col-span-5">
             {/* Market List with Collapsible Order Books */}
@@ -80,16 +71,14 @@ export default function EventDetailClient({
             </div>
           </div>
 
-          {/* Right Side - Desktop Trading Chart and Operations */}
+          {/* Right Side - Trading Chart and Operations (both mobile and desktop) */}
           <div className="lg:col-span-7 space-y-6">
-            {/* Desktop: Trading Chart */}
-            <div className="hidden lg:block">
-              <TradingChartCard 
-                selectedMarket={selectedMarket} 
-                selectedToken={selectedToken}
-                event={event}
-              />
-            </div>
+            {/* Single Trading Chart - responsive visibility handled in component */}
+            <TradingChartCard 
+              selectedMarket={selectedMarket} 
+              selectedToken={selectedToken}
+              event={event}
+            />
             
             <OperationsCard 
               selectedMarket={selectedMarket}
