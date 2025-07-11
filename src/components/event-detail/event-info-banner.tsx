@@ -35,8 +35,9 @@ export function EventInfoBanner({ event }: EventInfoBannerProps) {
   return (
     <Card>
       <CardContent className="px-4 py-2">
-        <div className="flex items-center justify-between gap-6">
-          {/* Left: Event Title */}
+        {/* Mobile: Stack title and metrics vertically, Desktop: Side by side */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 lg:gap-6">
+          {/* Event Title Row */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <h1 className="text-xl font-bold truncate">{event.title}</h1>
             {event.slug && (
@@ -50,11 +51,11 @@ export function EventInfoBanner({ event }: EventInfoBannerProps) {
             )}
           </div>
 
-          {/* Right: Key Metrics */}
-          <div className="flex items-center gap-6 flex-shrink-0">
+          {/* Metrics Row - Responsive Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 lg:flex lg:items-center lg:gap-6 lg:flex-shrink-0">
             {/* Volume 24h */}
             <div className="text-center">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground mb-1">
                 <TrendingUp className="h-3 w-3" />
                 Volume (24h)
               </div>
@@ -63,7 +64,7 @@ export function EventInfoBanner({ event }: EventInfoBannerProps) {
 
             {/* Volume 1w */}
             <div className="text-center">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground mb-1">
                 <TrendingUp className="h-3 w-3" />
                 Volume (1w)
               </div>
@@ -72,7 +73,7 @@ export function EventInfoBanner({ event }: EventInfoBannerProps) {
 
             {/* Liquidity */}
             <div className="text-center">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground mb-1">
                 <DollarSign className="h-3 w-3" />
                 Liquidity
               </div>
@@ -81,7 +82,7 @@ export function EventInfoBanner({ event }: EventInfoBannerProps) {
 
             {/* End Date */}
             <div className="text-center">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground mb-1">
                 <Calendar className="h-3 w-3" />
                 End Date
               </div>
