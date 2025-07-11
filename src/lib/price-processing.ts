@@ -5,12 +5,24 @@ interface PricePoint {
   p: number // price
 }
 
+interface VolumePoint {
+  bucket_start: number
+  totalSize: number
+  totalDollarVolume: number
+}
+
 export interface CandlestickData {
   time: Time
   open: number
   high: number
   low: number
   close: number
+}
+
+export interface ProcessedVolumeData {
+  time: Time
+  totalSize: number
+  totalDollarVolume: number
 }
 
 export type TimePeriod = '1m' | '1h' | '6h' | '1d'
@@ -81,6 +93,96 @@ function processRawDataPoints(sortedData: PricePoint[]): CandlestickData[] {
     
     // Update previous point for next iteration
     previousPoint = current
+  }
+  
+  return result
+}
+
+/**
+ * Process raw volume data into time buckets with aggregation
+ */
+export function processRawVolumeData(
+  rawVolumeData: VolumePoint[], 
+  period: TimePeriod
+): ProcessedVolumeData[] {
+  if (!rawVolumeData || rawVolumeData.length === 0) return []
+  
+  // For 1m, return raw data as individual points
+  if (period === '1m') {
+    return rawVolumeData.map(point => ({
+      time: normalizeTimestamp(point.bucket_start) as Time,
+      totalSize: point.totalSize,
+      totalDollarVolume: point.totalDollarVolume
+    }))
+  }
+  
+  // For other periods, group into time buckets and aggregate
+  const bucketSizeMs = getBucketSizeInMs(period)
+  const buckets = groupVolumeIntoBuckets(rawVolumeData, bucketSizeMs)
+  
+  return aggregateVolumeBuckets(buckets)
+}
+
+/**
+ * Group volume data into time buckets
+ */
+function groupVolumeIntoBuckets(
+  volumeData: VolumePoint[], 
+  bucketSizeMs: number
+): Map<number, VolumePoint[]> {
+  const buckets = new Map<number, VolumePoint[]>()
+  
+  for (const point of volumeData) {
+    // Normalize timestamp first to align with price data
+    const normalizedTimestamp = normalizeTimestamp(point.bucket_start)
+    
+    // Convert timestamp to UTC and calculate bucket start time
+    const timestampMs = normalizedTimestamp * 1000
+    const bucketStart = Math.floor(timestampMs / bucketSizeMs) * bucketSizeMs
+    const bucketKey = Math.floor(bucketStart / 1000) // Convert back to seconds
+    
+    if (!buckets.has(bucketKey)) {
+      buckets.set(bucketKey, [])
+    }
+    buckets.get(bucketKey)!.push({
+      ...point,
+      bucket_start: normalizedTimestamp // Use normalized timestamp
+    })
+  }
+  
+  return buckets
+}
+
+/**
+ * Aggregate volume data within each time bucket
+ */
+function aggregateVolumeBuckets(
+  buckets: Map<number, VolumePoint[]>
+): ProcessedVolumeData[] {
+  const result: ProcessedVolumeData[] = []
+  
+  for (const bucketKey of buckets.keys()) {
+    const bucketData = buckets.get(bucketKey)!
+    
+    if (bucketData.length === 0) {
+      // Empty bucket - fill with zeros
+      result.push({
+        time: bucketKey as Time,
+        totalSize: 0,
+        totalDollarVolume: 0
+      })
+      continue
+    }
+    
+    // Aggregate volume data within the bucket
+    const totalSize = bucketData.reduce((sum, point) => sum + point.totalSize, 0)
+    const totalDollarVolume = bucketData.reduce((sum, point) => sum + point.totalDollarVolume, 0)
+    
+    result.push({
+      time: bucketKey as Time,
+      totalSize,
+      totalDollarVolume
+    })
   }
   
   return result

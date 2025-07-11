@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
 import { Market, Event } from '@/lib/stores'
 import { createChart, IChartApi, ISeriesApi, CandlestickData, ColorType, CandlestickSeries, LogicalRange, LineSeries, LineData, HistogramSeries, HistogramData } from 'lightweight-charts'
-import { processRawPriceData, TimePeriod } from '@/lib/price-processing'
+import { processRawPriceData, processRawVolumeData, type CandlestickData as ProcessedCandlestickData, type ProcessedVolumeData, type TimePeriod } from '@/lib/price-processing'
 
 interface TradingChartCardProps {
   selectedMarket: Market | null
@@ -20,8 +20,8 @@ interface RawPricePoint {
   p: number // price
 }
 
-interface VolumeData {
-  timestamp: number
+interface RawVolumeData {
+  bucket_start: number
   totalSize: number
   totalDollarVolume: number
 }
@@ -45,7 +45,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
   // Data refs - store raw data and processed data
   const rawDataRef = useRef<RawPricePoint[]>([])
   const realTimeDataRef = useRef<LineData[]>([])
-  const volumeDataRef = useRef<VolumeData[]>([])
+  const volumeDataRef = useRef<RawVolumeData[]>([])
   
   // Ref to track current token for tooltip (since tooltip effect has no dependencies)
   const selectedTokenRef = useRef<'yes' | 'no'>(selectedToken)
@@ -339,7 +339,9 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
           const currentVolumeData = volumeDataRef.current
           if (currentVolumeData && currentVolumeData.length > 0) {
             const targetTime = param.time as number
-            const volumeEntry = currentVolumeData.find(vol => vol.timestamp === targetTime)
+            // Process volume data for current period to match the chart display
+            const processedVolumeData = processRawVolumeData(currentVolumeData, selectedPeriod)
+            const volumeEntry = processedVolumeData.find(vol => (vol.time as number) === targetTime)
             
             if (volumeEntry) {
               const timestamp = param.time as number
@@ -531,10 +533,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
   // Note: selectedPeriod is NOT in dependencies to avoid unnecessary API calls
   // Period changes are handled by the separate effect below that re-processes cached data
   const fetchChartData = useCallback(async () => {
-    console.log(`🚀 fetchChartData called for market: ${selectedMarket?.conditionId}, token: ${selectedToken}`)
-    
     if (!selectedMarket?.clobTokenIds) {
-      console.log(`❌ No market or clobTokenIds available`)
       setError('No market selected or market data unavailable')
       return
     }
@@ -553,10 +552,8 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
       if (!tokenId || typeof tokenId !== 'string') {
         throw new Error(`Invalid ${selectedToken} token ID`)
       }
-      console.log(`✅ Parsed token ID: ${tokenId}`)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown parsing error'
-      console.log(`❌ Token parsing error: ${errorMessage}`)
       setError(`Failed to parse market token IDs: ${errorMessage}`)
       return
     }
@@ -568,7 +565,6 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
     try {
       // Fetch raw price data (14 days, fidelity=1)
       const priceUrl = `/api/prices-history?market=${encodeURIComponent(tokenId)}`
-      console.log(`📈 Fetching price data from: ${priceUrl}`)
       const priceResponse = await fetch(priceUrl)
       
       if (!priceResponse.ok) {
@@ -576,10 +572,8 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
       }
       
       const priceResult = await priceResponse.json()
-      console.log(`📈 Price response:`, priceResult)
       
       if (!priceResult.success || !priceResult.data?.length) {
-        console.log(`❌ No price data available`)
         setError('No price data available for this market.')
         setLoading(false)
         return
@@ -587,14 +581,11 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
       
       // Store raw data
       rawDataRef.current = priceResult.data
-      console.log(`📈 Stored ${priceResult.data.length} raw price data points`)
       
       // Process data for current period and display
       const processedData = processRawPriceData(priceResult.data, selectedPeriod)
-      console.log(`📈 Processed ${processedData.length} data points for period: ${selectedPeriod}`)
       
       if (processedData.length === 0) {
-        console.log(`❌ No processed data available`)
         setError('No valid price data found.')
         setLoading(false)
         return
@@ -603,47 +594,34 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
       // Update chart with processed data
       if (seriesRef.current && !isLiveMode) {
         seriesRef.current.setData(processedData)
-        console.log(`📈 Updated chart with processed data`)
       }
       
       setLoading(false)
-      console.log(`📈 About to start volume fetching...`)
       
-      // Fetch volume data using timestamps from processed price data
+      // Fetch volume data using timestamps from raw price data (covers full range)
       try {
-        // Extract oldest and newest timestamps from processed price data (after normalization)
-        const timestamps = processedData.map(d => d.time as number).sort((a, b) => a - b)
-        const oldestTimestamp = timestamps[0]
-        const newestTimestamp = timestamps[timestamps.length - 1]
+        // Extract oldest and newest timestamps from raw price data (with normalization)
+        const oldestRawTimestamp = rawDataRef.current[0].t
+        const newestRawTimestamp = rawDataRef.current[rawDataRef.current.length - 1].t
+        const oldestTimestamp = Math.floor(oldestRawTimestamp / 10) * 10  // Normalize
+        const newestTimestamp = Math.floor(newestRawTimestamp / 10) * 10  // Normalize
         
-        console.log(`📊 About to fetch volume data:`)
-        console.log(`📊 Processed data points: ${processedData.length}`)
-        console.log(`📊 Timestamp range: ${oldestTimestamp} to ${newestTimestamp}`)
-        console.log(`📊 Token ID: ${tokenId}`)
-        
-        const volumeUrl = `https://poly-trade-edge.vercel.app/api/volumes-history?market=${encodeURIComponent(tokenId)}&startTs=${oldestTimestamp}&endTs=${newestTimestamp}&fidelity=1`
-        console.log(`📊 Volume URL: ${volumeUrl}`)
+        const volumeUrl = `https://function-bun-production-cb03.up.railway.app/api/volumes-history?market=${encodeURIComponent(tokenId)}&startTs=${oldestTimestamp}&endTs=${newestTimestamp}&fidelity=1`
         
         const volumeResponse = await fetch(volumeUrl)
-        console.log(`📊 Volume response status: ${volumeResponse.status}`)
         
         if (volumeResponse.ok) {
           const volumeResult = await volumeResponse.json()
-          console.log(`📊 Volume result:`, volumeResult)
           if (volumeResult && Array.isArray(volumeResult)) {
             volumeDataRef.current = volumeResult
-            console.log(`📊 Stored ${volumeResult.length} volume data points`)
-            updateVolumeDisplay(processedData, volumeResult)
+            updateVolumeDisplay(processedData)
           } else {
-            console.log(`📊 Invalid volume data format:`, volumeResult)
             setVolumeError('Invalid volume data format')
           }
         } else {
-          console.log(`📊 Volume API error: ${volumeResponse.status}`)
           setVolumeError(`Volume API error: ${volumeResponse.status}`)
         }
       } catch (volumeErr) {
-        console.log(`📊 Volume fetch error:`, volumeErr)
         const volumeErrorMessage = volumeErr instanceof Error ? volumeErr.message : 'Unknown volume error'
         setVolumeError(`Volume data unavailable: ${volumeErrorMessage}`)
       }
@@ -655,16 +633,20 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
     }
   }, [selectedMarket?.clobTokenIds, selectedToken, isLiveMode])
 
-  // Update volume display - matches volume data by timestamp instead of index
-  const updateVolumeDisplay = useCallback((processedData: CandlestickData[], volumeData: VolumeData[]) => {
-    if (!volumeSeriesRef.current || volumeData.length === 0) return
+  // Update volume display - processes and aggregates volume data by time period
+  const updateVolumeDisplay = useCallback((processedPriceData: ProcessedCandlestickData[]) => {
+    if (!volumeSeriesRef.current || volumeDataRef.current.length === 0) return
     
     try {
-      const volumeHistogramData = processedData.map((priceCandle) => {
+      // Process raw volume data for the current time period
+      const processedVolumeData = processRawVolumeData(volumeDataRef.current, selectedPeriod)
+      
+      // Create histogram data by matching processed volume data to price data
+      const volumeHistogramData = processedPriceData.map((priceCandle) => {
         const targetTime = priceCandle.time as number
         
-        // Find volume entry with matching timestamp (volume timestamps should already be correct)
-        const volumeEntry = volumeData.find(vol => vol.timestamp === targetTime)
+        // Find volume entry with matching timestamp
+        const volumeEntry = processedVolumeData.find(vol => (vol.time as number) === targetTime)
         
         const isGreen = priceCandle.close >= priceCandle.open
         const color = isGreen ? '#26a69a' : '#ef5350'
@@ -683,7 +665,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
       console.error('Error updating volume display:', error)
       setVolumeError('Error processing volume data')
     }
-  }, [volumeType, setVolumeError])
+  }, [volumeType, selectedPeriod, setVolumeError])
 
   // Fetch data when dependencies change
   useEffect(() => {
@@ -700,7 +682,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
         seriesRef.current.setData(processedData)
         // Update volume display too
         if (volumeDataRef.current.length > 0) {
-          updateVolumeDisplay(processedData, volumeDataRef.current)
+          updateVolumeDisplay(processedData)
         }
       }
     }
@@ -710,7 +692,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
   useEffect(() => {
     if (!isLiveMode && rawDataRef.current.length > 0 && volumeDataRef.current.length > 0) {
       const processedData = processRawPriceData(rawDataRef.current, selectedPeriod)
-      updateVolumeDisplay(processedData, volumeDataRef.current)
+      updateVolumeDisplay(processedData)
     }
   }, [volumeType, selectedPeriod, isLiveMode, updateVolumeDisplay])
 
