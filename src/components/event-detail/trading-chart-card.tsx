@@ -527,7 +527,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
         }
       }
     }
-  }, []) // Remove dependencies to prevent recreation
+  }, [selectedPeriod]) // Add selectedPeriod to recreate tooltip when period changes
 
   // Fetch chart data - one API call per market/token combination
   // Note: selectedPeriod is NOT in dependencies to avoid unnecessary API calls

@@ -119,8 +119,11 @@ export function processRawVolumeData(
   // For other periods, group into time buckets and aggregate
   const bucketSizeMs = getBucketSizeInMs(period)
   const buckets = groupVolumeIntoBuckets(rawVolumeData, bucketSizeMs)
+  const result = aggregateVolumeBuckets(buckets)
   
-  return aggregateVolumeBuckets(buckets)
+
+  
+  return result
 }
 
 /**
