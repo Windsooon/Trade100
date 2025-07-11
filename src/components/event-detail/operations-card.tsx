@@ -63,36 +63,40 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Card className="w-full">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-lg">
           <Settings className="h-5 w-5" />
-          Operations
-          <Badge variant="secondary" className="ml-2">Coming Soon</Badge>
+          <span className="hidden sm:inline">Operations</span>
+          <span className="sm:hidden">Ops</span>
+          <Badge variant="secondary" className="ml-2 text-xs">Coming Soon</Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0">
         <Tabs defaultValue="trading" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="trading" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-3 bg-transparent">
+            <TabsTrigger value="trading" className="flex items-center gap-1 sm:gap-2">
               <TrendingUp className="h-4 w-4" />
-              Trading
-              <Badge variant="outline" className="ml-1 text-xs">Soon</Badge>
+              <span className="hidden sm:inline">Trading</span>
+              <span className="sm:hidden">Trade</span>
+              <Badge variant="outline" className="ml-1 text-xs hidden sm:inline">Soon</Badge>
             </TabsTrigger>
-            <TabsTrigger value="position" className="flex items-center gap-2">
+            <TabsTrigger value="position" className="flex items-center gap-1 sm:gap-2">
               <Wallet className="h-4 w-4" />
-              Position
-              <Badge variant="outline" className="ml-1 text-xs">Soon</Badge>
+              <span className="hidden sm:inline">Position</span>
+              <span className="sm:hidden">Pos</span>
+              <Badge variant="outline" className="ml-1 text-xs hidden sm:inline">Soon</Badge>
             </TabsTrigger>
-            <TabsTrigger value="ai" className="flex items-center gap-2">
+            <TabsTrigger value="ai" className="flex items-center gap-1 sm:gap-2">
               <Brain className="h-4 w-4" />
-              AI Analyze
-              <Badge variant="outline" className="ml-1 text-xs">Soon</Badge>
+              <span className="hidden sm:inline">AI Analyze</span>
+              <span className="sm:hidden">AI</span>
+              <Badge variant="outline" className="ml-1 text-xs hidden sm:inline">Soon</Badge>
             </TabsTrigger>
           </TabsList>
 
           {/* Trading Tab */}
-          <TabsContent value="trading" className="space-y-4 mt-6">
+          <TabsContent value="trading" className="space-y-4 mt-4 sm:mt-6">
             {/* Private Key Input */}
             <div className="space-y-2">
               <Label htmlFor="private-key">Private Key</Label>
@@ -100,7 +104,7 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                 <Input
                   id="private-key"
                   type={showPrivateKey ? "text" : "password"}
-                  placeholder="Enter your Ethereum private key"
+                  placeholder="Enter private key"
                   value={privateKey}
                   onChange={(e) => setPrivateKey(e.target.value)}
                 />
@@ -131,11 +135,10 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                 {/* Token Selection */}
                 <div className="space-y-2">
                   <Label>Token</Label>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <Button 
                       variant={selectedToken === 'yes' ? 'default' : 'outline'}
                       size="sm"
-                      className="flex-1"
                       onClick={() => onTokenChange('yes')}
                     >
                       YES
@@ -143,7 +146,6 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                     <Button 
                       variant={selectedToken === 'no' ? 'default' : 'outline'}
                       size="sm"
-                      className="flex-1"
                       onClick={() => onTokenChange('no')}
                     >
                       NO
@@ -155,12 +157,12 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                 <div className="space-y-2">
                   <Label>Order Type</Label>
                   <Tabs value={orderType} onValueChange={(value) => setOrderType(value as 'market' | 'limit')}>
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-2 bg-transparent">
                       <TabsTrigger value="market">Market</TabsTrigger>
                       <TabsTrigger value="limit">Limit</TabsTrigger>
                     </TabsList>
                     
-                    <TabsContent value="market" className="space-y-4 mt-4">
+                    <TabsContent value="market" className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
                       <div className="space-y-2">
                         <Label htmlFor="market-shares">Shares</Label>
                         <Input
@@ -173,7 +175,7 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                       </div>
                     </TabsContent>
                     
-                    <TabsContent value="limit" className="space-y-4 mt-4">
+                    <TabsContent value="limit" className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
                       <div className="space-y-2">
                         <Label htmlFor="limit-price">Price</Label>
                         <Input
@@ -202,7 +204,7 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                 <Separator />
 
                 {/* Buy/Sell Buttons */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Button 
                     className="bg-green-600 hover:bg-green-700"
                     onClick={handleTrade}
@@ -228,7 +230,7 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
           </TabsContent>
 
           {/* Position Tab */}
-          <TabsContent value="position" className="space-y-4 mt-6">
+          <TabsContent value="position" className="space-y-4 mt-4 sm:mt-6">
             <div className="space-y-2">
               <Label htmlFor="wallet-address">Wallet Address</Label>
               <Input
@@ -280,14 +282,14 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
           </TabsContent>
 
           {/* AI Analyze Tab */}
-          <TabsContent value="ai" className="space-y-4 mt-6">
+          <TabsContent value="ai" className="space-y-4 mt-4 sm:mt-6">
             <div className="space-y-2">
               <Label htmlFor="gemini-key">Gemini API Key</Label>
               <div className="relative">
                 <Input
                   id="gemini-key"
                   type={showGeminiKey ? "text" : "password"}
-                  placeholder="Enter your Gemini API key"
+                  placeholder="Enter Gemini API key"
                   value={geminiApiKey}
                   onChange={(e) => setGeminiApiKey(e.target.value)}
                 />
