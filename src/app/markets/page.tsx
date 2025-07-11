@@ -98,12 +98,10 @@ function MarketCard({ market, eventSlug }: { market: Market; eventSlug: string }
   }
 
   let yesPrice = 0
-  let noPrice = 0
   
   try {
     if (market.outcomePrices && market.outcomePrices.length >= 2) {
       yesPrice = parseFloat(market.outcomePrices[0])
-      noPrice = parseFloat(market.outcomePrices[1])
     }
   } catch (error) {
     // Skip invalid markets
@@ -116,7 +114,7 @@ function MarketCard({ market, eventSlug }: { market: Market; eventSlug: string }
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Market Question */}
           <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-medium leading-tight">{market.question}</h4>
+            <h4 className="text-sm font-medium leading-tight">{market.groupItemTitle || market.question}</h4>
           </div>
         </div>
         
@@ -125,10 +123,6 @@ function MarketCard({ market, eventSlug }: { market: Market; eventSlug: string }
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">Yes</div>
             <div className="font-medium">{formatPrice(yesPrice)}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">No</div>
-            <div className="font-medium">{formatPrice(noPrice)}</div>
           </div>
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
