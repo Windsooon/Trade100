@@ -154,7 +154,6 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
 
   // Initialize chart
   useEffect(() => {
-    console.log('📈 Chart initialization effect triggered')
     let chart: IChartApi | null = null
     let resizeObserver: ResizeObserver | null = null
     
@@ -164,10 +163,6 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
       return
     }
 
-    console.log('📈 Initializing chart synchronously with container dimensions:', {
-      width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight
-    })
 
     const chartOptions = { 
       layout: { 
@@ -198,7 +193,6 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
     
     try {
       chart = createChart(chartContainerRef.current, chartOptions)
-      console.log('📈 Chart created successfully')
       
       const candlestickSeries = chart.addSeries(CandlestickSeries, {
         upColor: '#26a69a',
@@ -207,7 +201,6 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
         wickUpColor: '#26a69a',
         wickDownColor: '#ef5350',
       })
-      console.log('📈 Candlestick series added')
       
       // Position price series to take 70% of chart height
       candlestickSeries.priceScale().applyOptions({
@@ -225,7 +218,6 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
         },
         priceScaleId: '',
       })
-      console.log('📈 Volume series added')
       
       // Configure volume price scale
       volumeSeries.priceScale().applyOptions({
@@ -239,13 +231,11 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
       seriesRef.current = candlestickSeries
       volumeSeriesRef.current = volumeSeries
       
-      console.log('📈 All chart refs assigned successfully')
 
       // Handle resize
       const handleResize = () => {
         if (chartContainerRef.current && chartRef.current) {
           const newWidth = chartContainerRef.current.clientWidth
-          console.log('📈 Resize observer triggered, new width:', newWidth)
           chartRef.current.applyOptions({
             width: newWidth,
           })
@@ -254,25 +244,20 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
 
       resizeObserver = new ResizeObserver(handleResize)
       resizeObserver.observe(chartContainerRef.current)
-      console.log('📈 Resize observer attached')
     } catch (error) {
       console.error('📈 Error during chart initialization:', error)
     }
     
     return () => {
-      console.log('📈 Cleaning up chart...')
       if (resizeObserver) {
         resizeObserver.disconnect()
-        console.log('📈 Resize observer disconnected')
       }
       if (chart) {
         chart.remove()
-        console.log('📈 Chart removed')
       }
       chartRef.current = null
       seriesRef.current = null
       volumeSeriesRef.current = null
-      console.log('�� Chart refs cleared')
     }
   }, [chartKey])
 
@@ -755,44 +740,21 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
 
   // Fetch data when dependencies change (only for historical mode)
   useEffect(() => {
-    console.log('📊 Data fetch effect triggered:', {
-      marketConditionId: selectedMarket?.conditionId,
-      selectedToken,
-      isLiveMode
-    })
-    
     if (selectedMarket?.conditionId && !isLiveMode) {
-      console.log('📊 Calling fetchChartData...')
       fetchChartData()
-    } else {
-      console.log('📊 Skipping data fetch:', {
-        hasMarket: !!selectedMarket?.conditionId,
-        isLiveMode
-      })
     }
   }, [selectedMarket?.conditionId, selectedToken, fetchChartData, isLiveMode])
 
   // Update chart when period changes - uses cached raw data (no API call)
   useEffect(() => {
-    console.log('📊 Period change effect triggered:', {
-      selectedPeriod,
-      isLiveMode,
-      hasRawData: rawDataRef.current.length > 0,
-      hasSeriesRef: !!seriesRef.current
-    })
-    
     if (!isLiveMode && rawDataRef.current.length > 0 && seriesRef.current) {
-      console.log('📊 Processing data for period:', selectedPeriod)
       const processedData = processRawPriceData(rawDataRef.current, selectedPeriod)
-      console.log('📊 Processed data points:', processedData.length)
       
       if (processedData.length > 0) {
         seriesRef.current.setData(processedData)
-        console.log('📊 Chart data updated for period change')
         
         // Update volume display too
         if (volumeDataRef.current.length > 0) {
-          console.log('📊 Updating volume display for period change')
           updateVolumeDisplay(processedData)
         }
       }
@@ -827,13 +789,8 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
 
   // Add resize trigger when chart tab becomes active
   const handleTabChange = useCallback((value: string) => {
-    console.log('🔄 Tab change detected:', value)
-    
     if (value === 'chart') {
-      console.log('📊 Switching to chart tab - forcing chart re-initialization by changing key.')
       setChartKey(prev => prev + 1)
-    } else {
-      console.log('📊 Switched away from chart tab to:', value)
     }
   }, [])
 
