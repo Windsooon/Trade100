@@ -634,7 +634,7 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
         const oldestTimestamp = Math.floor(oldestRawTimestamp / 10) * 10  // Normalize
         const newestTimestamp = Math.floor(newestRawTimestamp / 10) * 10  // Normalize
         
-        const volumeUrl = `https://function-bun-production-cb03.up.railway.app/api/volumes-history?market=${encodeURIComponent(tokenId)}&startTs=${oldestTimestamp}&endTs=${newestTimestamp}&fidelity=1`
+        const volumeUrl = `https://trade-analyze-production.up.railway.app/api/volumes-history?market=${encodeURIComponent(tokenId)}&startTs=${oldestTimestamp}&endTs=${newestTimestamp}&fidelity=1`
         
         const volumeResponse = await fetch(volumeUrl)
         

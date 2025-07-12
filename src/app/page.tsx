@@ -72,7 +72,7 @@ function TradeCountCard() {
   const { data: tradeData, isLoading, isError } = useQuery<TradeApiResponse[]>({
     queryKey: ['trade-stats'],
     queryFn: async () => {
-      const response = await fetch('https://24h-trade-production.up.railway.app/api/trade?hours=24')
+      const response = await fetch('https://trade-analyze-production.up.railway.app/api/trade?hours=24')
       if (!response.ok) {
         throw new Error('Failed to fetch trade data')
       }
@@ -146,7 +146,7 @@ function TradingVolumeCard() {
   const { data: tradeData, isLoading, isError } = useQuery<TradeApiResponse[]>({
     queryKey: ['trade-stats'],
     queryFn: async () => {
-      const response = await fetch('https://24h-trade-production.up.railway.app/api/trade?hours=24')
+      const response = await fetch('https://trade-analyze-production.up.railway.app/api/trade?hours=24')
       if (!response.ok) {
         throw new Error('Failed to fetch trade data')
       }
