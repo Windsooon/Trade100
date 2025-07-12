@@ -71,7 +71,13 @@ function transformEventData(rawEvent: RawEventData): Event {
           closed: market.closed,
           clobTokenIds: market.clobTokenIds,
           lastTradePrice: market.lastTradePrice,
-          endDateIso: market.endDateIso
+          endDateIso: market.endDateIso,
+          endDate: market.endDate,
+          startDate: market.startDate,
+          icon: market.icon || market.image,
+          image: market.image || market.icon,
+          description: market.description,
+          liquidity: market.liquidity
         }
     }) || [],
     tags: rawEvent.tags?.map((tag: any) => ({

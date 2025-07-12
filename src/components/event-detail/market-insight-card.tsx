@@ -2,15 +2,25 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
+import { 
+  TrendingUp, 
+  AlertCircle, 
+  Loader2, 
+  Info,
+  BarChart3,
+  Brain,
+  Activity
+} from 'lucide-react'
 import { Market, Event } from '@/lib/stores'
 import { createChart, IChartApi, ISeriesApi, CandlestickData, ColorType, CandlestickSeries, LogicalRange, LineSeries, LineData, HistogramSeries, HistogramData } from 'lightweight-charts'
 import { processRawPriceData, processRawVolumeData, type CandlestickData as ProcessedCandlestickData, type ProcessedVolumeData, type TimePeriod } from '@/lib/price-processing'
 import { useLiveMode } from './live-mode-manager'
 
-interface TradingChartCardProps {
+interface MarketInsightCardProps {
   selectedMarket: Market | null
   selectedToken: 'yes' | 'no'
   event: Event
@@ -29,13 +39,16 @@ interface RawVolumeData {
 
 type VolumeType = 'totalSize' | 'totalDollarVolume'
 
-export function TradingChartCard({ selectedMarket, selectedToken, event }: TradingChartCardProps) {
+export function MarketInsightCard({ selectedMarket, selectedToken, event }: MarketInsightCardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1h')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [volumeType, setVolumeType] = useState<VolumeType>('totalDollarVolume')
   const [volumeError, setVolumeError] = useState<string | null>(null)
   
+  // State for forcing chart re-initialization on tab switch
+  const [chartKey, setChartKey] = useState(0)
+
   // Chart refs
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -141,43 +154,51 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
 
   // Initialize chart
   useEffect(() => {
+    console.log('📈 Chart initialization effect triggered')
     let chart: IChartApi | null = null
     let resizeObserver: ResizeObserver | null = null
     
-    const initChart = () => {
-      if (!chartContainerRef.current) {
-        setTimeout(initChart, 100)
-        return
-      }
+    // The key prop should ensure this ref is available, but we check just in case.
+    if (!chartContainerRef.current) {
+      console.error('📈 Chart container ref not available on initialization.')
+      return
+    }
 
-      const chartOptions = { 
-        layout: { 
-          textColor: 'rgba(255, 255, 255, 0.9)', 
-          background: { type: ColorType.Solid, color: 'transparent' },
-          attributionLogo: false
-        },
-        grid: {
-          vertLines: { color: 'rgba(197, 203, 206, 0.1)' },
-          horzLines: { color: 'rgba(197, 203, 206, 0.1)' },
-        },
-        crosshair: {
-          mode: 1,
-        },
-        rightPriceScale: {
-          borderColor: 'rgba(197, 203, 206, 0.8)',
-        },
-        timeScale: {
-          borderColor: 'rgba(197, 203, 206, 0.8)',
-          timeVisible: true,
-          secondsVisible: false,
-          rightOffset: 20,
-          barSpacing: 6,
-          minBarSpacing: 2,
-        },
-        height: 384,
-      }
-      
+    console.log('📈 Initializing chart synchronously with container dimensions:', {
+      width: chartContainerRef.current.clientWidth,
+      height: chartContainerRef.current.clientHeight
+    })
+
+    const chartOptions = { 
+      layout: { 
+        textColor: 'rgba(255, 255, 255, 0.9)', 
+        background: { type: ColorType.Solid, color: 'transparent' },
+        attributionLogo: false
+      },
+      grid: {
+        vertLines: { color: 'rgba(197, 203, 206, 0.1)' },
+        horzLines: { color: 'rgba(197, 203, 206, 0.1)' },
+      },
+      crosshair: {
+        mode: 1,
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(197, 203, 206, 0.8)',
+      },
+      timeScale: {
+        borderColor: 'rgba(197, 203, 206, 0.8)',
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 20,
+        barSpacing: 6,
+        minBarSpacing: 2,
+      },
+      height: 384,
+    }
+    
+    try {
       chart = createChart(chartContainerRef.current, chartOptions)
+      console.log('📈 Chart created successfully')
       
       const candlestickSeries = chart.addSeries(CandlestickSeries, {
         upColor: '#26a69a',
@@ -186,6 +207,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
         wickUpColor: '#26a69a',
         wickDownColor: '#ef5350',
       })
+      console.log('📈 Candlestick series added')
       
       // Position price series to take 70% of chart height
       candlestickSeries.priceScale().applyOptions({
@@ -203,6 +225,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
         },
         priceScaleId: '',
       })
+      console.log('📈 Volume series added')
       
       // Configure volume price scale
       volumeSeries.priceScale().applyOptions({
@@ -215,34 +238,43 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
       chartRef.current = chart
       seriesRef.current = candlestickSeries
       volumeSeriesRef.current = volumeSeries
+      
+      console.log('📈 All chart refs assigned successfully')
 
       // Handle resize
       const handleResize = () => {
         if (chartContainerRef.current && chartRef.current) {
+          const newWidth = chartContainerRef.current.clientWidth
+          console.log('📈 Resize observer triggered, new width:', newWidth)
           chartRef.current.applyOptions({
-            width: chartContainerRef.current.clientWidth,
+            width: newWidth,
           })
         }
       }
 
       resizeObserver = new ResizeObserver(handleResize)
       resizeObserver.observe(chartContainerRef.current)
+      console.log('📈 Resize observer attached')
+    } catch (error) {
+      console.error('📈 Error during chart initialization:', error)
     }
-
-    setTimeout(initChart, 50)
     
     return () => {
+      console.log('📈 Cleaning up chart...')
       if (resizeObserver) {
         resizeObserver.disconnect()
+        console.log('📈 Resize observer disconnected')
       }
       if (chart) {
         chart.remove()
+        console.log('📈 Chart removed')
       }
       chartRef.current = null
       seriesRef.current = null
       volumeSeriesRef.current = null
+      console.log('�� Chart refs cleared')
     }
-  }, [])
+  }, [chartKey])
 
   // Setup tooltip - waits for chart initialization to complete
   useEffect(() => {
@@ -538,7 +570,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
         }
       }
     }
-  }, [selectedPeriod, getCachedVolumeMap]) // Add selectedPeriod and getCachedVolumeMap to recreate tooltip when period changes
+  }, [selectedPeriod, getCachedVolumeMap, chartKey]) // Add selectedPeriod and getCachedVolumeMap to recreate tooltip when period changes
 
   // Fetch chart data - one API call per market/token combination
   // Note: selectedPeriod is NOT in dependencies to avoid unnecessary API calls
@@ -723,24 +755,49 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
 
   // Fetch data when dependencies change (only for historical mode)
   useEffect(() => {
+    console.log('📊 Data fetch effect triggered:', {
+      marketConditionId: selectedMarket?.conditionId,
+      selectedToken,
+      isLiveMode
+    })
+    
     if (selectedMarket?.conditionId && !isLiveMode) {
+      console.log('📊 Calling fetchChartData...')
       fetchChartData()
+    } else {
+      console.log('📊 Skipping data fetch:', {
+        hasMarket: !!selectedMarket?.conditionId,
+        isLiveMode
+      })
     }
   }, [selectedMarket?.conditionId, selectedToken, fetchChartData, isLiveMode])
 
   // Update chart when period changes - uses cached raw data (no API call)
   useEffect(() => {
+    console.log('📊 Period change effect triggered:', {
+      selectedPeriod,
+      isLiveMode,
+      hasRawData: rawDataRef.current.length > 0,
+      hasSeriesRef: !!seriesRef.current
+    })
+    
     if (!isLiveMode && rawDataRef.current.length > 0 && seriesRef.current) {
+      console.log('📊 Processing data for period:', selectedPeriod)
       const processedData = processRawPriceData(rawDataRef.current, selectedPeriod)
+      console.log('📊 Processed data points:', processedData.length)
+      
       if (processedData.length > 0) {
         seriesRef.current.setData(processedData)
+        console.log('📊 Chart data updated for period change')
+        
         // Update volume display too
         if (volumeDataRef.current.length > 0) {
+          console.log('📊 Updating volume display for period change')
           updateVolumeDisplay(processedData)
         }
       }
     }
-  }, [selectedPeriod, isLiveMode, updateVolumeDisplay])
+  }, [selectedPeriod, isLiveMode, updateVolumeDisplay, chartKey]) // Add chartKey to re-run on re-initialization
 
   // Update volume series when volume type changes
   useEffect(() => {
@@ -748,148 +805,287 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
       const processedData = processRawPriceData(rawDataRef.current, selectedPeriod)
       updateVolumeDisplay(processedData)
     }
-  }, [volumeType, selectedPeriod, isLiveMode, updateVolumeDisplay])
+  }, [volumeType, selectedPeriod, isLiveMode, updateVolumeDisplay, chartKey]) // Add chartKey to re-run on re-initialization
+
+  // Format date for display
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch {
+      return dateString
+    }
+  }
 
   const chartTitle = getChartTitle(selectedToken)
 
+  // Add resize trigger when chart tab becomes active
+  const handleTabChange = useCallback((value: string) => {
+    console.log('🔄 Tab change detected:', value)
+    
+    if (value === 'chart') {
+      console.log('📊 Switching to chart tab - forcing chart re-initialization by changing key.')
+      setChartKey(prev => prev + 1)
+    } else {
+      console.log('📊 Switched away from chart tab to:', value)
+    }
+  }, [])
+
   return (
-    <Card className="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <TrendingUp className="h-4 w-4" />
-            {chartTitle}
-          </CardTitle>
-        </div>
-        <div className="space-y-3 mt-2">
-          <div>
-            <div className="text-xs text-muted-foreground mb-2 font-medium">Time Period</div>
-            <div className="flex gap-1">
-              {/* Only show Live button for active markets */}
-              {isCurrentMarketActive && (
-                <Button
-                  variant={isLiveMode ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={switchToLiveMode}
-                  disabled={loading}
-                  className="text-xs px-2 py-1 h-7"
-                >
-                  Live
-                </Button>
-              )}
-              {(['1m', '1h', '6h', '1d'] as TimePeriod[]).map((period) => (
-                <Button
-                  key={period}
-                  variant={!isLiveMode && selectedPeriod === period ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => handleHistoricalModeSwitch(period)}
-                  disabled={loading}
-                  className="text-xs px-2 py-1 h-7"
-                >
-                  {period}
-                </Button>
-              ))}
-            </div>
-          </div>
-          {/* Hide volume controls in live mode */}
-          {!isLiveMode && (
-            <div>
-              <div className="text-xs text-muted-foreground mb-2 font-medium">Volume Display</div>
-              <div className="flex gap-1">
-                <Button
-                  variant={volumeType === 'totalDollarVolume' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setVolumeType('totalDollarVolume')}
-                  disabled={loading}
-                  className="text-xs px-2 py-1 h-7"
-                >
-                  Volume ($)
-                </Button>
-                <Button
-                  variant={volumeType === 'totalSize' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setVolumeType('totalSize')}
-                  disabled={loading}
-                  className="text-xs px-2 py-1 h-7"
-                >
-                  Volume (Shares)
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Live mode status */}
-          {isLiveMode && (
-            <div>
-              <div className="text-xs text-muted-foreground mb-2 font-medium">Live Mode Status</div>
-              <div className="flex items-center gap-2">
-                {(() => {
-                  const status = getLiveModeStatus()
-                  if (!status) return null
-                  
-                  const statusColor = status.type === 'error' ? 'text-red-500' : 
-                                    status.type === 'warning' ? 'text-yellow-500' : 
-                                    'text-green-500'
-                  
-                  return (
-                    <div className={`text-xs ${statusColor}`}>
-                      {status.message}
-                    </div>
-                  )
-                })()}
-              </div>
-            </div>
-          )}
-          {/* Hide volume error in live mode */}
-          {!isLiveMode && volumeError && (
-            <Alert className="mt-2 py-2">
-              <AlertCircle className="h-3 w-3" />
-              <AlertDescription className="text-xs">
-                {volumeError}
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
+    <Card className="w-full">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Activity className="h-5 w-5" />
+          <span className="hidden sm:inline">Market Insight</span>
+          <span className="sm:hidden">Insight</span>
+        </CardTitle>
       </CardHeader>
-      <CardContent>
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        
-        {/* Hide volume error in live mode */}
-        {!isLiveMode && volumeError && (
-          <Alert variant="default" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{volumeError}</AlertDescription>
-          </Alert>
-        )}
-        
-        {/* Show live mode errors */}
-        {isLiveMode && liveError && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{liveError}</AlertDescription>
-          </Alert>
-        )}
-        
-        <div className="relative">
-          {loading && (
-            <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
-              <Loader2 className="animate-spin h-8 w-8 text-muted-foreground" />
+      <CardContent className="pt-0">
+        <Tabs defaultValue="chart" className="w-full" onValueChange={handleTabChange}>
+          <TabsList className="grid w-full grid-cols-3 bg-transparent">
+            <TabsTrigger value="chart" className="flex items-center gap-1 sm:gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Chart</span>
+              <span className="sm:hidden">Chart</span>
+            </TabsTrigger>
+            <TabsTrigger value="info" className="flex items-center gap-1 sm:gap-2">
+              <Info className="h-4 w-4" />
+              <span className="hidden sm:inline">Info</span>
+              <span className="sm:hidden">Info</span>
+            </TabsTrigger>
+            <TabsTrigger value="analyze" className="flex items-center gap-1 sm:gap-2">
+              <Brain className="h-4 w-4" />
+              <span className="hidden sm:inline">Trade Analyze</span>
+              <span className="sm:hidden">Analyze</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Chart Tab */}
+          <TabsContent value="chart" className="space-y-4 mt-4 sm:mt-6">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-base font-medium">
+                  <TrendingUp className="h-4 w-4" />
+                  {chartTitle}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-2 font-medium">Time Period</div>
+                <div className="flex gap-1">
+                  {/* Only show Live button for active markets */}
+                  {isCurrentMarketActive && (
+                    <Button
+                      variant={isLiveMode ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={switchToLiveMode}
+                      disabled={loading}
+                      className="text-xs px-2 py-1 h-7"
+                    >
+                      Live
+                    </Button>
+                  )}
+                  {(['1m', '1h', '6h', '1d'] as TimePeriod[]).map((period) => (
+                    <Button
+                      key={period}
+                      variant={!isLiveMode && selectedPeriod === period ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleHistoricalModeSwitch(period)}
+                      disabled={loading}
+                      className="text-xs px-2 py-1 h-7"
+                    >
+                      {period}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              {/* Hide volume controls in live mode */}
+              {!isLiveMode && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-2 font-medium">Volume Display</div>
+                  <div className="flex gap-1">
+                    <Button
+                      variant={volumeType === 'totalDollarVolume' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setVolumeType('totalDollarVolume')}
+                      disabled={loading}
+                      className="text-xs px-2 py-1 h-7"
+                    >
+                      Volume ($)
+                    </Button>
+                    <Button
+                      variant={volumeType === 'totalSize' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setVolumeType('totalSize')}
+                      disabled={loading}
+                      className="text-xs px-2 py-1 h-7"
+                    >
+                      Volume (Shares)
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Live mode status */}
+              {isLiveMode && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-2 font-medium">Live Mode Status</div>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const status = getLiveModeStatus()
+                      if (!status) return null
+                      
+                      const statusColor = status.type === 'error' ? 'text-red-500' : 
+                                        status.type === 'warning' ? 'text-yellow-500' : 
+                                        'text-green-500'
+                      
+                      return (
+                        <div className={`text-xs ${statusColor}`}>
+                          {status.message}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </div>
+              )}
+              {/* Hide volume error in live mode */}
+              {!isLiveMode && volumeError && (
+                <Alert className="mt-2 py-2">
+                  <AlertCircle className="h-3 w-3" />
+                  <AlertDescription className="text-xs">
+                    {volumeError}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
-          )}
-          <div 
-            ref={chartContainerRef} 
-            className="h-96 w-full"
-          />
-          <div className="text-xs text-muted-foreground mt-2">
-            Chart: {getDataPointCount()}{!isLiveMode && `, displaying ${selectedPeriod} view`}
-            {!isLiveMode && volumeDataRef.current.length > 0 && ` • ${volumeDataRef.current.length} volume data points`}
-          </div>
-        </div>
+
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Hide volume error in live mode */}
+            {!isLiveMode && volumeError && (
+              <Alert variant="default" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{volumeError}</AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Show live mode errors */}
+            {isLiveMode && liveError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{liveError}</AlertDescription>
+              </Alert>
+            )}
+            
+            <div className="relative">
+              {loading && (
+                <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
+                  <Loader2 className="animate-spin h-8 w-8 text-muted-foreground" />
+                </div>
+              )}
+              <div 
+                key={chartKey}
+                ref={chartContainerRef} 
+                className="w-full"
+                style={{ height: '384px' }}
+              />
+              <div className="text-xs text-muted-foreground mt-2">
+                Chart: {getDataPointCount()}{!isLiveMode && `, displaying ${selectedPeriod} view`}
+                {!isLiveMode && volumeDataRef.current.length > 0 && ` • ${volumeDataRef.current.length} volume data points`}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Info Tab */}
+          <TabsContent value="info" className="space-y-4 mt-4 sm:mt-6">
+            <div style={{ minHeight: '500px' }}>
+              {selectedMarket ? (
+                <div className="space-y-6">
+
+                  
+                  {/* Market Question */}
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-medium">Market Question</h3>
+                    <p className="text-sm text-foreground leading-relaxed">{selectedMarket.question}</p>
+                  </div>
+
+                  {/* Market Description */}
+                  {selectedMarket.description && (
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-medium">Description</h3>
+                      <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                        {selectedMarket.description}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Date Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-medium">Start Date</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedMarket.startDate ? formatDate(selectedMarket.startDate) : 'N/A'}
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-medium">End Date</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedMarket.endDate ? formatDate(selectedMarket.endDate) : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Additional Market Details */}
+                  {(selectedMarket.liquidity || selectedMarket.volume24hr) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {selectedMarket.liquidity && (
+                        <div className="space-y-2">
+                          <h3 className="text-lg font-medium">Liquidity</h3>
+                          <p className="text-sm text-muted-foreground">
+                            ${parseFloat(selectedMarket.liquidity.toString()).toLocaleString()}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {selectedMarket.volume24hr && (
+                        <div className="space-y-2">
+                          <h3 className="text-lg font-medium">24h Volume</h3>
+                          <p className="text-sm text-muted-foreground">
+                            ${selectedMarket.volume24hr.toLocaleString()}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Info className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No market selected</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Trade Analyze Tab */}
+          <TabsContent value="analyze" className="space-y-4 mt-4 sm:mt-6">
+            <div className="text-center py-8 text-muted-foreground" style={{ minHeight: '500px' }}>
+              <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Trade analysis coming soon</p>
+            </div>
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   )

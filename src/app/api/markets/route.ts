@@ -49,8 +49,12 @@ interface ApiMarket {
   clobTokenIds?: string
   lastTradePrice?: number
   endDateIso?: string
+  endDate?: string
+  startDate?: string
   icon?: string
   image?: string
+  description?: string
+  liquidity?: number
 }
 
 interface ApiTag {
@@ -105,7 +109,7 @@ function transformEvent(apiEvent: ApiEvent): Event {
       
       const parsedOutcomePrices = parseOutcomePrices(market.outcomePrices)
       
-      return {
+      const transformedMarket = {
         id: market.id,
         question: market.question,
         conditionId: market.conditionId,
@@ -126,8 +130,17 @@ function transformEvent(apiEvent: ApiEvent): Event {
         clobTokenIds: market.clobTokenIds,
         lastTradePrice: market.lastTradePrice,
         endDateIso: market.endDateIso,
-        icon: market.icon || market.image
+        endDate: market.endDate,
+        startDate: market.startDate,
+        icon: market.icon || market.image,
+        image: market.image || market.icon,
+        description: market.description,
+        liquidity: market.liquidity
       }
+      
+
+      
+      return transformedMarket
     }) || [],
     tags: apiEvent.tags?.map((tag: ApiTag) => ({
       id: tag.id,

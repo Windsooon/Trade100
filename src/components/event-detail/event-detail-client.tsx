@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { SharedOrderBookProvider } from './shared-order-book-provider'
 import { EventInfoBanner } from './event-info-banner'
 import { MarketListCard } from './market-list-card'
-import { TradingChartCard } from './trading-chart-card'
+import { MarketInsightCard } from './market-insight-card'
 import { OperationsCard } from './operations-card'
 import { Event, Market } from '@/lib/stores'
 
@@ -71,10 +71,10 @@ export default function EventDetailClient({
             </div>
           </div>
 
-          {/* Right Side - Trading Chart and Operations (both mobile and desktop) */}
+          {/* Right Side - Market Insight and Operations (both mobile and desktop) */}
           <div className="lg:col-span-7 space-y-6">
-            {/* Single Trading Chart - responsive visibility handled in component */}
-            <TradingChartCard 
+            {/* Market Insight Card with Chart, Info, and Trade Analyze tabs */}
+            <MarketInsightCard 
               selectedMarket={selectedMarket} 
               selectedToken={selectedToken}
               event={event}

@@ -24,6 +24,7 @@ export interface Market {
   id?: string
   question: string
   conditionId: string
+  slug?: string
   groupItemTitle?: string
   bestBid?: string
   bestAsk?: string
@@ -44,6 +45,8 @@ export interface Market {
   endDate?: string
   startDate?: string
   icon?: string
+  image?: string
+  description?: string
   liquidity?: number
   liquidityNum?: number
 }
