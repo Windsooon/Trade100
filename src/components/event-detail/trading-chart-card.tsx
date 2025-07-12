@@ -8,6 +8,7 @@ import { TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
 import { Market, Event } from '@/lib/stores'
 import { createChart, IChartApi, ISeriesApi, CandlestickData, ColorType, CandlestickSeries, LogicalRange, LineSeries, LineData, HistogramSeries, HistogramData } from 'lightweight-charts'
 import { processRawPriceData, processRawVolumeData, type CandlestickData as ProcessedCandlestickData, type ProcessedVolumeData, type TimePeriod } from '@/lib/price-processing'
+import { useLiveMode } from './live-mode-manager'
 
 interface TradingChartCardProps {
   selectedMarket: Market | null
@@ -30,7 +31,6 @@ type VolumeType = 'totalSize' | 'totalDollarVolume'
 
 export function TradingChartCard({ selectedMarket, selectedToken, event }: TradingChartCardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1h')
-  const [isLiveMode, setIsLiveMode] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [volumeType, setVolumeType] = useState<VolumeType>('totalDollarVolume')
@@ -44,8 +44,11 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
   
   // Data refs - store raw data and processed data
   const rawDataRef = useRef<RawPricePoint[]>([])
-  const realTimeDataRef = useRef<LineData[]>([])
   const volumeDataRef = useRef<RawVolumeData[]>([])
+  
+  // Cache for processed volume data and volume maps
+  const processedVolumeCache = useRef<Map<TimePeriod, ProcessedVolumeData[]>>(new Map())
+  const volumeMapCache = useRef<Map<TimePeriod, Map<number, ProcessedVolumeData>>>(new Map())
   
   // Ref to track current token for tooltip (since tooltip effect has no dependencies)
   const selectedTokenRef = useRef<'yes' | 'no'>(selectedToken)
@@ -54,10 +57,71 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
   useEffect(() => {
     selectedTokenRef.current = selectedToken
   }, [selectedToken])
-  
+
   const isCurrentMarketActive = useMemo(() => {
     return selectedMarket?.active === true && selectedMarket?.archived === false && selectedMarket?.closed === false
   }, [selectedMarket])
+
+  // Initialize live mode hook
+  const {
+    isLiveMode,
+    liveError,
+    liveDataCount,
+    connectionStatus,
+    switchToLiveMode,
+    switchToHistoricalMode,
+    getChartTitle,
+    getDataPointCount,
+    getLiveModeStatus,
+    clearLiveData
+  } = useLiveMode({
+    isCurrentMarketActive,
+    selectedMarket,
+    selectedToken,
+    rawDataRef,
+    chartRef,
+    seriesRef,
+    volumeSeriesRef
+  })
+
+  // 🚀 OPTIMIZATION 3: Intelligent Caching System
+  // Caches processed volume data by time period to avoid expensive reprocessing
+  const getCachedProcessedVolumeData = useCallback((period: TimePeriod) => {
+    // Check if we have cached data for this period - avoids reprocessing
+    if (processedVolumeCache.current.has(period)) {
+      return processedVolumeCache.current.get(period)!
+    }
+    
+    // Process and cache the data for future use
+    const processedData = processRawVolumeData(volumeDataRef.current, period)
+    processedVolumeCache.current.set(period, processedData)
+    
+    // Also create and cache volume map for O(1) lookups
+    const volumeMap = new Map<number, ProcessedVolumeData>()
+    processedData.forEach(vol => {
+      volumeMap.set(vol.time as number, vol)
+    })
+    volumeMapCache.current.set(period, volumeMap)
+    
+    return processedData
+  }, [])
+
+  // Helper function to get cached volume map
+  const getCachedVolumeMap = useCallback((period: TimePeriod) => {
+    if (volumeMapCache.current.has(period)) {
+      return volumeMapCache.current.get(period)!
+    }
+    
+    // This will also create the volume map cache
+    getCachedProcessedVolumeData(period)
+    return volumeMapCache.current.get(period)!
+  }, [getCachedProcessedVolumeData])
+
+  // Clear caches when volume data changes
+  const clearVolumeDataCaches = useCallback(() => {
+    processedVolumeCache.current.clear()
+    volumeMapCache.current.clear()
+  }, [])
 
   const formatVolume = useCallback((value: number, isDollar: boolean = false): string => {
     const prefix = isDollar ? '$' : ''
@@ -69,65 +133,11 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
     return `${prefix}${value.toFixed(0)}`
   }, [])
 
-  // Handle mode switching
-  const switchToLiveMode = useCallback(() => {
-    // Only allow live mode for active markets
-    if (!isCurrentMarketActive) {
-      return
-    }
-    
-    setIsLiveMode(true)
-    
-    if (chartRef.current && seriesRef.current) {
-      // Remove candlestick series
-      chartRef.current.removeSeries(seriesRef.current)
-      
-      // Create line series for real-time data
-      const lineSeries = chartRef.current.addSeries(LineSeries, {
-        color: '#2196F3',
-        lineWidth: 2,
-        priceLineVisible: true,
-        lastValueVisible: true,
-        crosshairMarkerVisible: true,
-      })
-      
-      seriesRef.current = lineSeries
-      
-      // Set existing real-time data if any
-      if (realTimeDataRef.current.length > 0) {
-        lineSeries.setData(realTimeDataRef.current)
-      }
-    }
-  }, [isCurrentMarketActive])
-
-  const switchToHistoricalMode = useCallback((period: TimePeriod) => {
-    setIsLiveMode(false)
+  // Handle mode switching - wrapper for the hook function that also sets the period
+  const handleHistoricalModeSwitch = useCallback((period: TimePeriod) => {
     setSelectedPeriod(period)
-    
-    if (chartRef.current && seriesRef.current) {
-      // Remove line series
-      chartRef.current.removeSeries(seriesRef.current)
-      
-      // Create candlestick series for historical data
-      const candlestickSeries = chartRef.current.addSeries(CandlestickSeries, {
-        upColor: '#26a69a',
-        downColor: '#ef5350',
-        borderVisible: false,
-        wickUpColor: '#26a69a',
-        wickDownColor: '#ef5350',
-      })
-      
-      seriesRef.current = candlestickSeries
-      
-      // Process and display data for the new period
-      if (rawDataRef.current.length > 0) {
-        const processedData = processRawPriceData(rawDataRef.current, period)
-        if (processedData.length > 0) {
-          candlestickSeries.setData(processedData)
-        }
-      }
-    }
-  }, [])
+    switchToHistoricalMode(period)
+  }, [switchToHistoricalMode])
 
   // Initialize chart
   useEffect(() => {
@@ -335,13 +345,14 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
           // Show volume tooltip, hide price tooltip
           toolTip.style.display = 'none'
           
-          // Get volume data for this timestamp
+          // Get volume data for this timestamp using cached volume map
           const currentVolumeData = volumeDataRef.current
           if (currentVolumeData && currentVolumeData.length > 0) {
             const targetTime = param.time as number
-            // Process volume data for current period to match the chart display
-            const processedVolumeData = processRawVolumeData(currentVolumeData, selectedPeriod)
-            const volumeEntry = processedVolumeData.find(vol => (vol.time as number) === targetTime)
+            
+            // Use cached volume map for instant O(1) lookup
+            const volumeMap = getCachedVolumeMap(selectedPeriod)
+            const volumeEntry = volumeMap.get(targetTime)
             
             if (volumeEntry) {
               const timestamp = param.time as number
@@ -527,7 +538,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
         }
       }
     }
-  }, [selectedPeriod]) // Add selectedPeriod to recreate tooltip when period changes
+  }, [selectedPeriod, getCachedVolumeMap]) // Add selectedPeriod and getCachedVolumeMap to recreate tooltip when period changes
 
   // Fetch chart data - one API call per market/token combination
   // Note: selectedPeriod is NOT in dependencies to avoid unnecessary API calls
@@ -614,6 +625,8 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
           const volumeResult = await volumeResponse.json()
           if (volumeResult && Array.isArray(volumeResult)) {
             volumeDataRef.current = volumeResult
+            // Clear caches when new volume data is loaded
+            clearVolumeDataCaches()
             updateVolumeDisplay(processedData)
           } else {
             setVolumeError('Invalid volume data format')
@@ -633,46 +646,87 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
     }
   }, [selectedMarket?.clobTokenIds, selectedToken, isLiveMode])
 
-  // Update volume display - processes and aggregates volume data by time period
+  // 🚀 OPTIMIZATION 1: Missing Timestamp Handler
+  // Handles sparse volume data by filling missing timestamps with zero values
+  // This ensures chart displays correctly even when API doesn't return 0-volume entries
+  const alignVolumeWithPriceTimestamps = useCallback((volumeData: ProcessedVolumeData[], priceTimestamps: number[]) => {
+    // Create hash map for O(1) lookup (Hash Map Lookup optimization)
+    const volumeMap = new Map<number, ProcessedVolumeData>()
+    volumeData.forEach(vol => {
+      volumeMap.set(vol.time as number, vol)
+    })
+    
+    // Fill missing timestamps with zero values - ensures 1:1 mapping with price data
+    return priceTimestamps.map(timestamp => {
+      const existingVolume = volumeMap.get(timestamp)
+      return existingVolume || {
+        time: timestamp as any,
+        totalSize: 0,
+        totalDollarVolume: 0
+      }
+    })
+  }, [])
+
+  // 🚀 OPTIMIZATION 2: Pre-aligned Volume Data  
+  // Creates chart-ready histogram data with O(1) volume lookups
+  // Eliminates expensive linear searches during chart rendering
+  const createPreAlignedVolumeData = useCallback((priceData: ProcessedCandlestickData[], alignedVolumeData: ProcessedVolumeData[]) => {
+    // Create hash map for instant volume lookup - replaces O(n) find() with O(1) get()
+    const volumeMap = new Map<number, ProcessedVolumeData>()
+    alignedVolumeData.forEach(vol => {
+      volumeMap.set(vol.time as number, vol)
+    })
+    
+    // Pre-align volume data with price data for efficient rendering
+    return priceData.map(priceCandle => {
+      const timestamp = priceCandle.time as number
+      const volumeEntry = volumeMap.get(timestamp) // O(1) lookup - major performance gain
+      
+      const isGreen = priceCandle.close >= priceCandle.open
+      const color = isGreen ? '#26a69a' : '#ef5350'
+      const volumeValue = volumeEntry ? 
+        (volumeType === 'totalDollarVolume' ? volumeEntry.totalDollarVolume : volumeEntry.totalSize) : 0
+      
+      return {
+        time: priceCandle.time,
+        value: volumeValue,
+        color: color
+      }
+    })
+  }, [volumeType])
+
+  // 🚀 OPTIMIZED VOLUME DISPLAY PIPELINE
+  // Combines all three optimizations for maximum performance with sparse volume data
+  // Performance improvement: O(n²) → O(n) + caching + missing data handling
   const updateVolumeDisplay = useCallback((processedPriceData: ProcessedCandlestickData[]) => {
     if (!volumeSeriesRef.current || volumeDataRef.current.length === 0) return
     
     try {
-      // Process raw volume data for the current time period
-      const processedVolumeData = processRawVolumeData(volumeDataRef.current, selectedPeriod)
+      // Use cached processed volume data for better performance
+      const processedVolumeData = getCachedProcessedVolumeData(selectedPeriod)
       
-      // Create histogram data by matching processed volume data to price data
-      const volumeHistogramData = processedPriceData.map((priceCandle) => {
-        const targetTime = priceCandle.time as number
-        
-        // Find volume entry with matching timestamp
-        const volumeEntry = processedVolumeData.find(vol => (vol.time as number) === targetTime)
-        
-        const isGreen = priceCandle.close >= priceCandle.open
-        const color = isGreen ? '#26a69a' : '#ef5350'
-        const volumeValue = volumeEntry ? 
-          (volumeType === 'totalDollarVolume' ? volumeEntry.totalDollarVolume : volumeEntry.totalSize) : 0
-        
-        return {
-          time: priceCandle.time,
-          value: volumeValue || 0,
-          color: color
-        }
-      })
+      // Extract price timestamps for alignment
+      const priceTimestamps = processedPriceData.map(candle => candle.time as number)
+      
+      // Align volume data with price timestamps (handles missing timestamps)
+      const alignedVolumeData = alignVolumeWithPriceTimestamps(processedVolumeData, priceTimestamps)
+      
+      // Create pre-aligned histogram data for efficient rendering
+      const volumeHistogramData = createPreAlignedVolumeData(processedPriceData, alignedVolumeData)
       
       volumeSeriesRef.current.setData(volumeHistogramData)
     } catch (error) {
       console.error('Error updating volume display:', error)
       setVolumeError('Error processing volume data')
     }
-  }, [volumeType, selectedPeriod, setVolumeError])
+  }, [selectedPeriod, getCachedProcessedVolumeData, alignVolumeWithPriceTimestamps, createPreAlignedVolumeData, setVolumeError])
 
-  // Fetch data when dependencies change
+  // Fetch data when dependencies change (only for historical mode)
   useEffect(() => {
     if (selectedMarket?.conditionId && !isLiveMode) {
       fetchChartData()
     }
-  }, [selectedMarket?.conditionId, selectedToken, fetchChartData])
+  }, [selectedMarket?.conditionId, selectedToken, fetchChartData, isLiveMode])
 
   // Update chart when period changes - uses cached raw data (no API call)
   useEffect(() => {
@@ -696,7 +750,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
     }
   }, [volumeType, selectedPeriod, isLiveMode, updateVolumeDisplay])
 
-  const chartTitle = `${selectedToken.toUpperCase()} Token Price Chart ${isLiveMode ? '(Live)' : '(Historical)'}`
+  const chartTitle = getChartTitle(selectedToken)
 
   return (
     <Card className="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm">
@@ -728,7 +782,7 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
                   key={period}
                   variant={!isLiveMode && selectedPeriod === period ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => switchToHistoricalMode(period)}
+                  onClick={() => handleHistoricalModeSwitch(period)}
                   disabled={loading}
                   className="text-xs px-2 py-1 h-7"
                 >
@@ -737,30 +791,57 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
               ))}
             </div>
           </div>
-          <div>
-            <div className="text-xs text-muted-foreground mb-2 font-medium">Volume Display</div>
-            <div className="flex gap-1">
-              <Button
-                variant={volumeType === 'totalDollarVolume' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setVolumeType('totalDollarVolume')}
-                disabled={loading}
-                className="text-xs px-2 py-1 h-7"
-              >
-                Volume ($)
-              </Button>
-              <Button
-                variant={volumeType === 'totalSize' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setVolumeType('totalSize')}
-                disabled={loading}
-                className="text-xs px-2 py-1 h-7"
-              >
-                Volume (Shares)
-              </Button>
+          {/* Hide volume controls in live mode */}
+          {!isLiveMode && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-2 font-medium">Volume Display</div>
+              <div className="flex gap-1">
+                <Button
+                  variant={volumeType === 'totalDollarVolume' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setVolumeType('totalDollarVolume')}
+                  disabled={loading}
+                  className="text-xs px-2 py-1 h-7"
+                >
+                  Volume ($)
+                </Button>
+                <Button
+                  variant={volumeType === 'totalSize' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setVolumeType('totalSize')}
+                  disabled={loading}
+                  className="text-xs px-2 py-1 h-7"
+                >
+                  Volume (Shares)
+                </Button>
+              </div>
             </div>
-          </div>
-          {volumeError && (
+          )}
+          
+          {/* Live mode status */}
+          {isLiveMode && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-2 font-medium">Live Mode Status</div>
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const status = getLiveModeStatus()
+                  if (!status) return null
+                  
+                  const statusColor = status.type === 'error' ? 'text-red-500' : 
+                                    status.type === 'warning' ? 'text-yellow-500' : 
+                                    'text-green-500'
+                  
+                  return (
+                    <div className={`text-xs ${statusColor}`}>
+                      {status.message}
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          )}
+          {/* Hide volume error in live mode */}
+          {!isLiveMode && volumeError && (
             <Alert className="mt-2 py-2">
               <AlertCircle className="h-3 w-3" />
               <AlertDescription className="text-xs">
@@ -778,10 +859,19 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
           </Alert>
         )}
         
-        {volumeError && (
+        {/* Hide volume error in live mode */}
+        {!isLiveMode && volumeError && (
           <Alert variant="default" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{volumeError}</AlertDescription>
+          </Alert>
+        )}
+        
+        {/* Show live mode errors */}
+        {isLiveMode && liveError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{liveError}</AlertDescription>
           </Alert>
         )}
         
@@ -796,11 +886,8 @@ export function TradingChartCard({ selectedMarket, selectedToken, event }: Tradi
             className="h-96 w-full"
           />
           <div className="text-xs text-muted-foreground mt-2">
-            Chart: {isLiveMode ? 
-              `${realTimeDataRef.current.length} live data points` : 
-              `${rawDataRef.current.length} raw data points loaded, displaying ${selectedPeriod} view`
-            }
-            {volumeDataRef.current.length > 0 && ` • ${volumeDataRef.current.length} volume data points`}
+            Chart: {getDataPointCount()}{!isLiveMode && `, displaying ${selectedPeriod} view`}
+            {!isLiveMode && volumeDataRef.current.length > 0 && ` • ${volumeDataRef.current.length} volume data points`}
           </div>
         </div>
       </CardContent>

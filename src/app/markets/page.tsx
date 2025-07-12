@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { RefreshCw, Filter, X, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react'
+import { RefreshCw, Filter, X, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, ChevronsUpDown, Search } from 'lucide-react'
 import { Event, Market } from '@/lib/stores'
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
@@ -283,6 +283,7 @@ function EventCard({ event }: { event: Event }) {
 }
 
 export default function MarketsPage() {
+  const [searchTerm, setSearchTerm] = useState<string>('')
   const [selectedTag, setSelectedTag] = useState<string>('all')
   const [minPrice, setMinPrice] = useState<string>('')
   const [maxPrice, setMaxPrice] = useState<string>('')
@@ -334,13 +335,19 @@ export default function MarketsPage() {
     isError: eventsError,
     error: eventsErrorDetails,
   } = useQuery<EventsResponse>({
-    queryKey: ['all-events'],
+    queryKey: ['all-events', searchTerm],
     queryFn: async () => {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000)
       
       try {
-        const response = await fetch('/api/markets?limit=9999', {
+        const url = new URL('/api/markets', window.location.origin)
+        url.searchParams.set('limit', '9999')
+        if (searchTerm.trim()) {
+          url.searchParams.set('search', searchTerm.trim())
+        }
+        
+        const response = await fetch(url.toString(), {
           signal: controller.signal,
         })
         
@@ -485,9 +492,10 @@ export default function MarketsPage() {
   const endIndex = startIndex + itemsPerPage
   const paginatedEvents = filteredAndSortedEvents.slice(startIndex, endIndex)
 
-  const hasActiveFilters = minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== 'volume24hr' || sortDirection !== 'desc'
+  const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== 'volume24hr' || sortDirection !== 'desc'
 
   const clearAllFilters = () => {
+    setSearchTerm('')
     setSelectedTag('all')
     setMinPrice('')
     setMaxPrice('')
@@ -501,11 +509,18 @@ export default function MarketsPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
+  }, [searchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+
+      {/* Page Header */}
+      <div className="border-b bg-background">
+        <div className="container mx-auto px-4 py-4 max-w-[1200px]">
+          <h1 className="text-2xl font-bold">Markets</h1>
+        </div>
+      </div>
 
       {/* Horizontal Tag Navigation */}
       <div className="border-b bg-background">
@@ -574,6 +589,7 @@ export default function MarketsPage() {
               {hasActiveFilters && (
                 <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
                   <span className="text-sm font-medium">Active:</span>
+                  {searchTerm && <Badge variant="secondary">Search: "{searchTerm}"</Badge>}
                   {(minPrice || maxPrice) && <Badge variant="secondary">Price: {minPrice || '0'}-{maxPrice || '1'}</Badge>}
                   {(minBestAsk || maxBestAsk) && <Badge variant="secondary">Ask: {minBestAsk || '0'}-{maxBestAsk || '1'}</Badge>}
                   {(sortBy !== 'volume24hr' || sortDirection !== 'desc') && <Badge variant="secondary">Sort: {sortBy} ({sortDirection})</Badge>}
@@ -652,6 +668,21 @@ export default function MarketsPage() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Search Bar */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">SEARCH</h3>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search events by title..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Results Summary */}
@@ -668,6 +699,24 @@ export default function MarketsPage() {
               <CardContent className="space-y-4">
                 {/* Mobile filters - simplified */}
                 <div className="space-y-4">
+                  {/* Search */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground">SEARCH</h3>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search events by title..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sort */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground">SORT</h3>
                   <div className="flex gap-2">
                     <Select value={sortBy} onValueChange={setSortBy}>
                       <SelectTrigger className="flex-1">
@@ -689,6 +738,7 @@ export default function MarketsPage() {
                     >
                       {sortDirection === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
                     </Button>
+                    </div>
                   </div>
 
                   {hasActiveFilters && (
