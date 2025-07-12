@@ -20,20 +20,20 @@ export function Navbar() {
             </Link>
             
             {/* Navigation - moved to left side */}
-            <nav className="hidden md:flex items-center space-x-6">
-              <Link
-                href="/markets"
-                className="text-sm font-medium transition-colors hover:opacity-80 navbar-link"
-              >
+            <div className="flex items-center gap-6">
+              <Link href="/" className="navbar-link">
+                Home
+              </Link>
+              <Link href="/markets" className="navbar-link">
                 Markets
               </Link>
-              <Link
-                href="/activity"
-                className="text-sm font-medium transition-colors hover:opacity-80 navbar-link"
-              >
+              <Link href="/portfolio" className="navbar-link">
+                Portfolio (Mock Data)
+              </Link>
+              <Link href="/activity" className="navbar-link">
                 Activity
               </Link>
-            </nav>
+            </div>
           </div>
 
           {/* Right side - GitHub link and Theme Toggle */}
