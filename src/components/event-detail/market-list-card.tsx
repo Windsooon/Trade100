@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { useState, useMemo } from 'react'
 import { usePolymarketStatus } from '@/hooks/use-polymarket-status'
 import { OrderBookDisplay } from './order-book-display'
-import { SharedOrderBookProvider } from './shared-order-book-provider'
+import { SharedOrderBookProvider, useSharedOrderBook } from './shared-order-book-provider'
 
 interface MarketListCardProps {
   markets: Market[]
@@ -70,104 +70,24 @@ export function MarketListCard({
     const isSelected = selectedMarket?.conditionId === market.conditionId
     const isExpanded = expandedMarket === market.conditionId
     
-    // Get YES/NO prices from static market data
-    const getYesNoPrice = (market: Market): { yesPrice: number, noPrice: number } => {
-      try {
-        if (market.outcomePrices && Array.isArray(market.outcomePrices) && market.outcomePrices.length >= 2) {
-          return {
-            yesPrice: parseFloat(market.outcomePrices[0]) || 0,
-            noPrice: parseFloat(market.outcomePrices[1]) || 0
-          }
-        }
-      } catch (error) {
-        console.error('Error parsing outcome prices:', error)
-      }
-      return { yesPrice: 0, noPrice: 0 }
-    }
-    const { yesPrice, noPrice } = getYesNoPrice(market)
-    
     return (
-      <Collapsible
+      <MarketRow 
         key={market.conditionId}
-        open={isExpanded}
-        onOpenChange={(open) => {
-          if (open) {
-            // Close any other expanded market and open this one (accordion behavior)
-            setExpandedMarket(market.conditionId)
-          } else {
+        market={market}
+        isActive={isActive}
+        isSelected={isSelected}
+        isExpanded={isExpanded}
+        selectedToken={selectedToken}
+        onMarketSelect={onMarketSelect}
+        onTokenChange={onTokenChange}
+        onExpandToggle={() => {
+          if (isExpanded) {
             setExpandedMarket(null)
+          } else {
+            setExpandedMarket(market.conditionId)
           }
         }}
-      >
-        <div
-          className={`border rounded transition-colors ${
-            isSelected 
-              ? 'border-primary bg-primary/5' 
-              : 'border-border hover:border-primary/50 hover:bg-muted/50'
-          }`}
-        >
-          {/* Market Row */}
-          <div className="p-3">
-            <div className="flex items-center justify-between">
-              {/* Left side - Market info */}
-              <div 
-                className="flex-1 cursor-pointer"
-                onClick={() => onMarketSelect(market)}
-              >
-                {/* Market question and collapsible trigger */}
-                <div className="flex items-start gap-2 mb-2">
-                  <div className="flex-1 text-sm font-medium leading-tight">
-                    {getMarketDisplayTitle(market)}
-                  </div>
-                  {/* Collapsible trigger positioned right next to title */}
-                  {isActive && (
-                    <CollapsibleTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="p-1 h-6 w-6 flex-shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                        }}
-                      >
-                        <ChevronsUpDown className="h-4 w-4" />
-                        <span className="sr-only">Toggle order book</span>
-                      </Button>
-                    </CollapsibleTrigger>
-                  )}
-                </div>
-                
-                {/* Yes/No prices */}
-                <div className="flex items-center gap-3 text-xs">
-                  <div className="flex items-center gap-1">
-                    <span className="text-muted-foreground">Yes:</span>
-                    <span className="font-medium text-green-600 dark:text-green-400">
-                      {yesPrice.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-muted-foreground">No:</span>
-                    <span className="font-medium text-red-600 dark:text-red-400">
-                      {noPrice.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Collapsible Order Book */}
-          {isActive && (
-            <CollapsibleContent>
-                              <OrderBookDisplay
-                  conditionId={market.conditionId}
-                  selectedToken={selectedToken}
-                  onTokenChange={onTokenChange}
-                />
-            </CollapsibleContent>
-          )}
-        </div>
-      </Collapsible>
+      />
     )
   }
 
@@ -249,4 +169,152 @@ export function MarketListCard({
       </Card>
     </SharedOrderBookProvider>
   )
+}
+
+// Separate component that can access orderbook data
+function MarketRow({ 
+  market, 
+  isActive, 
+  isSelected, 
+  isExpanded, 
+  selectedToken, 
+  onMarketSelect, 
+  onTokenChange, 
+  onExpandToggle 
+}: {
+  market: Market
+  isActive: boolean
+  isSelected: boolean
+  isExpanded: boolean
+  selectedToken: 'yes' | 'no'
+  onMarketSelect: (market: Market) => void
+  onTokenChange: (token: 'yes' | 'no') => void
+  onExpandToggle: () => void
+}) {
+  const { orderBooks } = useSharedOrderBook()
+  
+  // Get YES/NO prices with real-time updates from orderbook
+  const getYesNoPrice = (market: Market): { yesPrice: number, noPrice: number } => {
+    // Try to get real-time prices from orderbook first (for active markets)
+    if (isActive && market.clobTokenIds) {
+      try {
+        const yesOrderBookKey = `${market.conditionId}_yes`
+        const noOrderBookKey = `${market.conditionId}_no`
+        
+        const yesOrderBook = orderBooks[yesOrderBookKey]
+        const noOrderBook = orderBooks[noOrderBookKey]
+        
+        let yesPrice = 1 // Default fallback for no asks
+        let noPrice = 1 // Default fallback for no asks
+        
+        // Get YES price from lowest ask in YES orderbook
+        if (yesOrderBook && yesOrderBook.asks.length > 0) {
+          yesPrice = parseFloat(yesOrderBook.asks[0].price)
+        }
+        
+        // Get NO price from lowest ask in NO orderbook
+        if (noOrderBook && noOrderBook.asks.length > 0) {
+          noPrice = parseFloat(noOrderBook.asks[0].price)
+        }
+        
+        return { yesPrice, noPrice }
+      } catch (error) {
+        console.error('Error getting orderbook prices:', error)
+      }
+    }
+    
+    // Fall back to static prices
+    try {
+      if (market.outcomePrices && Array.isArray(market.outcomePrices) && market.outcomePrices.length >= 2) {
+        return {
+          yesPrice: parseFloat(market.outcomePrices[0]) || 0,
+          noPrice: parseFloat(market.outcomePrices[1]) || 0
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing outcome prices:', error)
+    }
+    return { yesPrice: 0, noPrice: 0 }
+  }
+  
+  const { yesPrice, noPrice } = getYesNoPrice(market)
+    
+    return (
+      <Collapsible
+        key={market.conditionId}
+        open={isExpanded}
+        onOpenChange={(open) => {
+          onExpandToggle()
+        }}
+      >
+        <div
+          className={`border rounded transition-colors ${
+            isSelected 
+              ? 'border-primary bg-primary/5' 
+              : 'border-border hover:border-primary/50 hover:bg-muted/50'
+          }`}
+        >
+          {/* Market Row */}
+          <div className="p-3">
+            <div className="flex items-center justify-between">
+              {/* Left side - Market info */}
+              <div 
+                className="flex-1 cursor-pointer"
+                onClick={() => onMarketSelect(market)}
+              >
+                {/* Market question and collapsible trigger */}
+                <div className="flex items-start gap-2 mb-2">
+                  <div className="flex-1 text-sm font-medium leading-tight">
+                    {getMarketDisplayTitle(market)}
+                  </div>
+                  {/* Collapsible trigger positioned right next to title */}
+                  {isActive && (
+                    <CollapsibleTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="p-1 h-6 w-6 flex-shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                        }}
+                      >
+                        <ChevronsUpDown className="h-4 w-4" />
+                        <span className="sr-only">Toggle order book</span>
+                      </Button>
+                    </CollapsibleTrigger>
+                  )}
+                </div>
+                
+                {/* Yes/No prices */}
+                <div className="flex items-center gap-3 text-xs">
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground">Yes:</span>
+                    <span className="font-medium text-green-500">
+                      {yesPrice.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground">No:</span>
+                    <span className="font-medium text-red-500">
+                      {noPrice.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Collapsible Order Book */}
+          {isActive && (
+            <CollapsibleContent>
+                              <OrderBookDisplay
+                  conditionId={market.conditionId}
+                  selectedToken={selectedToken}
+                  onTokenChange={onTokenChange}
+                />
+            </CollapsibleContent>
+          )}
+        </div>
+      </Collapsible>
+    )
 } 

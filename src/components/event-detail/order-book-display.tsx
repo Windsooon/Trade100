@@ -192,7 +192,7 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
                   {asks.length > 0 && (
                     <div className="space-y-0.5">
                       {asks.map((lvl, i) => (
-                        <div key={`ask-${i}`} className="grid grid-cols-3 gap-2 py-0.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20">
+                        <div key={`ask-${i}`} className="grid grid-cols-3 gap-2 py-0.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20">
                           <div className="font-mono">{lvl.price.toFixed(4)}</div>
                           <div className="font-mono">{lvl.size.toFixed(2)}</div>
                           <div className="font-mono">{lvl.cumulativeValue.toFixed(2)}</div>
@@ -208,7 +208,7 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
                         <span className="text-muted-foreground">Last: </span>
                         {lastTradePrice ? (
                           <span className={`font-medium ${
-                            lastTradeSide === 'BUY' ? 'text-green-600' : 'text-red-600'
+                            lastTradeSide === 'BUY' ? 'text-green-500' : 'text-red-500'
                           }`}>
                             {lastTradePrice.toFixed(4)}
                           </span>
@@ -229,7 +229,7 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
                   {bids.length > 0 && (
                     <div className="space-y-0.5">
                       {bids.map((lvl, i) => (
-                        <div key={`bid-${i}`} className="grid grid-cols-3 gap-2 py-0.5 text-xs text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20">
+                        <div key={`bid-${i}`} className="grid grid-cols-3 gap-2 py-0.5 text-xs text-green-500 hover:bg-green-50 dark:hover:bg-green-950/20">
                           <div className="font-mono">{lvl.price.toFixed(4)}</div>
                           <div className="font-mono">{lvl.size.toFixed(2)}</div>
                           <div className="font-mono">{lvl.cumulativeValue.toFixed(2)}</div>
