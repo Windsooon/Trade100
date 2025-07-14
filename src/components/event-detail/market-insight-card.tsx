@@ -16,9 +16,9 @@ import {
   Activity
 } from 'lucide-react'
 import { Market, Event } from '@/lib/stores'
-import { createChart, IChartApi, ISeriesApi, CandlestickData, ColorType, CandlestickSeries, LogicalRange, LineSeries, LineData, HistogramSeries, HistogramData } from 'lightweight-charts'
-import { processRawPriceData, processRawVolumeData, type CandlestickData as ProcessedCandlestickData, type ProcessedVolumeData, type TimePeriod } from '@/lib/price-processing'
-import { useLiveMode } from './live-mode-manager'
+import { createChart, IChartApi, ISeriesApi, CandlestickData, ColorType, CandlestickSeries, HistogramSeries, HistogramData, LineData } from 'lightweight-charts'
+// Remove old price processing import - no longer needed
+// import { processRawPriceData, processRawVolumeData, type CandlestickData as ProcessedCandlestickData, type ProcessedVolumeData, type TimePeriod } from '@/lib/price-processing'
 import { Pie, PieChart } from "recharts"
 import {
   ChartConfig,
@@ -33,16 +33,30 @@ interface MarketInsightCardProps {
   event: Event
 }
 
-interface RawPricePoint {
-  t: number // timestamp
-  p: number // price
+// New interface for market history API response
+interface MarketHistoryResponse {
+  market: string
+  start: number
+  fidelity: number
+  data: MarketHistoryDataPoint[]
 }
 
-interface RawVolumeData {
-  bucket_start: number
-  totalSize: number
-  totalDollarVolume: number
+interface MarketHistoryDataPoint {
+  timestamp: number
+  volume: {
+    totalSize: number
+    totalDollarVolume: number
+  }
+  price: {
+    open: number
+    high: number
+    low: number
+    close: number
+  }
 }
+
+// Define TimePeriod type locally since we removed the import
+type TimePeriod = '1m' | '1h' | '6h' | '1d'
 
 type VolumeType = 'totalSize' | 'totalDollarVolume'
 
@@ -109,13 +123,10 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> | null>(null)
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   
-  // Data refs - store raw data and processed data
-  const rawDataRef = useRef<RawPricePoint[]>([])
-  const volumeDataRef = useRef<RawVolumeData[]>([])
+  // Data refs - store raw data from new API
+  const rawDataRef = useRef<MarketHistoryDataPoint[]>([])
+  const volumeDataRef = useRef<MarketHistoryDataPoint[]>([])
   
-  // Cache for processed volume data and volume maps
-  const processedVolumeCache = useRef<Map<TimePeriod, ProcessedVolumeData[]>>(new Map())
-  const volumeMapCache = useRef<Map<TimePeriod, Map<number, ProcessedVolumeData>>>(new Map())
   
   // Ref to track current token for tooltip (since tooltip effect has no dependencies)
   const selectedTokenRef = useRef<'yes' | 'no'>(selectedToken)
@@ -129,66 +140,6 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
     return selectedMarket?.active === true && selectedMarket?.archived === false && selectedMarket?.closed === false
   }, [selectedMarket])
 
-  // Initialize live mode hook
-  const {
-    isLiveMode,
-    liveError,
-    liveDataCount,
-    connectionStatus,
-    switchToLiveMode,
-    switchToHistoricalMode,
-    getChartTitle,
-    getDataPointCount,
-    getLiveModeStatus,
-    clearLiveData
-  } = useLiveMode({
-    isCurrentMarketActive,
-    selectedMarket,
-    selectedToken,
-    rawDataRef,
-    chartRef,
-    seriesRef,
-    volumeSeriesRef
-  })
-
-  // 🚀 OPTIMIZATION 3: Intelligent Caching System
-  // Caches processed volume data by time period to avoid expensive reprocessing
-  const getCachedProcessedVolumeData = useCallback((period: TimePeriod) => {
-    // Check if we have cached data for this period - avoids reprocessing
-    if (processedVolumeCache.current.has(period)) {
-      return processedVolumeCache.current.get(period)!
-    }
-    
-    // Process and cache the data for future use
-    const processedData = processRawVolumeData(volumeDataRef.current, period)
-    processedVolumeCache.current.set(period, processedData)
-    
-    // Also create and cache volume map for O(1) lookups
-    const volumeMap = new Map<number, ProcessedVolumeData>()
-    processedData.forEach(vol => {
-      volumeMap.set(vol.time as number, vol)
-    })
-    volumeMapCache.current.set(period, volumeMap)
-    
-    return processedData
-  }, [])
-
-  // Helper function to get cached volume map
-  const getCachedVolumeMap = useCallback((period: TimePeriod) => {
-    if (volumeMapCache.current.has(period)) {
-      return volumeMapCache.current.get(period)!
-    }
-    
-    // This will also create the volume map cache
-    getCachedProcessedVolumeData(period)
-    return volumeMapCache.current.get(period)!
-  }, [getCachedProcessedVolumeData])
-
-  // Clear caches when volume data changes
-  const clearVolumeDataCaches = useCallback(() => {
-    processedVolumeCache.current.clear()
-    volumeMapCache.current.clear()
-  }, [])
 
   const formatVolume = useCallback((value: number, isDollar: boolean = false): string => {
     const prefix = isDollar ? '$' : ''
@@ -200,11 +151,6 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
     return `${prefix}${value.toFixed(0)}`
   }, [])
 
-  // Handle mode switching - wrapper for the hook function that also sets the period
-  const handleHistoricalModeSwitch = useCallback((period: TimePeriod) => {
-    setSelectedPeriod(period)
-    switchToHistoricalMode(period)
-  }, [switchToHistoricalMode])
 
   // Initialize chart
   useEffect(() => {
@@ -363,24 +309,25 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
     const volumeToolTip = document.createElement('div')
     volumeToolTip.className = 'volume-tooltip'
     volumeToolTip.style.cssText = `
-      width: ${toolTipWidth}px; 
+      width: 180px; 
       height: auto; 
       position: absolute; 
       display: none; 
-      padding: 8px; 
+      padding: 10px; 
       box-sizing: border-box; 
       font-size: 12px; 
       text-align: left; 
       z-index: 1001; 
       pointer-events: none; 
       border: 1px solid; 
-      border-radius: 4px;
+      border-radius: 6px;
       font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif; 
       -webkit-font-smoothing: antialiased; 
       -moz-osx-font-smoothing: grayscale;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.9);
       color: white;
       border-color: #26a69a;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     `
     container.appendChild(volumeToolTip)
 
@@ -416,16 +363,15 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
           // Show volume tooltip, hide price tooltip
           toolTip.style.display = 'none'
           
-          // Get volume data for this timestamp using cached volume map
+          // Get volume data for this timestamp
           const currentVolumeData = volumeDataRef.current
           if (currentVolumeData && currentVolumeData.length > 0) {
             const targetTime = param.time as number
             
-            // Use cached volume map for instant O(1) lookup
-            const volumeMap = getCachedVolumeMap(selectedPeriod)
-            const volumeEntry = volumeMap.get(targetTime)
+            // Find the volume data for this timestamp
+            const volumePoint = currentVolumeData.find(vol => vol.timestamp === targetTime)
             
-            if (volumeEntry) {
+            if (volumePoint) {
               const timestamp = param.time as number
               const date = new Date(timestamp * 1000)
               const dateStr = date.toLocaleDateString('en-US', {
@@ -436,18 +382,20 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
               })
               
               volumeToolTip.innerHTML = `
-                <div style="color: #26a69a; font-weight: 500;">
-                  Volume Data
+                <div style="color: #26a69a; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid rgba(38, 166, 154, 0.3); padding-bottom: 4px;">
+                  📊 Volume Data
                 </div>
-                <div style="margin: 4px 0px;">
-                  <div style="font-size: 11px; color: white;">
-                    Size: <span style="color: #26a69a;">${formatVolume(volumeEntry.totalSize)}</span>
+                <div style="margin: 6px 0px;">
+                  <div style="font-size: 11px; color: white; margin-bottom: 3px; display: flex; justify-content: space-between;">
+                    <span>Total Size:</span>
+                    <span style="color: #26a69a; font-weight: 500;">${formatVolume(volumePoint.volume.totalSize)}</span>
                   </div>
-                  <div style="font-size: 11px; color: white;">
-                    Dollar Volume: <span style="color: #26a69a;">${formatVolume(volumeEntry.totalDollarVolume, true)}</span>
+                  <div style="font-size: 11px; color: white; margin-bottom: 3px; display: flex; justify-content: space-between;">
+                    <span>Dollar Volume:</span>
+                    <span style="color: #26a69a; font-weight: 500;">${formatVolume(volumePoint.volume.totalDollarVolume, true)}</span>
                   </div>
                 </div>
-                <div style="color: #ccc; font-size: 10px;">
+                <div style="color: #888; font-size: 10px; text-align: center; margin-top: 6px; padding-top: 4px; border-top: 1px solid rgba(136, 136, 136, 0.3);">
                   ${dateStr}
                 </div>
               `
@@ -455,9 +403,10 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
               volumeToolTip.style.display = 'block'
               
               // Position volume tooltip
+              const volumeTooltipWidth = 180
               let left = param.point.x + toolTipMargin
-              if (left > container.clientWidth - toolTipWidth) {
-                left = param.point.x - toolTipMargin - toolTipWidth
+              if (left > container.clientWidth - volumeTooltipWidth) {
+                left = param.point.x - toolTipMargin - volumeTooltipWidth
               }
               
               let top = param.point.y + toolTipMargin
@@ -609,34 +558,65 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
         }
       }
     }
-  }, [selectedPeriod, getCachedVolumeMap, chartKey]) // Add selectedPeriod and getCachedVolumeMap to recreate tooltip when period changes
+  }, [selectedPeriod, chartKey]) // Add selectedPeriod and getCachedVolumeMap to recreate tooltip when period changes
 
-  // Fetch chart data - one API call per market/token combination
-  // Note: selectedPeriod is NOT in dependencies to avoid unnecessary API calls
-  // Period changes are handled by the separate effect below that re-processes cached data
-  const fetchChartData = useCallback(async () => {
-    if (!selectedMarket?.clobTokenIds) {
-      setError('No market selected or market data unavailable')
-      return
+  // Simple client-side cache for market history data
+  const cacheRef = useRef<Map<string, { data: MarketHistoryDataPoint[]; timestamp: number }>>(new Map())
+  const CACHE_DURATION = 60 * 1000 // 1 minute cache
+
+  // Check if we have valid cached data
+  const getCachedData = useCallback((cacheKey: string): MarketHistoryDataPoint[] | null => {
+    const cached = cacheRef.current.get(cacheKey)
+    if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+      return cached.data
+    }
+    return null
+  }, [])
+
+  // Store data in cache
+  const setCachedData = useCallback((cacheKey: string, data: MarketHistoryDataPoint[]) => {
+    cacheRef.current.set(cacheKey, {
+      data,
+      timestamp: Date.now()
+    })
+  }, [])
+
+  // Calculate timestamps for getting historical data based on period
+  // Note: API returns data based on actual trading activity, not guaranteed 200 points
+  const calculateTimeRange = useCallback((period: TimePeriod): { startTs: number; endTs: number; fidelity: number } => {
+    const now = Math.floor(Date.now() / 1000) // Current timestamp in seconds
+    let startTs: number
+    let fidelity: number
+    
+    switch (period) {
+      case '1m':
+        startTs = now - (48 * 3600) // Last 48 hours for 1m candles
+        fidelity = 1
+        break
+      case '1h':
+        startTs = now - (14 * 24 * 3600) // Last 14 days for 1h candles
+        fidelity = 60
+        break
+      case '6h':
+        startTs = now - (30 * 24 * 3600) // Last 30 days for 6h candles
+        fidelity = 360
+        break
+      case '1d':
+        startTs = now - (90 * 24 * 3600) // Last 90 days for 1d candles
+        fidelity = 1440
+        break
+      default:
+        startTs = now - (7 * 24 * 3600) // Default to 7 days
+        fidelity = 60
     }
     
-    let tokenId: string | null = null
-    try {
-      const clobTokenIds = selectedMarket.clobTokenIds.trim()
-      if (!clobTokenIds) {
-        throw new Error('Empty token IDs string')
-      }
-      const ids = JSON.parse(clobTokenIds)
-      if (!Array.isArray(ids) || ids.length < 2) {
-        throw new Error('Invalid token IDs format')
-      }
-      tokenId = selectedToken === 'yes' ? ids[0] : ids[1]
-      if (!tokenId || typeof tokenId !== 'string') {
-        throw new Error(`Invalid ${selectedToken} token ID`)
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown parsing error'
-      setError(`Failed to parse market token IDs: ${errorMessage}`)
+    return { startTs, endTs: now, fidelity }
+  }, [])
+
+  // New fetch function for market history API
+  const fetchMarketHistoryData = useCallback(async () => {
+    if (!selectedMarket?.conditionId) {
+      setError('No market selected or market data unavailable')
       return
     }
     
@@ -645,95 +625,118 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
     setVolumeError(null)
     
     try {
-      // Fetch raw price data (14 days, fidelity=1)
-      const priceUrl = `/api/prices-history?market=${encodeURIComponent(tokenId)}`
-      const priceResponse = await fetch(priceUrl)
+      const { startTs, endTs, fidelity } = calculateTimeRange(selectedPeriod)
+      const marketId = selectedMarket.conditionId
+      const cacheKey = `${marketId}-${selectedPeriod}-${fidelity}`
+
+      // Check cache first
+      const cachedData = getCachedData(cacheKey)
+      if (cachedData) {
+        rawDataRef.current = cachedData
+        volumeDataRef.current = cachedData // Same data contains both price and volume
+        
+        // Update chart with cached data
+        const chartData = cachedData.map(point => ({
+          time: point.timestamp as any,
+          open: point.price.open,
+          high: point.price.high,
+          low: point.price.low,
+          close: point.price.close
+        }))
+        
+        if (seriesRef.current) {
+          seriesRef.current.setData(chartData)
+        }
+        
+        // Update volume display
+        const volumeData = cachedData.map(point => ({
+          time: point.timestamp as any,
+          value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
+          color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
+        }))
+        
+        if (volumeSeriesRef.current) {
+          volumeSeriesRef.current.setData(volumeData)
+        }
+        
+        setLoading(false)
+        return
+      }
+
+      const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
       
-      if (!priceResponse.ok) {
-        throw new Error(`Failed to fetch price data: ${priceResponse.status}`)
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch market history: ${response.status}`)
       }
       
-      const priceResult = await priceResponse.json()
+      const result: MarketHistoryResponse = await response.json()
       
-      if (!priceResult.success || !priceResult.data?.length) {
-        setError('No price data available for this market.')
+      if (!result.data || result.data.length === 0) {
+        setError('No market history data available for this period.')
         setLoading(false)
         return
       }
       
-      // Store raw data
-      rawDataRef.current = priceResult.data
+      // Store raw data and cache it
+      rawDataRef.current = result.data
+      volumeDataRef.current = result.data // Same data contains both price and volume
+      setCachedData(cacheKey, result.data)
       
-      // Process data for current period and display
-      const processedData = processRawPriceData(priceResult.data, selectedPeriod)
+      // Convert to chart format
+      const chartData = result.data.map(point => ({
+        time: point.timestamp as any,
+        open: point.price.open,
+        high: point.price.high,
+        low: point.price.low,
+        close: point.price.close
+      }))
       
-      if (processedData.length === 0) {
-        setError('No valid price data found.')
-        setLoading(false)
-        return
+      // Update chart with new data
+      if (seriesRef.current) {
+        seriesRef.current.setData(chartData)
       }
       
-      // Update chart with processed data
-      if (seriesRef.current && !isLiveMode) {
-        seriesRef.current.setData(processedData)
+      // Update volume display
+      const volumeData = result.data.map(point => ({
+        time: point.timestamp as any,
+        value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
+        color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
+      }))
+      
+      if (volumeSeriesRef.current) {
+        volumeSeriesRef.current.setData(volumeData)
       }
       
       setLoading(false)
-      
-      // Fetch volume data using timestamps from raw price data (covers full range)
-      try {
-        // Extract oldest and newest timestamps from raw price data (with normalization)
-        const oldestRawTimestamp = rawDataRef.current[0].t
-        const newestRawTimestamp = rawDataRef.current[rawDataRef.current.length - 1].t
-        const oldestTimestamp = Math.floor(oldestRawTimestamp / 10) * 10  // Normalize
-        const newestTimestamp = Math.floor(newestRawTimestamp / 10) * 10  // Normalize
-        
-        const volumeUrl = `https://trade-analyze-production.up.railway.app/api/volumes-history?market=${encodeURIComponent(tokenId)}&startTs=${oldestTimestamp}&endTs=${newestTimestamp}&fidelity=1`
-        
-        const volumeResponse = await fetch(volumeUrl)
-        
-        if (volumeResponse.ok) {
-          const volumeResult = await volumeResponse.json()
-          if (volumeResult && Array.isArray(volumeResult)) {
-            volumeDataRef.current = volumeResult
-            // Clear caches when new volume data is loaded
-            clearVolumeDataCaches()
-            updateVolumeDisplay(processedData)
-          } else {
-            setVolumeError('Invalid volume data format')
-          }
-        } else {
-          setVolumeError(`Volume API error: ${volumeResponse.status}`)
-        }
-      } catch (volumeErr) {
-        const volumeErrorMessage = volumeErr instanceof Error ? volumeErr.message : 'Unknown volume error'
-        setVolumeError(`Volume data unavailable: ${volumeErrorMessage}`)
-      }
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-      setError(`Error loading chart: ${errorMessage}`)
+      setError(`Error loading market history: ${errorMessage}`)
       setLoading(false)
     }
-  }, [selectedMarket?.clobTokenIds, selectedToken, isLiveMode])
+  }, [selectedMarket?.conditionId, selectedPeriod, calculateTimeRange, volumeType, getCachedData, setCachedData])
 
   // 🚀 OPTIMIZATION 1: Missing Timestamp Handler
   // Handles sparse volume data by filling missing timestamps with zero values
   // This ensures chart displays correctly even when API doesn't return 0-volume entries
-  const alignVolumeWithPriceTimestamps = useCallback((volumeData: ProcessedVolumeData[], priceTimestamps: number[]) => {
+  const alignVolumeWithPriceTimestamps = useCallback((volumeData: MarketHistoryDataPoint[], priceTimestamps: number[]) => {
     // Create hash map for O(1) lookup (Hash Map Lookup optimization)
-    const volumeMap = new Map<number, ProcessedVolumeData>()
+    const volumeMap = new Map<number, MarketHistoryDataPoint>()
     volumeData.forEach(vol => {
-      volumeMap.set(vol.time as number, vol)
+      volumeMap.set(vol.timestamp, vol)
     })
     
     // Fill missing timestamps with zero values - ensures 1:1 mapping with price data
     return priceTimestamps.map(timestamp => {
       const existingVolume = volumeMap.get(timestamp)
       return existingVolume || {
-        time: timestamp as any,
-        totalSize: 0,
-        totalDollarVolume: 0
+        timestamp: timestamp as any,
+        volume: {
+          totalSize: 0,
+          totalDollarVolume: 0
+        }
       }
     })
   }, [])
@@ -741,25 +744,25 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
   // 🚀 OPTIMIZATION 2: Pre-aligned Volume Data  
   // Creates chart-ready histogram data with O(1) volume lookups
   // Eliminates expensive linear searches during chart rendering
-  const createPreAlignedVolumeData = useCallback((priceData: ProcessedCandlestickData[], alignedVolumeData: ProcessedVolumeData[]) => {
+  const createPreAlignedVolumeData = useCallback((priceData: MarketHistoryDataPoint[], alignedVolumeData: MarketHistoryDataPoint[]) => {
     // Create hash map for instant volume lookup - replaces O(n) find() with O(1) get()
-    const volumeMap = new Map<number, ProcessedVolumeData>()
+    const volumeMap = new Map<number, MarketHistoryDataPoint>()
     alignedVolumeData.forEach(vol => {
-      volumeMap.set(vol.time as number, vol)
+      volumeMap.set(vol.timestamp, vol)
     })
     
     // Pre-align volume data with price data for efficient rendering
     return priceData.map(priceCandle => {
-      const timestamp = priceCandle.time as number
+      const timestamp = priceCandle.timestamp as number
       const volumeEntry = volumeMap.get(timestamp) // O(1) lookup - major performance gain
       
-      const isGreen = priceCandle.close >= priceCandle.open
+      const isGreen = priceCandle.price.close >= priceCandle.price.open
       const color = isGreen ? '#26a69a' : '#ef5350'
       const volumeValue = volumeEntry ? 
-        (volumeType === 'totalDollarVolume' ? volumeEntry.totalDollarVolume : volumeEntry.totalSize) : 0
+        (volumeType === 'totalDollarVolume' ? volumeEntry.volume.totalDollarVolume : volumeEntry.volume.totalSize) : 0
       
       return {
-        time: priceCandle.time,
+        time: priceCandle.timestamp,
         value: volumeValue,
         color: color
       }
@@ -769,59 +772,78 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
   // 🚀 OPTIMIZED VOLUME DISPLAY PIPELINE
   // Combines all three optimizations for maximum performance with sparse volume data
   // Performance improvement: O(n²) → O(n) + caching + missing data handling
-  const updateVolumeDisplay = useCallback((processedPriceData: ProcessedCandlestickData[]) => {
+  const updateVolumeDisplay = useCallback((processedPriceData: MarketHistoryDataPoint[]) => {
     if (!volumeSeriesRef.current || volumeDataRef.current.length === 0) return
     
     try {
+      // TODO: Implement new volume display for new API
+      return
       // Use cached processed volume data for better performance
-      const processedVolumeData = getCachedProcessedVolumeData(selectedPeriod)
+      // const processedVolumeData = getCachedProcessedVolumeData(selectedPeriod)
       
       // Extract price timestamps for alignment
-      const priceTimestamps = processedPriceData.map(candle => candle.time as number)
+      // const priceTimestamps = processedPriceData.map(candle => candle.time as number)
       
       // Align volume data with price timestamps (handles missing timestamps)
-      const alignedVolumeData = alignVolumeWithPriceTimestamps(processedVolumeData, priceTimestamps)
+      // const alignedVolumeData = alignVolumeWithPriceTimestamps(processedVolumeData, priceTimestamps)
       
       // Create pre-aligned histogram data for efficient rendering
-      const volumeHistogramData = createPreAlignedVolumeData(processedPriceData, alignedVolumeData)
+      // const volumeHistogramData = createPreAlignedVolumeData(processedPriceData, alignedVolumeData)
       
-      volumeSeriesRef.current.setData(volumeHistogramData)
+      // volumeSeriesRef.current.setData(volumeHistogramData)
     } catch (error) {
       console.error('Error updating volume display:', error)
       setVolumeError('Error processing volume data')
     }
-  }, [selectedPeriod, getCachedProcessedVolumeData, alignVolumeWithPriceTimestamps, createPreAlignedVolumeData, setVolumeError])
+  }, [selectedPeriod, setVolumeError])
 
-  // Fetch data when dependencies change (only for historical mode)
+  // Fetch data when dependencies change
   useEffect(() => {
-    if (selectedMarket?.conditionId && !isLiveMode) {
-      fetchChartData()
+    if (selectedMarket?.conditionId) {
+      fetchMarketHistoryData()
     }
-  }, [selectedMarket?.conditionId, selectedToken, fetchChartData, isLiveMode])
+  }, [selectedMarket?.conditionId, selectedPeriod, fetchMarketHistoryData]) // Remove selectedToken dependency
 
-  // Update chart when period changes - uses cached raw data (no API call)
+  // Update volume display when volume type changes
   useEffect(() => {
-    if (!isLiveMode && rawDataRef.current.length > 0 && seriesRef.current) {
-      const processedData = processRawPriceData(rawDataRef.current, selectedPeriod)
+    if (rawDataRef.current.length > 0) {
+      // Update volume display with new volume type
+      const volumeData = rawDataRef.current.map(point => ({
+        time: point.timestamp as any,
+        value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
+        color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
+      }))
       
-      if (processedData.length > 0) {
-        seriesRef.current.setData(processedData)
-        
-        // Update volume display too
-        if (volumeDataRef.current.length > 0) {
-          updateVolumeDisplay(processedData)
-        }
+      if (volumeSeriesRef.current) {
+        volumeSeriesRef.current.setData(volumeData)
       }
     }
-  }, [selectedPeriod, isLiveMode, updateVolumeDisplay, chartKey]) // Add chartKey to re-run on re-initialization
+  }, [volumeType, chartKey])
 
-  // Update volume series when volume type changes
+  // Restore chart data when chart is re-initialized (chartKey changes)
   useEffect(() => {
-    if (!isLiveMode && rawDataRef.current.length > 0 && volumeDataRef.current.length > 0) {
-      const processedData = processRawPriceData(rawDataRef.current, selectedPeriod)
-      updateVolumeDisplay(processedData)
+    if (rawDataRef.current.length > 0 && seriesRef.current && volumeSeriesRef.current) {
+      // Restore price data
+      const chartData = rawDataRef.current.map(point => ({
+        time: point.timestamp as any,
+        open: point.price.open,
+        high: point.price.high,
+        low: point.price.low,
+        close: point.price.close
+      }))
+      
+      seriesRef.current.setData(chartData)
+      
+      // Restore volume data
+      const volumeData = rawDataRef.current.map(point => ({
+        time: point.timestamp as any,
+        value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
+        color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
+      }))
+      
+      volumeSeriesRef.current.setData(volumeData)
     }
-  }, [volumeType, selectedPeriod, isLiveMode, updateVolumeDisplay, chartKey]) // Add chartKey to re-run on re-initialization
+  }, [chartKey, volumeType])
 
   // Format date for display
   const formatDate = (dateString: string): string => {
@@ -839,7 +861,7 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
     }
   }
 
-  const chartTitle = getChartTitle(selectedToken)
+  const chartTitle = `${selectedMarket?.question || 'Market'} Price Chart`
 
   // Add resize trigger when chart tab becomes active
   const handleTabChange = useCallback((value: string) => {
@@ -889,24 +911,12 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
               <div>
                 <div className="text-xs text-muted-foreground mb-2 font-medium">Time Period</div>
                 <div className="flex gap-1">
-                  {/* Only show Live button for active markets */}
-                  {isCurrentMarketActive && (
-                    <Button
-                      variant={isLiveMode ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={switchToLiveMode}
-                      disabled={loading}
-                      className="text-xs px-2 py-1 h-7"
-                    >
-                      Live
-                    </Button>
-                  )}
                   {(['1m', '1h', '6h', '1d'] as TimePeriod[]).map((period) => (
                     <Button
                       key={period}
-                      variant={!isLiveMode && selectedPeriod === period ? 'default' : 'outline'}
+                      variant={selectedPeriod === period ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => handleHistoricalModeSwitch(period)}
+                      onClick={() => setSelectedPeriod(period)}
                       disabled={loading}
                       className="text-xs px-2 py-1 h-7"
                     >
@@ -915,57 +925,31 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
                   ))}
                 </div>
               </div>
-              {/* Hide volume controls in live mode */}
-              {!isLiveMode && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-2 font-medium">Volume Display</div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant={volumeType === 'totalDollarVolume' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setVolumeType('totalDollarVolume')}
-                      disabled={loading}
-                      className="text-xs px-2 py-1 h-7"
-                    >
-                      Volume ($)
-                    </Button>
-                    <Button
-                      variant={volumeType === 'totalSize' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setVolumeType('totalSize')}
-                      disabled={loading}
-                      className="text-xs px-2 py-1 h-7"
-                    >
-                      Volume (Shares)
-                    </Button>
-                  </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-2 font-medium">Volume Display</div>
+                <div className="flex gap-1">
+                  <Button
+                    variant={volumeType === 'totalDollarVolume' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setVolumeType('totalDollarVolume')}
+                    disabled={loading}
+                    className="text-xs px-2 py-1 h-7"
+                  >
+                    Volume ($)
+                  </Button>
+                  <Button
+                    variant={volumeType === 'totalSize' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setVolumeType('totalSize')}
+                    disabled={loading}
+                    className="text-xs px-2 py-1 h-7"
+                  >
+                    Volume (Shares)
+                  </Button>
                 </div>
-              )}
+              </div>
               
-              {/* Live mode status */}
-              {isLiveMode && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-2 font-medium">Live Mode Status</div>
-                  <div className="flex items-center gap-2">
-                    {(() => {
-                      const status = getLiveModeStatus()
-                      if (!status) return null
-                      
-                      const statusColor = status.type === 'error' ? 'text-red-500' : 
-                                        status.type === 'warning' ? 'text-yellow-500' : 
-                                        'text-green-500'
-                      
-                      return (
-                        <div className={`text-xs ${statusColor}`}>
-                          {status.message}
-                        </div>
-                      )
-                    })()}
-                  </div>
-                </div>
-              )}
-              {/* Hide volume error in live mode */}
-              {!isLiveMode && volumeError && (
+              {volumeError && (
                 <Alert className="mt-2 py-2">
                   <AlertCircle className="h-3 w-3" />
                   <AlertDescription className="text-xs">
@@ -982,22 +966,6 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
               </Alert>
             )}
             
-            {/* Hide volume error in live mode */}
-            {!isLiveMode && volumeError && (
-              <Alert variant="default" className="mb-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{volumeError}</AlertDescription>
-              </Alert>
-            )}
-            
-            {/* Show live mode errors */}
-            {isLiveMode && liveError && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{liveError}</AlertDescription>
-              </Alert>
-            )}
-            
             <div className="relative">
               {loading && (
                 <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
@@ -1011,8 +979,19 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
                 style={{ height: '384px' }}
               />
               <div className="text-xs text-muted-foreground mt-2">
-                Chart: {getDataPointCount()}{!isLiveMode && `, displaying ${selectedPeriod} view`}
-                {!isLiveMode && volumeDataRef.current.length > 0 && ` • ${volumeDataRef.current.length} volume data points`}
+                Chart: {rawDataRef.current.length} data points over {(() => {
+                  const days = (() => {
+                    switch (selectedPeriod) {
+                      case '1m': return 1
+                      case '1h': return 7
+                      case '6h': return 30
+                      case '1d': return 90
+                      default: return 7
+                    }
+                  })()
+                  return days === 1 ? '24 hours' : `${days} days`
+                })()} • {selectedPeriod} intervals
+                {volumeDataRef.current.length > 0 && ` • Volume data available`}
               </div>
             </div>
           </TabsContent>
@@ -1434,8 +1413,8 @@ function MoneyFlowAnalysis({ selectedMarket }: { selectedMarket: Market | null }
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-2 text-xs font-medium text-muted-foreground">Orders</th>
-                      <th className="text-right py-2 text-xs font-medium text-muted-foreground">Bullish (USD)</th>
-                      <th className="text-right py-2 text-xs font-medium text-muted-foreground">Bearish (USD)</th>
+                      <th className="text-right py-2 text-xs font-medium text-muted-foreground">Buy Yes + Sell No</th>
+                      <th className="text-right py-2 text-xs font-medium text-muted-foreground">Buy No + Sell Yes</th>
                     </tr>
                   </thead>
                   <tbody>
