@@ -94,8 +94,8 @@ export function Footer() {
             </p>
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <span>📧</span>
-              <Link href="mailto:contact@trade100.net" className="hover:text-foreground transition-colors">
-                contact@trade100.net
+              <Link href="mailto:contact@wisdom100.net" className="hover:text-foreground transition-colors">
+                contact@wisdom100.net
               </Link>
             </div>
           </div>

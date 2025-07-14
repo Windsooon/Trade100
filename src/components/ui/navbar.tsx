@@ -21,9 +21,6 @@ export function Navbar() {
             
             {/* Navigation - moved to left side */}
             <div className="flex items-center gap-6">
-              <Link href="/" className="navbar-link">
-                Home
-              </Link>
               <Link href="/markets" className="navbar-link">
                 Markets
               </Link>
