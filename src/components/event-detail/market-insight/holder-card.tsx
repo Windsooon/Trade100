@@ -27,16 +27,16 @@ export function HolderCard({
             {holder.profileImage ? (
               <img
                 src={holder.profileImage}
-                alt={`${holder.name || holder.pseudonym} profile`}
+                alt={`${holder.name || 'User'} profile`}
                 className="w-10 h-10 rounded-full object-cover"
                 onError={(e) => {
-                  e.currentTarget.src = getDefaultAvatar(holder.name || holder.pseudonym)
+                  e.currentTarget.src = getDefaultAvatar(holder.name || 'User')
                 }}
               />
             ) : (
               <img
-                src={getDefaultAvatar(holder.name || holder.pseudonym)}
-                alt={`${holder.name || holder.pseudonym} profile`}
+                src={getDefaultAvatar(holder.name || 'User')}
+                alt={`${holder.name || 'User'} profile`}
                 className="w-10 h-10 rounded-full"
               />
             )}
@@ -47,13 +47,10 @@ export function HolderCard({
             <div className="flex items-center gap-2 mb-1">
               {holder.displayUsernamePublic && holder.name ? (
                 <span className="font-medium text-sm">{holder.name}</span>
-              ) : null}
-              <span className="text-sm text-muted-foreground">{holder.pseudonym}</span>
+              ) : (
+                <span className="font-medium text-sm">Anonymous User</span>
+              )}
             </div>
-            
-            {holder.bio && (
-              <p className="text-xs text-muted-foreground truncate">{holder.bio}</p>
-            )}
             
             <div className="text-xs text-muted-foreground mt-1">
               {holder.proxyWallet.slice(0, 6)}...{holder.proxyWallet.slice(-4)}
@@ -82,7 +79,7 @@ export function HolderCard({
             <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
-                  Trade History - {holder.displayUsernamePublic && holder.name ? holder.name : holder.pseudonym}
+                  Trade History - {holder.displayUsernamePublic && holder.name ? holder.name : 'Anonymous User'}
                 </DialogTitle>
                 <DialogDescription>
                   Trading activity and price chart for {selectedMarket?.question}

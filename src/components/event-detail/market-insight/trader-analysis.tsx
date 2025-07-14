@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Loader2, Users } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { TraderAnalysisProps } from './types'
 import { HolderCard } from './holder-card'
 
@@ -106,19 +105,13 @@ export function TraderAnalysis({ selectedMarket }: TraderAnalysisProps) {
 
   return (
     <div className="space-y-6" style={{ minHeight: '500px' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium">Top Holders</h3>
-          <p className="text-sm text-muted-foreground">Leading traders in this market</p>
-        </div>
-        <Badge variant="outline" className="text-xs">
-          {holdersData?.length || 0} holders
-        </Badge>
+      {/* Header - simplified */}
+      <div>
+        <h3 className="text-lg font-medium">Top Holders</h3>
       </div>
 
-      {/* Holders List */}
-      <div className="space-y-3">
+      {/* Two Column Layout for YES/NO Holders */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {holdersData && holdersData.length > 0 ? (
           holdersData.map((tokenData: any, tokenIndex: number) => (
             <div key={tokenIndex} className="space-y-3">
@@ -128,19 +121,21 @@ export function TraderAnalysis({ selectedMarket }: TraderAnalysisProps) {
               </div>
               
               {/* Holders for this token */}
-              {tokenData.holders && tokenData.holders.map((holder: any, holderIndex: number) => (
-                <HolderCard 
-                  key={`${tokenIndex}-${holderIndex}`} 
-                  holder={holder} 
-                  selectedMarket={selectedMarket}
-                  formatShares={formatShares}
-                  getDefaultAvatar={getDefaultAvatar}
-                />
-              ))}
+              <div className="space-y-3">
+                {tokenData.holders && tokenData.holders.map((holder: any, holderIndex: number) => (
+                  <HolderCard 
+                    key={`${tokenIndex}-${holderIndex}`} 
+                    holder={holder} 
+                    selectedMarket={selectedMarket}
+                    formatShares={formatShares}
+                    getDefaultAvatar={getDefaultAvatar}
+                  />
+                ))}
+              </div>
             </div>
           ))
         ) : (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="col-span-2 text-center py-8 text-muted-foreground">
             <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p className="text-sm">No holders data available</p>
           </div>

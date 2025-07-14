@@ -54,7 +54,6 @@ export function TradeChart({
       
       setPriceData(result.data)
     } catch (err) {
-      console.error('Market history fetch error:', err)
       setChartError('Failed to load price data')
     } finally {
       setChartLoading(false)
@@ -150,7 +149,6 @@ export function TradeChart({
         chart.remove()
       }
     } catch (error) {
-      console.error('Chart initialization error:', error)
       setChartError('Failed to initialize chart')
     }
   }, [])
@@ -192,29 +190,17 @@ export function TradeChart({
 
   // Function to add trade markers using custom primitives
   const addTradeMarkers = useCallback((trades: any[], period: TimePeriod) => {
-    console.log('🎯 addTradeMarkers called with:', {
-      tradesCount: trades.length,
-      period,
-      priceSeriesRefExists: !!priceSeriesRef.current,
-      chartRefExists: !!chartRef.current,
-      firstTrade: trades[0]
-    })
-
     if (!priceSeriesRef.current || !chartRef.current) {
-      console.log('❌ Price series ref or chart ref not available')
       return
     }
 
     if (trades.length === 0) {
-      console.log('❌ No trades to add markers for')
       return
     }
 
     try {
       // Convert trades to marker data
       const markerData: any[] = []
-      
-      console.log('🔄 Converting trades to marker data...')
       
       for (let i = 0; i < trades.length; i++) {
         const trade = trades[i]
@@ -228,19 +214,7 @@ export function TradeChart({
         }
         
         markerData.push(marker)
-        
-        console.log(`📍 Marker ${i + 1}:`, {
-          originalTimestamp: trade.timestamp,
-          originalDate: new Date(trade.timestamp * 1000).toISOString(),
-          convertedTimestamp: chartTimestamp,
-          convertedDate: new Date(chartTimestamp * 1000).toISOString(),
-          side: trade.side,
-          price: trade.price,
-          marker
-        })
       }
-
-      console.log(`🎯 Creating custom primitive for ${markerData.length} markers`)
       
       // Create a custom primitive to draw trade markers using any to bypass TypeScript issues
       const tradeMarkerPrimitive: any = {
@@ -290,18 +264,16 @@ export function TradeChart({
                         ctx.arc(x, y, 8, 0, 2 * Math.PI)
                         ctx.fill()
                         ctx.shadowBlur = 0 // Reset shadow
-                        
-                        console.log(`✅ Drew marker at (${x}, ${y}) for ${marker.side}`)
                       }
                     }
                   }
                 }
               } catch (error) {
-                console.warn('Error drawing individual marker:', error)
+                // Error drawing individual marker
               }
             })
           } catch (error) {
-            console.error('Error in primitive draw function:', error)
+            // Error in primitive draw function
           }
         }
       }
@@ -309,70 +281,33 @@ export function TradeChart({
       // Attach the primitive to the price series
       try {
         (priceSeriesRef.current as any).attachPrimitive(tradeMarkerPrimitive)
-        console.log('✅ Trade marker primitive attached successfully')
       } catch (error) {
-        console.error('❌ Failed to attach primitive:', error)
-        
-        // Fallback: Log the error and continue without markers
-        console.log('🔄 Unable to add trade markers, continuing without them')
+        // Fallback: Unable to add trade markers, continuing without them
       }
     } catch (error) {
-      console.error('❌ Error in addTradeMarkers:', error)
-      console.error('Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack trace'
-      })
+      // Error in addTradeMarkers
     }
   }, [convertTradeTimestampToChartTime])
 
   // Calculate valid trades in timeframe
   const validTrades = useMemo(() => {
-    console.log('🔍 Calculating validTrades...')
-    
     if (trades.length === 0 || priceData.length === 0) {
-      console.log('❌ No trades or price data:', { tradesCount: trades.length, priceDataCount: priceData.length })
       return []
     }
     
     const minTime = Math.min(...priceData.map(p => p.timestamp))
     const maxTime = Math.max(...priceData.map(p => p.timestamp))
     
-    console.log('⏱️ Price data time range:', {
-      minTime,
-      maxTime,
-      minDate: new Date(minTime * 1000).toISOString(),
-      maxDate: new Date(maxTime * 1000).toISOString()
-    })
-    
     const validTradesFiltered = trades.filter(trade => 
       trade.timestamp >= minTime && trade.timestamp <= maxTime
     )
-    
-    console.log('📊 Trade validation results:', {
-      totalTrades: trades.length,
-      validTrades: validTradesFiltered.length,
-      firstTrade: trades[0] ? {
-        timestamp: trades[0].timestamp,
-        date: new Date(trades[0].timestamp * 1000).toISOString(),
-        withinRange: trades[0].timestamp >= minTime && trades[0].timestamp <= maxTime
-      } : null,
-      lastTrade: trades[trades.length - 1] ? {
-        timestamp: trades[trades.length - 1].timestamp,
-        date: new Date(trades[trades.length - 1].timestamp * 1000).toISOString(),
-        withinRange: trades[trades.length - 1].timestamp >= minTime && trades[trades.length - 1].timestamp <= maxTime
-      } : null
-    })
     
     return validTradesFiltered
   }, [trades, priceData])
 
   // Update chart with price data and trade markers
   useEffect(() => {
-    console.log('📈 Chart update effect triggered')
-    
     if (priceData.length > 0 && priceSeriesRef.current && volumeSeriesRef.current) {
-      console.log('✅ Chart components ready, updating...')
-      
       // Convert price data to chart format
       const chartData = priceData.map(point => ({
         time: point.timestamp as any,
@@ -381,12 +316,6 @@ export function TradeChart({
         low: point.price.low,
         close: point.price.close
       }))
-      
-      console.log('📊 Setting price data:', {
-        dataPoints: chartData.length,
-        firstPoint: chartData[0],
-        lastPoint: chartData[chartData.length - 1]
-      })
       
       priceSeriesRef.current.setData(chartData)
       
@@ -398,63 +327,37 @@ export function TradeChart({
       }))
       
       volumeSeriesRef.current.setData(volumeData)
-      console.log('📊 Volume data set')
 
       // Add trade markers if we have valid trades
       if (validTrades.length > 0 && chartRef.current) {
-        console.log(`🎯 Found ${validTrades.length} valid trades, processing markers...`)
-        
         // If trades exist but aren't visible, adjust the chart's visible range
         if (trades.length > 0) {
           const tradeTimestamps = trades.map(trade => convertTradeTimestampToChartTime(trade.timestamp, selectedPeriod))
           const minTradeTime = Math.min(...tradeTimestamps)
           const maxTradeTime = Math.max(...tradeTimestamps)
           
-          console.log('⏱️ Adjusting chart time range:', {
-            minTradeTime,
-            maxTradeTime,
-            minTradeDate: new Date(minTradeTime * 1000).toISOString(),
-            maxTradeDate: new Date(maxTradeTime * 1000).toISOString()
-          })
-          
           // Set visible range to show the trades with some padding
           const padding = (maxTradeTime - minTradeTime) * 0.1 || 24 * 3600 // 10% padding or 1 day minimum
           const from = Math.max(minTradeTime - padding, Math.min(...priceData.map(p => p.timestamp)))
           const to = Math.min(maxTradeTime + padding, Math.max(...priceData.map(p => p.timestamp)))
-          
-          console.log('📐 Setting visible range:', {
-            from,
-            to,
-            fromDate: new Date(from * 1000).toISOString(),
-            toDate: new Date(to * 1000).toISOString()
-          })
           
           try {
             chartRef.current.timeScale().setVisibleRange({
               from: from as any,
               to: to as any
             })
-            console.log('✅ Visible range set successfully')
           } catch (error) {
-            console.warn('⚠️ Failed to set visible range:', error)
+            // Failed to set visible range
           }
         }
         
         // Add markers with a delay to ensure chart is fully rendered
-        console.log('⏳ Scheduling marker addition in 700ms...')
         setTimeout(() => {
-          console.log('🎯 Adding trade markers now...')
           addTradeMarkers(validTrades, selectedPeriod)
         }, 700) // Increased delay to allow for range adjustment
-      } else {
-        console.log(`❌ No valid trades to display: ${trades.length} total trades, ${priceData.length} price points, validTrades: ${validTrades.length}`)
       }
     } else {
-      console.log('❌ Chart components not ready:', {
-        priceDataLength: priceData.length,
-        priceSeriesExists: !!priceSeriesRef.current,
-        volumeSeriesExists: !!volumeSeriesRef.current
-      })
+      // Chart components not ready
     }
   }, [priceData, validTrades, addTradeMarkers, selectedPeriod, trades, convertTradeTimestampToChartTime])
 

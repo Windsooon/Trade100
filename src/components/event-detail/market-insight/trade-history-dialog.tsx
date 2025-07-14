@@ -19,17 +19,8 @@ export function TradeHistoryDialog({
 
   // Fetch trades for this user and market
   const fetchTrades = useCallback(async (page: number) => {
-    console.log('fetchTrades called with:', {
-      page,
-      selectedMarket: selectedMarket?.conditionId,
-      holder: holder?.proxyWallet,
-      hasSelectedMarket: !!selectedMarket?.conditionId,
-      hasHolder: !!holder?.proxyWallet
-    })
-
     if (!selectedMarket?.conditionId || !holder?.proxyWallet) {
       const errorMsg = `Missing market or user data: market=${!!selectedMarket?.conditionId}, holder=${!!holder?.proxyWallet}`
-      console.log(errorMsg)
       setError(errorMsg)
       return
     }
@@ -40,7 +31,6 @@ export function TradeHistoryDialog({
     try {
       const offset = (page - 1) * tradesPerPage
       const url = `/api/trades?user=${encodeURIComponent(holder.proxyWallet)}&market=${encodeURIComponent(selectedMarket.conditionId)}&limit=${tradesPerPage}&offset=${offset}&takerOnly=false`
-      console.log('Fetching trades from URL:', url)
       
       const response = await fetch(url)
 
@@ -49,19 +39,16 @@ export function TradeHistoryDialog({
       }
 
       const result = await response.json()
-      console.log('Trades API response:', result)
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to fetch trades')
       }
 
       const tradesData = result.data || []
-      console.log(`Setting ${tradesData.length} trades:`, tradesData.slice(0, 3))
       
       setTrades(tradesData)
       setTotalTrades(tradesData.length)
     } catch (err) {
-      console.error('Trade fetch error:', err)
       setError('Failed to load trade history')
       setTrades([])
     } finally {

@@ -64,26 +64,26 @@ export default function ActivityPage() {
       {/* Main Content - takes remaining space */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="container mx-auto px-4 py-6 flex-1 flex flex-col">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold mb-2">Trading Activity</h1>
-            <p className="text-muted-foreground">
-              Real-time trading activity and analysis tools for Polymarket
-            </p>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Trading Activity</h1>
+          <p className="text-muted-foreground">
+            Real-time trading activity and analysis tools for Polymarket
+          </p>
+        </div>
 
           {/* Two-column layout - takes remaining space */}
           <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 flex-1 min-h-0">
-            {/* Left side: Activity Feed - 30% */}
+          {/* Left side: Activity Feed - 30% */}
             <div className="lg:col-span-3 min-h-0">
-              <ActivityFeed onTradeReceived={handleTradeReceived} />
-            </div>
+            <ActivityFeed onTradeReceived={handleTradeReceived} />
+          </div>
 
-            {/* Right side: Data Tables - 70% */}
+          {/* Right side: Data Tables - 70% */}
             <div className="lg:col-span-7 min-h-0">
-              <ActivityDataTables 
-                trades={allTrades} 
-                onRefresh={handleRefresh}
-              />
+            <ActivityDataTables 
+              trades={allTrades} 
+              onRefresh={handleRefresh}
+            />
             </div>
           </div>
         </div>

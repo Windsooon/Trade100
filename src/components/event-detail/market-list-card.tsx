@@ -316,5 +316,5 @@ function MarketRow({
           )}
         </div>
       </Collapsible>
-    )
+  )
 } 
