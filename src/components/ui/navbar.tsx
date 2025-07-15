@@ -38,7 +38,7 @@ export function Navbar() {
                 Markets
               </Link>
               <Link href="/portfolio" className="navbar-link">
-                Portfolio (Mock Data)
+                Portfolio
               </Link>
               <Link href="/activity" className="navbar-link">
                 Activity
