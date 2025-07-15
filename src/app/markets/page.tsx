@@ -13,6 +13,7 @@ import { RefreshCw, Filter, X, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Che
 import { Event, Market } from '@/lib/stores'
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
+import { BottomNavigation } from '@/components/ui/bottom-navigation'
 import Link from 'next/link'
 
 interface FetchLog {
@@ -549,7 +550,7 @@ export default function MarketsPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6 max-w-[1200px]">
+      <div className="container mx-auto px-4 py-6 pb-20 md:pb-6 space-y-6 max-w-[1200px]">
         {/* Top Filter Bar */}
         <Card>
           <CardHeader>
@@ -827,6 +828,7 @@ export default function MarketsPage() {
       </div>
       
       <Footer />
+      <BottomNavigation />
     </div>
   )
 }

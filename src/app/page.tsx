@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
+import { BottomNavigation } from '@/components/ui/bottom-navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -639,7 +640,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 pb-20 md:pb-6">
         {/* Cards Grid - Mobile: 2 cards side by side, Desktop: centered with margins */}
         <div className="grid grid-cols-2 sm:grid-cols-12 gap-4">
           <div className="hidden sm:block sm:col-span-2"></div>
@@ -751,6 +752,7 @@ export default function HomePage() {
       </div>
       
       <Footer />
+      <BottomNavigation />
     </div>
   )
 } 

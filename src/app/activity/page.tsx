@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
+import { BottomNavigation } from '@/components/ui/bottom-navigation'
 import { ActivityFeed } from '@/components/ui/activity-feed'
 import { ActivityDataTables } from '@/components/ui/activity-data-tables'
 
@@ -63,7 +64,7 @@ export default function ActivityPage() {
 
       {/* Main Content - takes remaining space */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="container mx-auto px-4 py-6 flex-1 flex flex-col">
+        <div className="container mx-auto px-4 py-6 pb-20 md:pb-6 flex-1 flex flex-col">
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2">Trading Activity</h1>
           <p className="text-muted-foreground">
@@ -90,6 +91,7 @@ export default function ActivityPage() {
       </div>
       
       <Footer />
+      <BottomNavigation />
     </div>
   )
 } 

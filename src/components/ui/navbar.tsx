@@ -32,8 +32,8 @@ export function Navbar() {
               Trade100
             </Link>
             
-            {/* Navigation - moved to left side */}
-            <div className="flex items-center gap-6">
+            {/* Navigation - moved to left side, hidden on mobile */}
+            <div className="hidden md:flex items-center gap-6">
               <Link href="/markets" className="navbar-link">
                 Markets
               </Link>
@@ -46,9 +46,11 @@ export function Navbar() {
             </div>
           </div>
 
-          {/* Right side - Settings, Discord, GitHub link */}
-          <div className="flex items-center space-x-2">
-            <SettingsSheet />
+          {/* Right side - Settings, Discord, GitHub link, hidden on mobile */}
+          <div className="hidden md:flex items-center space-x-2">
+            <div data-settings-trigger>
+              <SettingsSheet />
+            </div>
             
             <Button
               variant="ghost"

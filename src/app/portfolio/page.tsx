@@ -4,6 +4,7 @@ import * as React from "react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
+import { BottomNavigation } from '@/components/ui/bottom-navigation'
 import { WalletSetupGuide } from '@/components/ui/wallet-setup-guide'
 import { useWalletAddress } from '@/hooks/use-wallet-address'
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -208,10 +209,11 @@ export default function PortfolioPage() {
             <h1 className="text-2xl font-bold">Portfolio</h1>
           </div>
         </div>
-        <div className="container mx-auto px-4 py-6 space-y-6 max-w-[1200px]">
+        <div className="container mx-auto px-4 py-6 pb-20 md:pb-6 space-y-6 max-w-[1200px]">
           <div className="text-center py-8">Loading...</div>
         </div>
         <Footer />
+        <BottomNavigation />
       </div>
     )
   }
@@ -226,10 +228,11 @@ export default function PortfolioPage() {
             <h1 className="text-2xl font-bold">Portfolio</h1>
           </div>
         </div>
-        <div className="container mx-auto px-4 py-6 space-y-6 max-w-[1200px]">
+        <div className="container mx-auto px-4 py-6 pb-20 md:pb-6 space-y-6 max-w-[1200px]">
           <WalletSetupGuide onAddressAdded={refetchWalletAddress} />
         </div>
         <Footer />
+        <BottomNavigation />
       </div>
     )
   }
@@ -250,7 +253,7 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6 max-w-[1200px]">
+      <div className="container mx-auto px-4 py-6 pb-20 md:pb-6 space-y-6 max-w-[1200px]">
         {/* Error Alert */}
         {error && (
           <Alert variant="destructive">
@@ -428,6 +431,7 @@ export default function PortfolioPage() {
       </div>
 
       <Footer />
+      <BottomNavigation />
     </div>
   )
 }
