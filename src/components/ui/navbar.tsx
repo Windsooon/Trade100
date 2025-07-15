@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Github } from "lucide-react"
+import { SettingsSheet } from "@/components/ui/settings-sheet"
 
 // Discord icon component since lucide-react doesn't have one
 const DiscordIcon = ({ className }: { className?: string }) => (
@@ -45,8 +46,10 @@ export function Navbar() {
             </div>
           </div>
 
-          {/* Right side - Discord, GitHub link and Theme Toggle */}
+          {/* Right side - Settings, Discord, GitHub link */}
           <div className="flex items-center space-x-2">
+            <SettingsSheet />
+            
             <Button
               variant="ghost"
               size="sm"

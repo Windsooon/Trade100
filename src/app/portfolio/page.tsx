@@ -4,6 +4,8 @@ import * as React from "react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
+import { WalletSetupGuide } from '@/components/ui/wallet-setup-guide'
+import { useWalletAddress } from '@/hooks/use-wallet-address'
 import {
   Card,
   CardContent,
@@ -197,6 +199,7 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export default function PortfolioPage() {
+  const { walletAddress, hasWalletAddress, isLoading, refetchWalletAddress } = useWalletAddress()
   const [timeRange, setTimeRange] = React.useState("30d")
   const [selectedDate, setSelectedDate] = React.useState<string | null>(null)
   const [activityData, setActivityData] = React.useState<any[]>([])
@@ -283,6 +286,42 @@ export default function PortfolioPage() {
     return true
   })
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="border-b bg-background">
+          <div className="container mx-auto px-4 py-4 max-w-[1200px]">
+            <h1 className="text-2xl font-bold">Portfolio</h1>
+          </div>
+        </div>
+        <div className="container mx-auto px-4 py-6 space-y-6 max-w-[1200px]">
+          <div className="text-center py-8">Loading...</div>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
+
+  // Show setup guide if no wallet address
+  if (!hasWalletAddress) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="border-b bg-background">
+          <div className="container mx-auto px-4 py-4 max-w-[1200px]">
+            <h1 className="text-2xl font-bold">Portfolio</h1>
+          </div>
+        </div>
+        <div className="container mx-auto px-4 py-6 space-y-6 max-w-[1200px]">
+          <WalletSetupGuide onAddressAdded={refetchWalletAddress} />
+        </div>
+        <Footer />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -290,7 +329,12 @@ export default function PortfolioPage() {
       {/* Page Header */}
       <div className="border-b bg-background">
         <div className="container mx-auto px-4 py-4 max-w-[1200px]">
-          <h1 className="text-2xl font-bold">Portfolio</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">Portfolio</h1>
+            <div className="text-sm text-muted-foreground">
+              Wallet: <code className="bg-muted px-2 py-1 rounded text-xs">{walletAddress}</code>
+            </div>
+          </div>
         </div>
       </div>
 
