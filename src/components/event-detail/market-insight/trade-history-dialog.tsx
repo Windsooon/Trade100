@@ -10,15 +10,14 @@ export function TradeHistoryDialog({
   holder, 
   selectedMarket 
 }: TradeHistoryDialogProps) {
-  const [trades, setTrades] = useState<any[]>([])
+  const [allTrades, setAllTrades] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalTrades, setTotalTrades] = useState(0)
-  const tradesPerPage = 15
+  const tradesPerPage = 20
 
-  // Fetch trades for this user and market
-  const fetchTrades = useCallback(async (page: number) => {
+  // Fetch all trades for this user and market (limit 100)
+  const fetchTrades = useCallback(async () => {
     if (!selectedMarket?.conditionId || !holder?.proxyWallet) {
       const errorMsg = `Missing market or user data: market=${!!selectedMarket?.conditionId}, holder=${!!holder?.proxyWallet}`
       setError(errorMsg)
@@ -29,8 +28,7 @@ export function TradeHistoryDialog({
     setError(null)
 
     try {
-      const offset = (page - 1) * tradesPerPage
-      const url = `/api/trades?user=${encodeURIComponent(holder.proxyWallet)}&market=${encodeURIComponent(selectedMarket.conditionId)}&limit=${tradesPerPage}&offset=${offset}&takerOnly=false`
+      const url = `/api/trades?user=${encodeURIComponent(holder.proxyWallet)}&market=${encodeURIComponent(selectedMarket.conditionId)}`
       
       const response = await fetch(url)
 
@@ -46,30 +44,32 @@ export function TradeHistoryDialog({
 
       const tradesData = result.data || []
       
-      setTrades(tradesData)
-      setTotalTrades(tradesData.length)
+      setAllTrades(tradesData)
     } catch (err) {
       setError('Failed to load trade history')
-      setTrades([])
+      setAllTrades([])
     } finally {
       setLoading(false)
     }
-  }, [selectedMarket?.conditionId, holder?.proxyWallet, tradesPerPage])
+  }, [selectedMarket?.conditionId, holder?.proxyWallet])
 
-  // Fetch trades when component mounts or page changes
+  // Fetch trades when component mounts
   useEffect(() => {
-    fetchTrades(currentPage)
-  }, [fetchTrades, currentPage])
+    fetchTrades()
+  }, [fetchTrades])
 
   // Reset to page 1 when market or holder changes
   useEffect(() => {
     setCurrentPage(1)
-    setTrades([])
-    setTotalTrades(0)
+    setAllTrades([])
     setError(null)
   }, [selectedMarket?.conditionId, holder?.proxyWallet])
 
-  const totalPages = Math.ceil(totalTrades / tradesPerPage)
+  // Calculate pagination
+  const totalPages = Math.ceil(allTrades.length / tradesPerPage)
+  const startIndex = (currentPage - 1) * tradesPerPage
+  const endIndex = startIndex + tradesPerPage
+  const currentPageTrades = allTrades.slice(startIndex, endIndex)
 
   const formatTimestamp = (timestamp: number): string => {
     return new Date(timestamp * 1000).toLocaleString()
@@ -85,7 +85,7 @@ export function TradeHistoryDialog({
       <div className="border rounded-lg p-6 bg-muted/20">
         <h4 className="text-sm font-medium mb-4">Price Chart with Buy/Sell Indicators</h4>
         <TradeChart 
-          trades={trades}
+          trades={allTrades} // Pass all trades to chart
           loading={loading}
           error={error}
           holder={holder}
@@ -97,9 +97,9 @@ export function TradeHistoryDialog({
       {/* Trading History */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium">Trading History</h4>
+          <h4 className="text-sm font-medium">Last 100 Trading History</h4>
           <Badge variant="outline" className="text-xs">
-            {totalTrades} trades
+            {allTrades.length} activities
           </Badge>
         </div>
 
@@ -108,7 +108,7 @@ export function TradeHistoryDialog({
           <div className="flex items-center justify-center py-8">
             <div className="text-center space-y-2">
               <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Loading trades...</p>
+              <p className="text-sm text-muted-foreground">Loading activities...</p>
             </div>
           </div>
         )}
@@ -117,21 +117,13 @@ export function TradeHistoryDialog({
         {error && !loading && (
           <div className="text-center py-8 text-muted-foreground">
             <p className="text-sm">{error}</p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="mt-2"
-              onClick={() => fetchTrades(currentPage)}
-            >
-              Retry
-            </Button>
           </div>
         )}
 
         {/* Trades List */}
-        {!loading && !error && trades.length > 0 && (
+        {!loading && !error && currentPageTrades.length > 0 && (
           <div className="space-y-3">
-            {trades.map((trade: any, index: number) => (
+            {currentPageTrades.map((trade: any, index: number) => (
               <div key={index} className="border rounded-lg p-3 hover:bg-muted/30 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -163,9 +155,9 @@ export function TradeHistoryDialog({
         )}
 
         {/* Empty State */}
-        {!loading && !error && trades.length === 0 && (
+        {!loading && !error && allTrades.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
-            <p className="text-sm">No trades found for this user in this market</p>
+            <p className="text-sm">No activities found for this user in this market</p>
           </div>
         )}
 
@@ -173,7 +165,7 @@ export function TradeHistoryDialog({
         {!loading && !error && totalPages > 1 && (
           <div className="flex items-center justify-between pt-4 border-t">
             <div className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages} ({totalTrades} total trades)
+              Page {currentPage} of {totalPages} ({allTrades.length} total activities)
             </div>
             <div className="flex gap-2">
               <Button

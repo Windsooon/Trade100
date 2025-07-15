@@ -6,9 +6,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const user = searchParams.get('user')
     const market = searchParams.get('market')
-    const limit = searchParams.get('limit') || '10'
-    const offset = searchParams.get('offset') || '0'
-    const takerOnly = searchParams.get('takerOnly') || 'false'
     
     if (!user) {
       return NextResponse.json({ 
@@ -22,7 +19,8 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const url = `https://data-api.polymarket.com/trades?user=${encodeURIComponent(user)}&market=${encodeURIComponent(market)}&limit=${limit}&offset=${offset}&takerOnly=${takerOnly}`
+    // Use the new activity endpoint with limit=100 and no type filter
+    const url = `http://data-api.polymarket.com/activity?user=${encodeURIComponent(user)}&market=${encodeURIComponent(market)}&limit=100`
     
     const response = await proxyFetch(url, {
       headers: {
@@ -42,10 +40,10 @@ export async function GET(request: NextRequest) {
       data: data
     })
   } catch (error) {
-    console.error('Trades API error:', error)
+    console.error('Activity API error:', error)
     return NextResponse.json({ 
       success: false,
-      error: 'Failed to fetch trade data',
+      error: 'Failed to fetch activity data',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
