@@ -58,23 +58,35 @@ export default function EventDetailClient({
         {/* Event Info Banner */}
         <EventInfoBanner event={event} />
         
-        {/* Main Content - 3 Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Mobile Order: Market Insight + Operations first */}
-          <div className="lg:hidden space-y-4">
-            <MarketInsightCard 
-              selectedMarket={selectedMarket} 
-              selectedToken={selectedToken}
-              event={event}
-            />
-            <OperationsCard 
-              selectedMarket={selectedMarket}
-              selectedToken={selectedToken}
-              onTokenChange={handleTokenChange}
-            />
-          </div>
+        {/* Mobile Layout */}
+        <div className="lg:hidden space-y-6">
+          <MarketInsightCard 
+            selectedMarket={selectedMarket} 
+            selectedToken={selectedToken}
+            event={event}
+          />
+          <MarketListCard 
+            markets={event.markets}
+            selectedMarket={selectedMarket}
+            onMarketSelect={handleMarketSelect}
+            selectedToken={selectedToken}
+            onTokenChange={handleTokenChange}
+            event={event}
+          />
+          <OperationsCard 
+            selectedMarket={selectedMarket}
+            selectedToken={selectedToken}
+            onTokenChange={handleTokenChange}
+          />
+          <TradingActivityCard 
+            selectedMarket={selectedMarket}
+            event={event}
+          />
+        </div>
 
-          {/* Market List - 3 columns on desktop, full width on mobile (2nd position) */}
+        {/* Desktop Layout - 3 Column Grid */}
+        <div className="hidden lg:grid lg:grid-cols-12 gap-6">
+          {/* Market List - 3 columns */}
           <div className="lg:col-span-3">
             <MarketListCard 
               markets={event.markets}
@@ -86,8 +98,8 @@ export default function EventDetailClient({
             />
           </div>
 
-          {/* Market Insight + Operations - 6 columns on desktop, hidden on mobile (shown first above) */}
-          <div className="hidden lg:block lg:col-span-6">
+          {/* Market Insight + Operations - 6 columns */}
+          <div className="lg:col-span-6">
             <div className="h-full flex flex-col gap-4">
               <div className="flex-1 min-h-0">
                 <MarketInsightCard 
@@ -106,7 +118,7 @@ export default function EventDetailClient({
             </div>
           </div>
 
-          {/* Trading Activity - 3 columns on desktop, full width on mobile (3rd position) */}
+          {/* Trading Activity - 3 columns */}
           <div className="lg:col-span-3">
             <TradingActivityCard 
               selectedMarket={selectedMarket}

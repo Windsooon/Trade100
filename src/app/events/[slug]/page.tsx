@@ -1,5 +1,6 @@
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
+import { BottomNavigation } from '@/components/ui/bottom-navigation'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { AlertCircleIcon } from 'lucide-react'
 import EventDetailClient from '@/components/event-detail/event-detail-client'
@@ -146,6 +147,7 @@ export default async function EventDetailPage({
           </Alert>
         </div>
         <Footer />
+        <BottomNavigation />
       </div>
     )
   }
@@ -153,10 +155,11 @@ export default async function EventDetailPage({
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
-      <div className="container mx-auto px-4 py-6 flex-1">
+      <div className="container mx-auto px-4 py-6 pb-20 md:pb-6 flex-1">
         <EventDetailClient event={eventData} selectedMarketId={selectedMarketId} />
       </div>
       <Footer />
+      <BottomNavigation />
     </div>
   )
 } 
