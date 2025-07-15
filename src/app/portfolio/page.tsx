@@ -161,6 +161,15 @@ export default function PortfolioPage() {
     }
   }, [walletAddress, activitySortBy, activitySortDirection])
 
+  // Load today's activity by default when wallet address is available
+  React.useEffect(() => {
+    if (hasWalletAddress && walletAddress && !selectedDate) {
+      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+      setSelectedDate(today)
+      fetchActivityData(today)
+    }
+  }, [hasWalletAddress, walletAddress, selectedDate, fetchActivityData])
+
   // Handle chart click
   const handleChartClick = (data: any) => {
     if (data && data.activeLabel) {

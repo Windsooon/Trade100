@@ -41,7 +41,7 @@ function groupActivitiesByEvent(activities: ActivityItem[]): EventGroup[] {
     if (!acc[key]) {
       acc[key] = {
         eventSlug: activity.eventSlug,
-        eventTitle: activity.title.split(' - ')[0] || activity.title, // Extract event title
+        eventTitle: activity.eventSlug ? activity.eventSlug.replace(/-/g, ' ') : 'Unknown Event', // Format eventSlug by removing dashes
         activities: [],
         totalTrades: 0,
         totalVolume: 0,
@@ -217,7 +217,6 @@ export function ActivitySection({
                             <ChevronRight className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-90" />
                             <div>
                               <h3 className="font-medium text-sm">{eventGroup.eventTitle}</h3>
-                              <p className="text-xs text-muted-foreground">{eventGroup.eventSlug}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-4 text-xs">
