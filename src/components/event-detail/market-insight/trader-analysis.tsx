@@ -139,9 +139,13 @@ export function TraderAnalysis({ selectedMarket }: TraderAnalysisProps) {
     )
   }
 
-  // Extract YES and NO holders data
-  const yesHolders = holdersData && holdersData.length > 0 ? holdersData[0]?.holders || [] : []
-  const noHolders = holdersData && holdersData.length > 1 ? holdersData[1]?.holders || [] : []
+  // Extract YES and NO holders data and filter out holders with empty names
+  const yesHolders = holdersData && holdersData.length > 0 
+    ? (holdersData[0]?.holders || []).filter((holder: any) => holder.name && holder.name.trim() !== '')
+    : []
+  const noHolders = holdersData && holdersData.length > 1 
+    ? (holdersData[1]?.holders || []).filter((holder: any) => holder.name && holder.name.trim() !== '')
+    : []
 
   return (
     <div className="space-y-6" style={{ minHeight: '500px' }}>
