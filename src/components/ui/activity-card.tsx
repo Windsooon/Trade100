@@ -4,7 +4,6 @@ import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ActivityItem } from "@/app/api/portfolio/activity/route"
-import { formatCurrency } from "@/lib/portfolio-utils"
 import { ExternalLink, ArrowUpDown, Coins, Gift, Repeat, Award } from "lucide-react"
 
 interface ActivityCardProps {
@@ -15,18 +14,18 @@ interface ActivityCardProps {
 function getActivityIcon(type: ActivityItem['type']) {
   switch (type) {
     case 'TRADE':
-      return <ArrowUpDown className="h-4 w-4" />
+      return <ArrowUpDown className="h-3 w-3" />
     case 'REDEEM':
-      return <Coins className="h-4 w-4" />
+      return <Coins className="h-3 w-3" />
     case 'SPLIT':
     case 'MERGE':
-      return <Repeat className="h-4 w-4" />
+      return <Repeat className="h-3 w-3" />
     case 'REWARD':
-      return <Award className="h-4 w-4" />
+      return <Award className="h-3 w-3" />
     case 'CONVERSION':
-      return <Gift className="h-4 w-4" />
+      return <Gift className="h-3 w-3" />
     default:
-      return <ArrowUpDown className="h-4 w-4" />
+      return <ArrowUpDown className="h-3 w-3" />
   }
 }
 
@@ -53,20 +52,39 @@ function getActivityTypeStyle(type: ActivityItem['type'], side?: string) {
   }
 }
 
-// Format relative time
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now() / 1000
-  const diff = now - timestamp
+// Format price to currency with proper decimal places
+function formatPrice(price: number): string {
+  if (price === 0) return '—'
+  if (price < 0.01) return `$${price.toFixed(4)}`
+  return `$${price.toFixed(2)}`
+}
+
+// Format shares with proper decimal places
+function formatShares(shares: number): string {
+  if (shares === 0) return '—'
+  return shares.toFixed(2)
+}
+
+// Format value as currency
+function formatValue(value: number): string {
+  if (value === 0) return '—'
+  return `$${value.toFixed(2)}`
+}
+
+// Format date to compact format
+function formatCompactDate(timestamp: number): string {
+  const date = new Date(timestamp * 1000)
+  const now = new Date()
+  const diffTime = Math.abs(now.getTime() - date.getTime())
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   
-  if (diff < 60) return 'Just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`
-  if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`
+  if (diffDays === 1) return 'Today'
+  if (diffDays === 2) return 'Yesterday'
+  if (diffDays <= 7) return `${diffDays}d ago`
   
-  return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+  return date.toLocaleDateString('en-US', {
     month: 'short',
-    day: 'numeric',
-    year: 'numeric'
+    day: 'numeric'
   })
 }
 
@@ -76,71 +94,75 @@ export function ActivityCard({ activity }: ActivityCardProps) {
   
   return (
     <Card className="hover:bg-muted/50 transition-colors">
-      <CardContent className="p-4">
-        <div className="grid grid-cols-7 gap-4 items-center text-sm">
-          {/* Type */}
-          <div className="flex items-center gap-2">
-            <div className={`p-1 rounded ${typeStyle}`}>
-              {getActivityIcon(activity.type)}
-            </div>
-            <span className="font-medium">{displayType}</span>
-          </div>
-
-          {/* Market */}
-          <div className="col-span-2 flex items-center gap-3">
+      <CardContent className="p-3">
+        {/* Desktop Layout */}
+        <div className="hidden md:grid grid-cols-12 gap-2 items-center text-sm">
+          {/* Market with icon - 4 columns */}
+          <div className="col-span-4 flex items-center gap-2 min-w-0">
             {activity.icon && (
               <img
                 src={activity.icon}
                 alt={activity.title}
-                className="w-8 h-8 rounded object-cover flex-shrink-0"
+                className="w-6 h-6 rounded object-cover flex-shrink-0"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none'
                 }}
               />
             )}
             <div className="min-w-0 flex-1">
-              <p className="font-medium truncate" title={activity.title}>
+              <p className="font-medium truncate text-xs" title={activity.title}>
                 {activity.title}
               </p>
             </div>
           </div>
 
-          {/* Outcome */}
-          <div>
+          {/* Price - 1 column */}
+          <div className="col-span-1 text-right">
+            <span className="font-mono text-xs">
+              {formatPrice(activity.price)}
+            </span>
+          </div>
+
+          {/* Shares - 1 column */}
+          <div className="col-span-1 text-right">
+            <span className="font-mono text-xs">
+              {formatShares(activity.size)}
+            </span>
+          </div>
+
+          {/* Value - 2 columns */}
+          <div className="col-span-2 text-right">
+            <span className="font-mono text-xs font-medium">
+              {formatValue(activity.usdcSize)}
+            </span>
+          </div>
+
+          {/* Outcome - 1 column */}
+          <div className="col-span-1 text-center">
             {activity.outcome ? (
               <Badge 
                 variant={activity.outcome === 'Yes' ? 'default' : 'secondary'}
-                className="text-xs"
+                className="text-xs px-1 py-0 h-5"
               >
                 {activity.outcome}
               </Badge>
             ) : (
-              <span className="text-muted-foreground">—</span>
+              <span className="text-muted-foreground text-xs">—</span>
             )}
           </div>
 
-          {/* Price */}
-          <div className="text-right">
-            {activity.price > 0 ? (
-              <span>{Math.round(activity.price * 100)}¢</span>
-            ) : (
-              <span className="text-muted-foreground">—</span>
-            )}
+          {/* Type - 1 column */}
+          <div className="col-span-1 flex items-center justify-center">
+            <div className={`p-1 rounded text-xs ${typeStyle}`} title={displayType}>
+              {getActivityIcon(activity.type)}
+            </div>
           </div>
 
-          {/* Shares */}
-          <div className="text-right">
-            <span>{activity.size.toLocaleString()}</span>
-          </div>
-
-          {/* Value */}
-          <div className="text-right font-medium">
-            {formatCurrency(activity.usdcSize)}
-          </div>
-
-          {/* Date */}
-          <div className="text-right text-muted-foreground flex items-center justify-end gap-1">
-            <span>{formatRelativeTime(activity.timestamp)}</span>
+          {/* Date with link - 1 column */}
+          <div className="col-span-1 text-right flex items-center justify-end gap-1">
+            <span className="text-muted-foreground text-xs">
+              {formatCompactDate(activity.timestamp)}
+            </span>
             <a
               href={`https://polygonscan.com/tx/${activity.transactionHash}`}
               target="_blank"
@@ -150,6 +172,64 @@ export function ActivityCard({ activity }: ActivityCardProps) {
             >
               <ExternalLink className="h-3 w-3" />
             </a>
+          </div>
+        </div>
+
+        {/* Mobile Layout */}
+        <div className="md:hidden space-y-2">
+          {/* Top row: Market + Value */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {activity.icon && (
+                <img
+                  src={activity.icon}
+                  alt={activity.title}
+                  className="w-6 h-6 rounded object-cover flex-shrink-0"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="font-medium truncate text-sm" title={activity.title}>
+                  {activity.title}
+                </p>
+              </div>
+            </div>
+            <div className="font-mono text-sm font-medium">
+              {formatValue(activity.usdcSize)}
+            </div>
+          </div>
+
+          {/* Bottom row: Details */}
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center gap-3">
+              <div className={`p-1 rounded ${typeStyle}`} title={displayType}>
+                {getActivityIcon(activity.type)}
+              </div>
+              {activity.outcome && (
+                <Badge 
+                  variant={activity.outcome === 'Yes' ? 'default' : 'secondary'}
+                  className="text-xs px-1 py-0 h-5"
+                >
+                  {activity.outcome}
+                </Badge>
+              )}
+              <span className="font-mono">{formatPrice(activity.price)}</span>
+              <span className="font-mono">{formatShares(activity.size)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span>{formatCompactDate(activity.timestamp)}</span>
+              <a
+                href={`https://polygonscan.com/tx/${activity.transactionHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition-colors"
+                title="View on PolygonScan"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
           </div>
         </div>
       </CardContent>

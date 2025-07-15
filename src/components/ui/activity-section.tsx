@@ -185,15 +185,15 @@ export function ActivitySection({
         {/* Activity Content */}
         {selectedDate && !isLoading && !error && activities.length > 0 && (
           <>
-            {/* Header Row */}
-            <div className="grid grid-cols-7 gap-4 items-center text-xs font-medium text-muted-foreground mb-4 px-4">
-              <div>Type</div>
-              <div className="col-span-2">Market</div>
-              <div>Outcome</div>
-              <div className="text-right">Price</div>
-              <div className="text-right">Shares</div>
-              <div className="text-right">Value</div>
-              <div className="text-right">Date</div>
+            {/* Header Row - Desktop Only */}
+            <div className="hidden md:grid grid-cols-12 gap-2 items-center text-xs font-medium text-muted-foreground mb-4 px-3">
+              <div className="col-span-4">Market</div>
+              <div className="col-span-1 text-right">Price</div>
+              <div className="col-span-1 text-right">Shares</div>
+              <div className="col-span-2 text-right">Value</div>
+              <div className="col-span-1 text-center">Outcome</div>
+              <div className="col-span-1 text-center">Type</div>
+              <div className="col-span-1 text-right">Date</div>
             </div>
 
             {/* Timeline Mode */}

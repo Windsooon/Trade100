@@ -61,10 +61,10 @@ export async function GET(request: NextRequest) {
         throw new Error(`Position API returned ${positionResponse.status}: ${errorText}`)
       }
       
-      const positionData: PositionValueResponse = await positionResponse.json()
+      const positionData: PositionValueResponse[] = await positionResponse.json()
       
-      if (positionData && typeof positionData.value === 'number') {
-        positionValue = positionData.value
+      if (Array.isArray(positionData) && positionData.length > 0 && typeof positionData[0].value === 'number') {
+        positionValue = positionData[0].value
       }
 
     } catch (error) {
