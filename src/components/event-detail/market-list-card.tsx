@@ -128,9 +128,6 @@ export function MarketListCard({
                 {/* Active Markets Section */}
                 {activeMarkets.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="font-medium text-sm text-muted-foreground">
-                      Active Markets (Accepting Orders) - {activeMarkets.length}
-                    </h4>
                     <div className="space-y-2">
                       {activeMarkets.map((market, index) => 
                         renderMarket(market, index, true)

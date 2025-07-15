@@ -14,6 +14,12 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
   
   // State for forcing chart re-initialization on tab switch
   const [chartKey, setChartKey] = useState(0)
+  
+  // Component instance ID to track if we get multiple instances
+  const instanceId = useRef(Math.random().toString(36).substr(2, 9))
+  
+  // Enhanced duplicate prevention using a global registry
+  const activeRequestsRef = useRef<Set<string>>(new Set())
 
   // Chart refs
   const chartContainerRef = useRef<HTMLDivElement>(null)
@@ -49,7 +55,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     let resizeObserver: ResizeObserver | null = null
     
     if (!chartContainerRef.current) {
-      console.error('📈 Chart container ref not available on initialization.')
       return
     }
 
@@ -497,14 +502,23 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       return
     }
     
+    const { startTs, endTs, fidelity } = calculateTimeRange(selectedPeriod)
+    const marketId = selectedMarket.conditionId
+    const requestKey = `${marketId}-${selectedPeriod}-${fidelity}`
+
+    // Check if this exact request is already active (StrictMode protection)
+    if (activeRequestsRef.current.has(requestKey)) {
+      return
+    }
+
+    // Mark this request as active immediately
+    activeRequestsRef.current.add(requestKey)
     setLoading(true)
     setError(null)
     setVolumeError(null)
     
     try {
-      const { startTs, endTs, fidelity } = calculateTimeRange(selectedPeriod)
-      const marketId = selectedMarket.conditionId
-      const cacheKey = `${marketId}-${selectedPeriod}-${fidelity}`
+      const cacheKey = requestKey
 
       // Check cache first
       const cachedData = getCachedData(cacheKey)
@@ -537,6 +551,8 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         }
         
         setLoading(false)
+        // Clean up active request marker for cached responses
+        activeRequestsRef.current.delete(requestKey)
         return
       }
 
@@ -592,15 +608,35 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
       setError(`Error loading market history: ${errorMessage}`)
       setLoading(false)
+    } finally {
+      // Always clean up the active request marker
+      activeRequestsRef.current.delete(requestKey)
     }
   }, [selectedMarket?.conditionId, selectedPeriod, calculateTimeRange, volumeType, getCachedData, setCachedData])
 
   // Fetch data when dependencies change
   useEffect(() => {
     if (selectedMarket?.conditionId) {
-      fetchMarketHistoryData()
+      // Use a small delay to handle StrictMode double execution
+      const timeoutId = setTimeout(() => {
+        fetchMarketHistoryData()
+      }, 10) // 10ms delay to let StrictMode settle
+      
+      return () => {
+        clearTimeout(timeoutId)
+      }
+    } else {
+      // Clear all active requests when no market selected
+      activeRequestsRef.current.clear()
     }
   }, [selectedMarket?.conditionId, selectedPeriod, fetchMarketHistoryData])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      activeRequestsRef.current.clear()
+    }
+  }, [])
 
   // Update volume display when volume type changes
   useEffect(() => {

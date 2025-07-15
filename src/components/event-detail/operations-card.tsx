@@ -63,43 +63,40 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Settings className="h-5 w-5" />
+    <Card className="w-full h-full flex flex-col">
+      <CardHeader className="pb-2 py-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Settings className="h-4 w-4" />
           <span className="hidden sm:inline">Operations</span>
           <span className="sm:hidden">Ops</span>
           <Badge variant="secondary" className="ml-2 text-xs">Coming Soon</Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        <Tabs defaultValue="trading" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-transparent">
-            <TabsTrigger value="trading" className="flex items-center gap-1 sm:gap-2">
-              <TrendingUp className="h-4 w-4" />
+      <CardContent className="pt-0 flex-1">
+        <Tabs defaultValue="trading" className="w-full h-full flex flex-col">
+          <TabsList className="grid w-full grid-cols-3 bg-transparent h-8">
+            <TabsTrigger value="trading" className="flex items-center gap-1 text-xs py-1">
+              <TrendingUp className="h-3 w-3" />
               <span className="hidden sm:inline">Trading</span>
               <span className="sm:hidden">Trade</span>
-              <Badge variant="outline" className="ml-1 text-xs hidden sm:inline">Soon</Badge>
             </TabsTrigger>
-            <TabsTrigger value="position" className="flex items-center gap-1 sm:gap-2">
-              <Wallet className="h-4 w-4" />
+            <TabsTrigger value="position" className="flex items-center gap-1 text-xs py-1">
+              <Wallet className="h-3 w-3" />
               <span className="hidden sm:inline">Position</span>
               <span className="sm:hidden">Pos</span>
-              <Badge variant="outline" className="ml-1 text-xs hidden sm:inline">Soon</Badge>
             </TabsTrigger>
-            <TabsTrigger value="ai" className="flex items-center gap-1 sm:gap-2">
-              <Brain className="h-4 w-4" />
+            <TabsTrigger value="ai" className="flex items-center gap-1 text-xs py-1">
+              <Brain className="h-3 w-3" />
               <span className="hidden sm:inline">AI Analyze</span>
               <span className="sm:hidden">AI</span>
-              <Badge variant="outline" className="ml-1 text-xs hidden sm:inline">Soon</Badge>
             </TabsTrigger>
           </TabsList>
 
           {/* Trading Tab */}
-          <TabsContent value="trading" className="space-y-4 mt-4 sm:mt-6">
+          <TabsContent value="trading" className="space-y-3 mt-3 flex-1">
             {/* Private Key Input */}
-            <div className="space-y-2">
-              <Label htmlFor="private-key">Private Key</Label>
+            <div className="space-y-1">
+              <Label htmlFor="private-key" className="text-xs">Private Key</Label>
               <div className="relative">
                 <Input
                   id="private-key"
@@ -107,25 +104,26 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                   placeholder="Enter private key"
                   value={privateKey}
                   onChange={(e) => setPrivateKey(e.target.value)}
+                  className="text-xs h-8"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  className="absolute right-0 top-0 h-8 px-2 hover:bg-transparent"
                   onClick={() => setShowPrivateKey(!showPrivateKey)}
                 >
                   {showPrivateKey ? (
-                    <EyeOff className="h-4 w-4" />
+                    <EyeOff className="h-3 w-3" />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-3 w-3" />
                   )}
                 </Button>
               </div>
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  Keep your private key safe! Never share it with anyone. It will be stored locally on your device.
+              <Alert className="py-1">
+                <AlertTriangle className="h-3 w-3" />
+                <AlertDescription className="text-xs">
+                  Keep your private key safe! Never share it with anyone.
                 </AlertDescription>
               </Alert>
             </div>
@@ -133,13 +131,14 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
             {privateKey ? (
               <>
                 {/* Token Selection */}
-                <div className="space-y-2">
-                  <Label>Token</Label>
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Token</Label>
+                  <div className="grid grid-cols-2 gap-1">
                     <Button 
                       variant={selectedToken === 'yes' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => onTokenChange('yes')}
+                      className="h-7 text-xs"
                     >
                       YES
                     </Button>
@@ -147,66 +146,70 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                       variant={selectedToken === 'no' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => onTokenChange('no')}
+                      className="h-7 text-xs"
                     >
                       NO
                     </Button>
                   </div>
                 </div>
 
-                {/* Order Type Nested Tabs */}
-                <div className="space-y-2">
-                  <Label>Order Type</Label>
+                {/* Order Type and Inputs */}
+                <div className="space-y-1">
+                  <Label className="text-xs">Order Type</Label>
                   <Tabs value={orderType} onValueChange={(value) => setOrderType(value as 'market' | 'limit')}>
-                    <TabsList className="grid w-full grid-cols-2 bg-transparent">
-                      <TabsTrigger value="market">Market</TabsTrigger>
-                      <TabsTrigger value="limit">Limit</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-2 bg-transparent h-7">
+                      <TabsTrigger value="market" className="text-xs">Market</TabsTrigger>
+                      <TabsTrigger value="limit" className="text-xs">Limit</TabsTrigger>
                     </TabsList>
                     
-                    <TabsContent value="market" className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="market-shares">Shares</Label>
+                    <TabsContent value="market" className="space-y-2 mt-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="market-shares" className="text-xs">Shares</Label>
                         <Input
                           id="market-shares"
                           type="number"
-                          placeholder="Enter number of shares"
+                          placeholder="Enter shares"
                           value={shares}
                           onChange={(e) => setShares(e.target.value)}
+                          className="text-xs h-8"
                         />
                       </div>
                     </TabsContent>
                     
-                    <TabsContent value="limit" className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="limit-price">Price</Label>
-                        <Input
-                          id="limit-price"
-                          type="number"
-                          step="0.0001"
-                          placeholder="0.5000"
-                          value={price}
-                          onChange={(e) => setPrice(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="limit-shares">Shares</Label>
-                        <Input
-                          id="limit-shares"
-                          type="number"
-                          placeholder="Enter number of shares"
-                          value={shares}
-                          onChange={(e) => setShares(e.target.value)}
-                        />
+                    <TabsContent value="limit" className="space-y-2 mt-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="limit-price" className="text-xs">Price</Label>
+                          <Input
+                            id="limit-price"
+                            type="number"
+                            step="0.0001"
+                            placeholder="0.5000"
+                            value={price}
+                            onChange={(e) => setPrice(e.target.value)}
+                            className="text-xs h-8"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="limit-shares" className="text-xs">Shares</Label>
+                          <Input
+                            id="limit-shares"
+                            type="number"
+                            placeholder="Shares"
+                            value={shares}
+                            onChange={(e) => setShares(e.target.value)}
+                            className="text-xs h-8"
+                          />
+                        </div>
                       </div>
                     </TabsContent>
                   </Tabs>
                 </div>
 
-                <Separator />
-
                 {/* Buy/Sell Buttons */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2">
                   <Button 
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-green-600 hover:bg-green-700 h-7 text-xs"
                     onClick={handleTrade}
                     disabled={!shares || (orderType === 'limit' && !price)}
                   >
@@ -216,28 +219,30 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                     variant="destructive"
                     onClick={handleTrade}
                     disabled={!shares || (orderType === 'limit' && !price)}
+                    className="h-7 text-xs"
                   >
                     Sell {selectedToken.toUpperCase()}
                   </Button>
                 </div>
               </>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Enter your private key to start trading</p>
+              <div className="text-center py-4 text-muted-foreground">
+                <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-xs">Enter your private key to start trading</p>
               </div>
             )}
           </TabsContent>
 
           {/* Position Tab */}
-          <TabsContent value="position" className="space-y-4 mt-4 sm:mt-6">
-            <div className="space-y-2">
-              <Label htmlFor="wallet-address">Wallet Address</Label>
+          <TabsContent value="position" className="space-y-3 mt-3 flex-1">
+            <div className="space-y-1">
+              <Label htmlFor="wallet-address" className="text-xs">Wallet Address</Label>
               <Input
                 id="wallet-address"
                 placeholder="0x..."
                 value={walletAddress}
                 onChange={(e) => setWalletAddress(e.target.value)}
+                className="text-xs h-8"
               />
             </div>
 
@@ -246,45 +251,43 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                 <Button 
                   onClick={handleLoadPosition}
                   disabled={positionLoading}
-                  className="w-full"
+                  className="w-full h-7 text-xs"
                 >
                   {positionLoading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading Position...
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      Loading...
                     </>
                   ) : (
                     'Load Position'
                   )}
                 </Button>
 
-                {positionLoading && (
-                  <div className="text-center py-4">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Fetching your positions...</p>
+                {positionLoading ? (
+                  <div className="text-center py-2">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-1" />
+                    <p className="text-xs text-muted-foreground">Fetching positions...</p>
                   </div>
-                )}
-
-                {!positionLoading && (
-                  <div className="border rounded-lg p-4 bg-muted/50">
-                    <p className="text-sm text-muted-foreground text-center">
+                ) : (
+                  <div className="border rounded-lg p-2 bg-muted/50">
+                    <p className="text-xs text-muted-foreground text-center">
                       Position data will be displayed here once loaded
                     </p>
                   </div>
                 )}
               </>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Enter your wallet address to view positions</p>
+              <div className="text-center py-4 text-muted-foreground">
+                <Wallet className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-xs">Enter wallet address to view positions</p>
               </div>
             )}
           </TabsContent>
 
           {/* AI Analyze Tab */}
-          <TabsContent value="ai" className="space-y-4 mt-4 sm:mt-6">
-            <div className="space-y-2">
-              <Label htmlFor="gemini-key">Gemini API Key</Label>
+          <TabsContent value="ai" className="space-y-3 mt-3 flex-1">
+            <div className="space-y-1">
+              <Label htmlFor="gemini-key" className="text-xs">Gemini API Key</Label>
               <div className="relative">
                 <Input
                   id="gemini-key"
@@ -292,25 +295,26 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                   placeholder="Enter Gemini API key"
                   value={geminiApiKey}
                   onChange={(e) => setGeminiApiKey(e.target.value)}
+                  className="text-xs h-8"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  className="absolute right-0 top-0 h-8 px-2 hover:bg-transparent"
                   onClick={() => setShowGeminiKey(!showGeminiKey)}
                 >
                   {showGeminiKey ? (
-                    <EyeOff className="h-4 w-4" />
+                    <EyeOff className="h-3 w-3" />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-3 w-3" />
                   )}
                 </Button>
               </div>
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  Keep your API key secure! It will be stored locally on your device and never shared.
+              <Alert className="py-1">
+                <AlertTriangle className="h-3 w-3" />
+                <AlertDescription className="text-xs">
+                  Keep your API key secure! It will be stored locally.
                 </AlertDescription>
               </Alert>
             </div>
@@ -320,11 +324,11 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                 <Button 
                   onClick={handleAnalyze}
                   disabled={analysisLoading}
-                  className="w-full"
+                  className="w-full h-7 text-xs"
                 >
                   {analysisLoading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                       Analyzing...
                     </>
                   ) : (
@@ -332,25 +336,23 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                   )}
                 </Button>
 
-                {analysisLoading && (
-                  <div className="text-center py-4">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">AI is analyzing the market...</p>
+                {analysisLoading ? (
+                  <div className="text-center py-2">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-1" />
+                    <p className="text-xs text-muted-foreground">AI is analyzing...</p>
                   </div>
-                )}
-
-                {!analysisLoading && (
-                  <div className="border rounded-lg p-4 bg-muted/50">
-                    <p className="text-sm text-muted-foreground text-center">
-                      AI analysis will be displayed here once generated
+                ) : (
+                  <div className="border rounded-lg p-2 bg-muted/50">
+                    <p className="text-xs text-muted-foreground text-center">
+                      AI analysis will be displayed here
                     </p>
                   </div>
                 )}
               </>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Enter your Gemini API key to get AI analysis</p>
+              <div className="text-center py-4 text-muted-foreground">
+                <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-xs">Enter Gemini API key for AI analysis</p>
               </div>
             )}
           </TabsContent>

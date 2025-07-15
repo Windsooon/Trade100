@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Loader2, Brain } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Pie, PieChart } from "recharts"
@@ -15,13 +15,16 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tradeData, setTradeData] = useState<TradeAnalysisData | null>(null)
-
+  
+  // Component instance ID to track if we get multiple instances
+  const instanceId = useRef(Math.random().toString(36).substr(2, 9))
+  
   // Client-side cache for trade analysis data (1 minute cache)
   const cacheRef = useRef<Map<string, { data: TradeAnalysisData; timestamp: number }>>(new Map())
   const CACHE_DURATION = 60 * 1000 // 1 minute in milliseconds
   
-  // Ref to track current request to prevent duplicates
-  const currentRequestRef = useRef<string | null>(null)
+  // Enhanced duplicate prevention using a global registry
+  const activeRequestsRef = useRef<Set<string>>(new Set())
 
   // Check if we have valid cached data
   const getCachedData = useCallback((conditionId: string): TradeAnalysisData | null => {
@@ -49,8 +52,8 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
 
     const conditionId = selectedMarket.conditionId
 
-    // Check if we already have a request in progress for this market
-    if (currentRequestRef.current === conditionId) {
+    // Check if this exact request is already active (StrictMode protection)
+    if (activeRequestsRef.current.has(conditionId)) {
       return
     }
 
@@ -62,16 +65,18 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
       return
     }
 
-    // Set current request to prevent duplicates
-    currentRequestRef.current = conditionId
+    // Mark this request as active immediately
+    activeRequestsRef.current.add(conditionId)
     setLoading(true)
     setError(null)
 
     try {
-      const response = await fetch(`https://trade-analyze-production.up.railway.app/api/trade-analyze?market=${encodeURIComponent(conditionId)}`)
+      const url = `https://trade-analyze-production.up.railway.app/api/trade-analyze?market=${encodeURIComponent(conditionId)}`
+      
+      const response = await fetch(url)
       
       // Check if this request is still relevant (user might have switched markets)
-      if (currentRequestRef.current !== conditionId) {
+      if (!activeRequestsRef.current.has(conditionId)) {
         return
       }
 
@@ -86,35 +91,40 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
       setTradeData(data)
     } catch (err) {
       // Only set error if this request is still relevant
-      if (currentRequestRef.current === conditionId) {
+      if (activeRequestsRef.current.has(conditionId)) {
         console.error('Trade analysis fetch error:', err)
         setError('No trade analysis data available for this market')
       }
     } finally {
-      // Clear current request if it's still this one
-      if (currentRequestRef.current === conditionId) {
-        currentRequestRef.current = null
-        setLoading(false)
-      }
+      // Always clean up the active request marker
+      activeRequestsRef.current.delete(conditionId)
+      setLoading(false)
     }
   }, [selectedMarket?.conditionId, getCachedData, setCachedData])
 
   // Fetch data when market changes
   useEffect(() => {
     if (selectedMarket?.conditionId) {
-      fetchTradeAnalysis()
+      // Use a small delay to handle StrictMode double execution
+      const timeoutId = setTimeout(() => {
+        fetchTradeAnalysis()
+      }, 10) // 10ms delay to let StrictMode settle
+      
+      return () => {
+        clearTimeout(timeoutId)
+      }
     } else {
-      // Clear current request and reset state when no market selected
-      currentRequestRef.current = null
+      // Clear all active requests and reset state when no market selected
+      activeRequestsRef.current.clear()
       setTradeData(null)
       setError(null)
     }
-  }, [selectedMarket?.conditionId]) // Remove fetchTradeAnalysis from deps to prevent duplicate calls
+  }, [selectedMarket?.conditionId, fetchTradeAnalysis])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      currentRequestRef.current = null
+      activeRequestsRef.current.clear()
     }
   }, [])
 
@@ -129,7 +139,7 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
   }, [])
 
   // Prepare unified chart data with both buy and sell orders
-  const unifiedChartData = useMemo((): MoneyFlowChartData[] => {
+  const unifiedChartData = useCallback((): MoneyFlowChartData[] => {
     if (!tradeData) return []
 
     const segments = [
@@ -203,7 +213,7 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
   } satisfies ChartConfig
 
   // Calculate table data
-  const tableData = useMemo(() => {
+  const tableData = useCallback(() => {
     if (!tradeData) return []
 
     return [
@@ -232,10 +242,10 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
   }, [tradeData])
 
   // Calculate totals
-  const totals = useMemo(() => {
-    if (!tableData.length) return { buy: 0, sell: 0, inflow: 0 }
+  const totals = useCallback(() => {
+    if (!tableData().length) return { buy: 0, sell: 0, inflow: 0 }
     
-    return tableData.reduce((acc, row) => ({
+    return tableData().reduce((acc, row) => ({
       buy: acc.buy + row.buy,
       sell: acc.sell + row.sell,
       inflow: acc.inflow + row.inflow
@@ -297,7 +307,7 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
             <h3 className="text-base font-semibold text-center">Order Volume Breakdown</h3>
           </div>
           <div className="flex-1 pb-0">
-            {unifiedChartData.length === 0 ? (
+            {unifiedChartData().length === 0 ? (
               <div className="flex items-center justify-center h-[400px] text-muted-foreground">
                 <p className="text-sm">No order data available</p>
               </div>
@@ -316,7 +326,7 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
                     } 
                   />
                   <Pie 
-                    data={unifiedChartData} 
+                    data={unifiedChartData()} 
                     dataKey="volume" 
                     nameKey="orderSize"
                     cx="50%" 
@@ -348,7 +358,7 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {tableData.map((row, index) => (
+                    {tableData().map((row, index) => (
                       <tr key={row.orderSize} className="border-b border-border/50">
                         <td className="py-3">
                           <div className="flex items-center gap-2">
@@ -372,10 +382,10 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
                     <tr className="border-t-2 font-semibold">
                       <td className="py-3">Total</td>
                       <td className="text-right py-3 text-price-positive">
-                        {formatCurrency(totals.buy)}
+                        {formatCurrency(totals().buy)}
                       </td>
                       <td className="text-right py-3 text-price-negative">
-                        {formatCurrency(totals.sell)}
+                        {formatCurrency(totals().sell)}
                       </td>
                     </tr>
                   </tbody>
