@@ -42,6 +42,7 @@ import {
   formatCurrency, 
   getLatestPnL 
 } from '@/lib/portfolio-utils'
+import { truncateWalletAddress } from '@/lib/utils'
 
 
 
@@ -247,7 +248,7 @@ export default function PortfolioPage() {
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold">Portfolio</h1>
             <div className="text-sm text-muted-foreground">
-              Wallet: <code className="bg-muted px-2 py-1 rounded text-xs">{walletAddress}</code>
+              Wallet: <code className="bg-muted px-2 py-1 rounded text-xs">{truncateWalletAddress(walletAddress || '')}</code>
             </div>
           </div>
         </div>

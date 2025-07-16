@@ -7,7 +7,7 @@ import { Footer } from '@/components/ui/footer'
 import { BottomNavigation } from '@/components/ui/bottom-navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
 import { TrendingUp, Clock, DollarSign, BarChart3, Activity, RefreshCw } from 'lucide-react'
 import { Event } from '@/lib/stores'
 import Link from 'next/link'
@@ -271,19 +271,16 @@ function MarketCard({ market }: { market: MarketDisplay }) {
           {/* Market Question */}
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-medium truncate">{market.question}</h3>
-            <div className="text-xs text-muted-foreground">
-              Ends: {formatDate(market.endDate)}
-            </div>
           </div>
         </div>
         
-        {/* Prices and Change */}
-        <div className="flex items-center gap-6 text-sm ml-4 flex-shrink-0">
-          <div className="text-center">
+        {/* Prices and Change - Fixed width columns */}
+        <div className="flex items-center gap-4 text-sm ml-4 flex-shrink-0">
+          <div className="w-16 text-left">
             <div className="text-xs text-muted-foreground mb-1">Yes</div>
             <div className="font-medium">{formatPrice(market.yesPrice)}</div>
           </div>
-          <div className="text-center">
+          <div className="w-20 text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
             <div className={`font-medium ${getPriceChangeColor(market.priceChange)}`}>
               {formatPriceChange(market.priceChange)}
@@ -327,6 +324,18 @@ export default function HomePage() {
   const [allEndingSoon, setAllEndingSoon] = useState<any[]>([])
   const [allLiquidity, setAllLiquidity] = useState<any[]>([])
 
+  
+  // Tag navigation
+  const [selectedTag, setSelectedTag] = useState('volume')
+  
+  // Tag list for navigation
+  const MARKET_TAGS = [
+    { id: 'recommend', label: 'Recommend (Soon)' },
+    { id: 'newest', label: 'Newest' },
+    { id: 'volume', label: '24h Volume' },
+    { id: 'liquidity', label: 'Liquidity' },
+    { id: 'endingSoon', label: 'Ending Soon' }
+  ]
   
   // Loading states for market tabs
   const [isLoading, setIsLoading] = useState({
@@ -653,35 +662,45 @@ export default function HomePage() {
           <div className="hidden sm:block sm:col-span-2"></div>
         </div>
         
-        {/* Market List with Tabs */}
+        {/* Market List with Tag Navigation */}
         <div className="mt-8 max-w-[1200px] mx-auto">
-          <Tabs defaultValue="volume" className="w-full">
-            <TabsList className="grid w-full grid-cols-5 bg-transparent">
-              <TabsTrigger value="recommend">Recommend (Soon)</TabsTrigger>
-              <TabsTrigger value="newest">Newest</TabsTrigger>
-              <TabsTrigger value="volume">24h Volume</TabsTrigger>
-              <TabsTrigger value="liquidity">Liquidity</TabsTrigger>
-              <TabsTrigger value="endingSoon">Ending Soon</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="recommend" className="mt-6">
-              <div className="space-y-3">
-                <div className="text-center py-12">
-                  <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-medium text-foreground mb-2">Personalized Recommendations</h3>
-                  <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
-                    We're working on smart market recommendations based on your trading history and interests.
-                  </p>
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground font-medium">Coming Soon</span>
-                  </div>
+          {/* Horizontal Tag Navigation */}
+          <div className="border-b bg-background mb-6">
+            <div className="container mx-auto px-4">
+              <div className="flex items-center gap-4 py-3 overflow-x-auto scrollbar-hide justify-center">
+              {MARKET_TAGS.map((tag) => (
+                <Button
+                  key={tag.id}
+                  variant={selectedTag === tag.id ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSelectedTag(tag.id)}
+                  className="whitespace-nowrap"
+                >
+                  {tag.label}
+                </Button>
+              ))}
+              </div>
+            </div>
+          </div>
+          
+          {/* Content based on selected tag */}
+          <div className="space-y-3 max-w-[800px] mx-auto">
+            {selectedTag === 'recommend' && (
+              <div className="text-center py-12">
+                <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <h3 className="text-lg font-medium text-foreground mb-2">Personalized Recommendations</h3>
+                <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                  We're working on smart market recommendations based on your trading history and interests.
+                </p>
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground font-medium">Coming Soon</span>
                 </div>
               </div>
-            </TabsContent>
-            
-            <TabsContent value="newest" className="mt-6">
-              <div className="space-y-3">
+            )}
+
+            {selectedTag === 'newest' && (
+              <>
                 {isLoading.newest ? (
                   <div className="text-center py-8">
                     <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
@@ -696,11 +715,11 @@ export default function HomePage() {
                     <MarketCard key={market.conditionId} market={market} />
                   ))
                 )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="volume" className="mt-6">
-              <div className="space-y-3">
+              </>
+            )}
+
+            {selectedTag === 'volume' && (
+              <>
                 {isLoading.volume ? (
                   <div className="text-center py-8">
                     <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
@@ -715,11 +734,11 @@ export default function HomePage() {
                     <MarketCard key={market.conditionId} market={market} />
                   ))
                 )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="liquidity" className="mt-6">
-              <div className="space-y-3">
+              </>
+            )}
+
+            {selectedTag === 'liquidity' && (
+              <>
                 {isLoading.liquidity ? (
                   <div className="text-center py-8">
                     <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
@@ -734,11 +753,11 @@ export default function HomePage() {
                     <MarketCard key={market.conditionId} market={market} />
                   ))
                 )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="endingSoon" className="mt-6">
-              <div className="space-y-3">
+              </>
+            )}
+
+            {selectedTag === 'endingSoon' && (
+              <>
                 {isLoading.endingSoon ? (
                   <div className="text-center py-8">
                     <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
@@ -753,9 +772,9 @@ export default function HomePage() {
                     <MarketCard key={market.conditionId} market={market} />
                   ))
                 )}
-              </div>
-            </TabsContent>
-          </Tabs>
+              </>
+            )}
+          </div>
         </div>
         
         {/* View All Markets Button */}

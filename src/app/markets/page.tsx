@@ -58,7 +58,7 @@ const PREDEFINED_TAGS = [
 ]
 
 // Market Card Component (for inside event cards)
-function MarketCard({ market, eventSlug }: { market: Market; eventSlug: string }) {
+function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string }) {
   const formatPrice = (price: number): string => {
     return price.toFixed(3)
   }
@@ -71,7 +71,7 @@ function MarketCard({ market, eventSlug }: { market: Market; eventSlug: string }
   
   const getPriceChangeColor = (change: number | null): string => {
     if (change === null) return ''
-    return change >= 0 ? 'text-green-500' : 'text-red-500'
+    return change >= 0 ? 'text-price-positive' : 'text-price-negative'
   }
 
   const formatVolume = (volume: number | null): string => {
@@ -113,26 +113,53 @@ function MarketCard({ market, eventSlug }: { market: Market; eventSlug: string }
     <Link href={`/events/${eventSlug}?market=${market.conditionId}`} target="_blank" rel="noopener noreferrer">
       <div className="flex cursor-pointer items-center justify-between rounded-md p-3 hover:bg-muted/30 transition-colors">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          {/* Market Question */}
+          {/* Market Icon */}
+          <div className="flex-shrink-0">
+            {(market.eventIcon || market.icon) ? (
+              <img
+                src={market.eventIcon || market.icon}
+                alt={`${market.question} icon`}
+                className="w-6 h-6 rounded-full"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-muted flex-shrink-0" />
+            )}
+          </div>
+          
+          {/* Market Question and Event Title */}
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-medium leading-tight">{market.groupItemTitle || market.question}</h4>
+            {market.eventTitle && (
+              <div className="text-xs text-muted-foreground">
+                {market.eventTitle}
+              </div>
+            )}
           </div>
         </div>
         
         {/* Prices and Metrics */}
-        <div className="flex items-center gap-4 text-sm ml-4 flex-shrink-0">
-          <div className="text-center">
+        <div className="flex items-center gap-5 text-sm ml-4 flex-shrink-0">
+          <div className="w-16 text-left">
             <div className="text-xs text-muted-foreground mb-1">Yes</div>
             <div className="font-medium">{formatPrice(yesPrice)}</div>
           </div>
-          <div className="text-center">
+          <div className="w-16 text-center">
+            <div className="text-xs text-muted-foreground mb-1">1h</div>
+            <div className={`font-medium ${getPriceChangeColor(market.oneHourPriceChange || null)}`}>
+              {formatPriceChange(market.oneHourPriceChange || null)}
+            </div>
+          </div>
+          <div className="w-16 text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
             <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
               {formatPriceChange(market.oneDayPriceChange || null)}
             </div>
           </div>
-          <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">Volume</div>
+          <div className="w-20 text-right">
+            <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
             <div className="font-medium">{formatVolume(market.volume24hr || null)}</div>
           </div>
         </div>
@@ -284,6 +311,7 @@ function EventCard({ event }: { event: Event }) {
 }
 
 export default function MarketsPage() {
+  const [viewMode, setViewMode] = useState<'markets' | 'events'>('markets')
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [selectedTag, setSelectedTag] = useState<string>('all')
   const [minPrice, setMinPrice] = useState<string>('')
@@ -373,6 +401,26 @@ export default function MarketsPage() {
     staleTime: 30 * 1000,
     gcTime: 60 * 1000,
   })
+
+  // Process markets from events for Markets view mode
+  const processMarketsFromEvents = (events: Event[]) => {
+    const markets: Array<Market & { eventTitle: string; eventSlug: string; eventIcon?: string }> = []
+    
+    events.forEach(event => {
+      event.markets
+        .filter(market => market.active && !market.archived && !market.closed)
+        .forEach(market => {
+          markets.push({
+            ...market,
+            eventTitle: event.title,
+            eventSlug: event.slug,
+            eventIcon: event.icon
+          })
+        })
+    })
+    
+    return markets
+  }
 
   // Client-side filtering and sorting for events
   const filteredAndSortedEvents = allEventsData?.events ? 
@@ -477,9 +525,11 @@ export default function MarketsPage() {
           case 'question':
             comparison = a.title.localeCompare(b.title)
             break
-          case 'endDate':
-            comparison = new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
-            break
+                      case 'endDate':
+              const aEndDate = a.endDate || '2099-12-31'
+              const bEndDate = b.endDate || '2099-12-31'
+              comparison = new Date(aEndDate).getTime() - new Date(bEndDate).getTime()
+              break
           default:
             return 0
         }
@@ -487,11 +537,108 @@ export default function MarketsPage() {
       })
     : []
 
-  // Pagination
-  const totalPages = Math.ceil(filteredAndSortedEvents.length / itemsPerPage)
+  // Process and filter markets for Markets view mode
+  const filteredAndSortedMarkets = viewMode === 'markets' && allEventsData?.events ? 
+    (() => {
+      // First filter events (same as events mode)
+      const filteredEvents = allEventsData.events.filter(event => {
+        // Only include events with active markets
+        const activeMarkets = event.markets.filter(market => 
+          market.active && !market.archived && !market.closed
+        )
+        if (activeMarkets.length === 0) return false
+
+        // Tag filter
+        if (selectedTag !== 'all') {
+          const eventTagLabels = event.tags.map(tag => tag.label)
+          if (!eventTagLabels.some(label => 
+            label.toLowerCase() === selectedTag.toLowerCase()
+          )) {
+            return false
+          }
+        }
+
+        return true
+      })
+
+      // Extract markets from filtered events
+      const allMarkets = processMarketsFromEvents(filteredEvents)
+
+      // Filter markets
+      return allMarkets
+        .filter(market => {
+          // Search filter (market question + event title)
+          if (searchTerm) {
+            const searchLower = searchTerm.toLowerCase()
+            if (!market.question.toLowerCase().includes(searchLower) && 
+                !market.eventTitle.toLowerCase().includes(searchLower)) {
+              return false
+            }
+          }
+
+          // Price filter
+          const [minPriceNum, maxPriceNum] = getPriceRange()
+          const yesPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
+          if (yesPrice < minPriceNum || yesPrice > maxPriceNum) {
+            return false
+          }
+
+          // Best ask filter
+          const [minAskNum, maxAskNum] = getBestAskRange()
+          const bestAsk = market.bestAsk ? parseFloat(market.bestAsk) : 0
+          if (bestAsk < minAskNum || bestAsk > maxAskNum) {
+            return false
+          }
+
+          return true
+        })
+        .sort((a, b) => {
+          let comparison = 0
+
+          switch (sortBy) {
+            case 'volume24hr':
+              comparison = (a.volume24hr || 0) - (b.volume24hr || 0)
+              break
+            case 'volume1wk':
+              comparison = (a.volume1wk || 0) - (b.volume1wk || 0)
+              break
+            case 'liquidity':
+              const aLiquidity = a.liquidityNum || a.liquidity || 0
+              const bLiquidity = b.liquidityNum || b.liquidity || 0
+              comparison = aLiquidity - bLiquidity
+              break
+            case 'question':
+              comparison = a.question.localeCompare(b.question)
+              break
+            case 'endDate':
+              // For markets, we can't sort by endDate since it's not available on market level
+              comparison = 0
+              break
+            case 'yesPrice':
+              const aPrice = a.outcomePrices?.[0] ? parseFloat(a.outcomePrices[0]) : 0
+              const bPrice = b.outcomePrices?.[0] ? parseFloat(b.outcomePrices[0]) : 0
+              comparison = aPrice - bPrice
+              break
+            case 'priceChange24h':
+              comparison = (a.oneDayPriceChange || 0) - (b.oneDayPriceChange || 0)
+              break
+            case 'priceChange1h':
+              comparison = (a.oneHourPriceChange || 0) - (b.oneHourPriceChange || 0)
+              break
+            default:
+              return 0
+          }
+          return sortDirection === 'desc' ? -comparison : comparison
+        })
+    })()
+    : []
+
+  // Determine current data and pagination
+  const currentData = viewMode === 'markets' ? filteredAndSortedMarkets : filteredAndSortedEvents
+  const totalPages = Math.ceil(currentData.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedEvents = filteredAndSortedEvents.slice(startIndex, endIndex)
+  const paginatedData = currentData.slice(startIndex, endIndex)
 
   const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== 'volume24hr' || sortDirection !== 'desc'
 
@@ -519,7 +666,33 @@ export default function MarketsPage() {
       {/* Page Header */}
       <div className="border-b bg-background">
         <div className="container mx-auto px-4 py-4 max-w-[1200px]">
-          <h1 className="text-2xl font-bold">Markets</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">{viewMode === 'markets' ? 'Markets' : 'Events'}</h1>
+            
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 border rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('markets')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  viewMode === 'markets'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Markets
+              </button>
+              <button
+                onClick={() => setViewMode('events')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  viewMode === 'events'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Events
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -657,6 +830,13 @@ export default function MarketsPage() {
                         <SelectItem value="liquidity">Liquidity</SelectItem>
                         <SelectItem value="question">Title (A-Z)</SelectItem>
                         <SelectItem value="endDate">End Date</SelectItem>
+                        {viewMode === 'markets' && (
+                          <>
+                            <SelectItem value="yesPrice">Yes Price</SelectItem>
+                            <SelectItem value="priceChange24h">24h Price Change</SelectItem>
+                            <SelectItem value="priceChange1h">1h Price Change</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     <Button
@@ -777,9 +957,13 @@ export default function MarketsPage() {
               <p className="text-muted-foreground">No events found</p>
             </div>
           ) : (
-            paginatedEvents.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))
+            viewMode === 'events' 
+              ? (paginatedData as Event[]).map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))
+                              : (paginatedData as (Market & { eventTitle: string; eventSlug: string; eventIcon?: string })[]).map((market) => (
+                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug} />
+                ))
           )}
         </div>
 
