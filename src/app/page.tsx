@@ -274,13 +274,28 @@ function MarketCard({ market }: { market: MarketDisplay }) {
           </div>
         </div>
         
-        {/* Prices and Change - Fixed width columns */}
-        <div className="flex items-center gap-4 text-sm ml-4 flex-shrink-0">
+        {/* Prices and Change - Responsive Layout */}
+        {/* Desktop Layout (md and up) */}
+        <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
           <div className="w-16 text-left">
             <div className="text-xs text-muted-foreground mb-1">Yes</div>
             <div className="font-medium">{formatPrice(market.yesPrice)}</div>
           </div>
           <div className="w-20 text-center">
+            <div className="text-xs text-muted-foreground mb-1">24h</div>
+            <div className={`font-medium ${getPriceChangeColor(market.priceChange)}`}>
+              {formatPriceChange(market.priceChange)}
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Layout (below md) */}
+        <div className="flex md:hidden items-center gap-3 text-sm ml-4 flex-shrink-0">
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Yes</div>
+            <div className="font-medium">{formatPrice(market.yesPrice)}</div>
+          </div>
+          <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
             <div className={`font-medium ${getPriceChangeColor(market.priceChange)}`}>
               {formatPriceChange(market.priceChange)}

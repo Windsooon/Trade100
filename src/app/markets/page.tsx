@@ -140,27 +140,42 @@ function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: str
           </div>
         </div>
         
-        {/* Prices and Metrics */}
-        <div className="flex items-center gap-5 text-sm ml-4 flex-shrink-0">
-          <div className="w-16 text-left">
+        {/* Prices and Metrics - Responsive Layout */}
+        {/* Desktop Layout (md and up) */}
+        <div className="hidden md:flex items-center gap-6 text-sm ml-4 flex-shrink-0">
+          <div className="w-20 text-left">
             <div className="text-xs text-muted-foreground mb-1">Yes</div>
             <div className="font-medium">{formatPrice(yesPrice)}</div>
           </div>
-          <div className="w-16 text-center">
+          <div className="w-24 text-center">
             <div className="text-xs text-muted-foreground mb-1">1h</div>
             <div className={`font-medium ${getPriceChangeColor(market.oneHourPriceChange || null)}`}>
               {formatPriceChange(market.oneHourPriceChange || null)}
             </div>
           </div>
-          <div className="w-16 text-center">
+          <div className="w-24 text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
             <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
               {formatPriceChange(market.oneDayPriceChange || null)}
             </div>
           </div>
-          <div className="w-20 text-right">
+          <div className="w-24 text-right">
             <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
             <div className="font-medium">{formatVolume(market.volume24hr || null)}</div>
+          </div>
+        </div>
+
+        {/* Mobile Layout (below md) */}
+        <div className="flex md:hidden items-center gap-3 text-sm ml-4 flex-shrink-0">
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Yes</div>
+            <div className="font-medium">{formatPrice(yesPrice)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">24h</div>
+            <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
+              {formatPriceChange(market.oneDayPriceChange || null)}
+            </div>
           </div>
         </div>
       </div>
@@ -249,32 +264,41 @@ function EventCard({ event }: { event: Event }) {
               
               {/* Event Info */}
               <div className="flex-1 min-w-0">
-                {/* Event Title and Collapsible Trigger */}
-                <div className="flex items-start justify-between mb-1">
-                  <div className="flex items-start gap-2 flex-1 min-w-0">
-                    <h2 className="text-base font-bold leading-tight text-foreground flex-1">{event.title}</h2>
-                    {/* Collapsible Trigger right next to title */}
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="sm" className="p-1 h-6 w-6">
-                        <ChevronsUpDown className="h-4 w-4" />
-                        <span className="sr-only">Toggle markets</span>
-                      </Button>
-                    </CollapsibleTrigger>
-                  </div>
-                  
-                  {/* Metrics on the right */}
-                  <div className="flex items-center gap-4 text-sm ml-4 flex-shrink-0">
-                    <div className="text-center">
-                      <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
-                      <div className="font-medium">{formatVolume(totalVolume)}</div>
+                  {/* Event Title and Collapsible Trigger */}
+                  <div className="flex items-start justify-between mb-1">
+                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                      <h2 className="text-base font-bold leading-tight text-foreground flex-1">{event.title}</h2>
+                      {/* Collapsible Trigger right next to title */}
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="p-1 h-6 w-6">
+                          <ChevronsUpDown className="h-4 w-4" />
+                          <span className="sr-only">Toggle markets</span>
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                    
+                    {/* Metrics on the right - Responsive */}
+                    {/* Desktop Layout (md and up) */}
+                    <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
+                        <div className="font-medium">{formatVolume(totalVolume)}</div>
+                      </div>
+
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground mb-1">Ends</div>
+                        <div className="font-medium">{formatDate(event.endDate)}</div>
+                      </div>
                     </div>
 
-                    <div className="text-center">
-                      <div className="text-xs text-muted-foreground mb-1">Ends</div>
-                      <div className="font-medium">{formatDate(event.endDate)}</div>
+                    {/* Mobile Layout (below md) - Only show volume */}
+                    <div className="flex md:hidden items-center text-sm ml-2 flex-shrink-0">
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground mb-1">Volume</div>
+                        <div className="font-medium">{formatVolume(totalVolume)}</div>
+                      </div>
                     </div>
                   </div>
-                </div>
                 
                 {/* Tags */}
                 <div className="flex flex-wrap gap-1">
@@ -782,7 +806,7 @@ export default function MarketsPage() {
                   {searchTerm && <Badge variant="secondary">Search: "{searchTerm}"</Badge>}
                   {(minPrice || maxPrice) && <Badge variant="secondary">Price: {minPrice || '0'}-{maxPrice || '1'}</Badge>}
                   {(minBestAsk || maxBestAsk) && <Badge variant="secondary">Ask: {minBestAsk || '0'}-{maxBestAsk || '1'}</Badge>}
-                  {(sortBy !== 'volume24hr' || sortDirection !== 'desc') && <Badge variant="secondary">Sort: {sortBy} ({sortDirection})</Badge>}
+                  {(sortBy !== getDefaultSort(viewMode) || sortDirection !== 'desc') && <Badge variant="secondary">Sort: {sortBy} ({sortDirection})</Badge>}
                   <Button variant="ghost" size="sm" onClick={clearAllFilters}>
                     <X className="h-4 w-4" />
                   </Button>
