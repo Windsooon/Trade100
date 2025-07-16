@@ -318,11 +318,27 @@ export default function MarketsPage() {
   const [maxPrice, setMaxPrice] = useState<string>('')
   const [minBestAsk, setMinBestAsk] = useState<string>('')
   const [maxBestAsk, setMaxBestAsk] = useState<string>('')
-  const [sortBy, setSortBy] = useState<string>('volume24hr')
+  const [sortBy, setSortBy] = useState<string>('priceChange24h') // Markets mode default
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const itemsPerPage = 20
+
+  // Get default sort option for each view mode
+  const getDefaultSort = (mode: 'markets' | 'events'): string => {
+    return mode === 'markets' ? 'priceChange24h' : 'volume24hr'
+  }
+
+  // Update sort when view mode changes (only if currently using a default)
+  useEffect(() => {
+    const currentDefault = getDefaultSort(viewMode === 'markets' ? 'events' : 'markets')
+    const newDefault = getDefaultSort(viewMode)
+    
+    // Only change sort if it's currently set to the other mode's default
+    if (sortBy === currentDefault) {
+      setSortBy(newDefault)
+    }
+  }, [viewMode, sortBy])
 
   // Helper functions for price range
   const handlePriceChange = (type: 'min' | 'max', value: string) => {
@@ -640,7 +656,7 @@ export default function MarketsPage() {
   const endIndex = startIndex + itemsPerPage
   const paginatedData = currentData.slice(startIndex, endIndex)
 
-  const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== 'volume24hr' || sortDirection !== 'desc'
+  const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode) || sortDirection !== 'desc'
 
   const clearAllFilters = () => {
     setSearchTerm('')
@@ -649,7 +665,7 @@ export default function MarketsPage() {
     setMaxPrice('')
     setMinBestAsk('')
     setMaxBestAsk('')
-    setSortBy('volume24hr')
+    setSortBy(getDefaultSort(viewMode))
     setSortDirection('desc')
     setCurrentPage(1)
   }
