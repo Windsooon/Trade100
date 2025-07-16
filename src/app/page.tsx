@@ -656,12 +656,29 @@ export default function HomePage() {
         {/* Market List with Tabs */}
         <div className="mt-8 max-w-[1200px] mx-auto">
           <Tabs defaultValue="volume" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-transparent">
+            <TabsList className="grid w-full grid-cols-5 bg-transparent">
+              <TabsTrigger value="recommend">Recommend (Soon)</TabsTrigger>
               <TabsTrigger value="newest">Newest</TabsTrigger>
               <TabsTrigger value="volume">24h Volume</TabsTrigger>
               <TabsTrigger value="liquidity">Liquidity</TabsTrigger>
               <TabsTrigger value="endingSoon">Ending Soon</TabsTrigger>
             </TabsList>
+            
+            <TabsContent value="recommend" className="mt-6">
+              <div className="space-y-3">
+                <div className="text-center py-12">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <h3 className="text-lg font-medium text-foreground mb-2">Personalized Recommendations</h3>
+                  <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                    We're working on smart market recommendations based on your trading history and interests.
+                  </p>
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground font-medium">Coming Soon</span>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
             
             <TabsContent value="newest" className="mt-6">
               <div className="space-y-3">

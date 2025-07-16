@@ -16,9 +16,11 @@ import {
   Activity, 
   MoreHorizontal, 
   Settings, 
-  Github 
+  Github,
+  Search
 } from "lucide-react"
 import { SettingsSheet } from "@/components/ui/settings-sheet"
+import { SearchModal } from "@/components/ui/search-modal"
 
 // Discord icon component
 const DiscordIcon = ({ className }: { className?: string }) => (
@@ -39,19 +41,21 @@ const navigationItems = [
     icon: TrendingUp,
   },
   {
+    name: "Search",
+    href: "#",
+    icon: Search,
+    isSearch: true,
+  },
+  {
     name: "Portfolio", 
     href: "/portfolio",
     icon: Wallet,
-  },
-  {
-    name: "Activity",
-    href: "/activity", 
-    icon: Activity,
   },
 ]
 
 export function BottomNavigation() {
   const pathname = usePathname()
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false)
 
   const isActive = (href: string) => {
     if (href === "/") {
@@ -75,6 +79,19 @@ export function BottomNavigation() {
         {navigationItems.map((item) => {
           const Icon = item.icon
           const active = isActive(item.href)
+          
+          if (item.isSearch) {
+            return (
+              <button
+                key={item.name}
+                onClick={() => setIsSearchOpen(true)}
+                className="flex flex-col items-center justify-center flex-1 h-full space-y-1 transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-xs font-medium">{item.name}</span>
+              </button>
+            )
+          }
           
           return (
             <Link
@@ -136,6 +153,9 @@ export function BottomNavigation() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      
+      {/* Search Modal */}
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </div>
   )
 } 

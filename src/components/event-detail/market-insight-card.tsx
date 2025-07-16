@@ -92,3 +92,4 @@ export function MarketInsightCard({ selectedMarket, selectedToken, event }: Mark
 }
 
 
+ 

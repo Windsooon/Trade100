@@ -180,26 +180,26 @@ export function OperationsCard({ selectedMarket, selectedToken, onTokenChange }:
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
                           <Label htmlFor="limit-price" className="text-xs">Price</Label>
-                          <Input
-                            id="limit-price"
-                            type="number"
-                            step="0.0001"
-                            placeholder="0.5000"
-                            value={price}
-                            onChange={(e) => setPrice(e.target.value)}
+                        <Input
+                          id="limit-price"
+                          type="number"
+                          step="0.0001"
+                          placeholder="0.5000"
+                          value={price}
+                          onChange={(e) => setPrice(e.target.value)}
                             className="text-xs h-8"
-                          />
-                        </div>
+                        />
+                      </div>
                         <div className="space-y-1">
                           <Label htmlFor="limit-shares" className="text-xs">Shares</Label>
-                          <Input
-                            id="limit-shares"
-                            type="number"
+                        <Input
+                          id="limit-shares"
+                          type="number"
                             placeholder="Shares"
-                            value={shares}
-                            onChange={(e) => setShares(e.target.value)}
+                          value={shares}
+                          onChange={(e) => setShares(e.target.value)}
                             className="text-xs h-8"
-                          />
+                        />
                         </div>
                       </div>
                     </TabsContent>

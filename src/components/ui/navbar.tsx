@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Github } from "lucide-react"
 import { SettingsSheet } from "@/components/ui/settings-sheet"
+import { SearchDropdown } from "@/components/ui/search-dropdown"
 
 // Discord icon component since lucide-react doesn't have one
 const DiscordIcon = ({ className }: { className?: string }) => (
@@ -40,9 +41,11 @@ export function Navbar() {
               <Link href="/portfolio" className="navbar-link">
                 Portfolio
               </Link>
-              <Link href="/activity" className="navbar-link">
-                Activity
-              </Link>
+              
+              {/* Search positioned right after Portfolio */}
+              <div className="ml-8">
+                <SearchDropdown />
+              </div>
             </div>
           </div>
 
