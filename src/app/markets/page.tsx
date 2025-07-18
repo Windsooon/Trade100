@@ -264,32 +264,32 @@ function EventCard({ event }: { event: Event }) {
               
               {/* Event Info */}
               <div className="flex-1 min-w-0">
-                  {/* Event Title and Collapsible Trigger */}
-                  <div className="flex items-start justify-between mb-1">
-                    <div className="flex items-start gap-2 flex-1 min-w-0">
-                      <h2 className="text-base font-bold leading-tight text-foreground flex-1">{event.title}</h2>
-                      {/* Collapsible Trigger right next to title */}
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="p-1 h-6 w-6">
-                          <ChevronsUpDown className="h-4 w-4" />
-                          <span className="sr-only">Toggle markets</span>
-                        </Button>
-                      </CollapsibleTrigger>
-                    </div>
-                    
+                {/* Event Title and Collapsible Trigger */}
+                <div className="flex items-start justify-between mb-1">
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    <h2 className="text-base font-bold leading-tight text-foreground flex-1">{event.title}</h2>
+                    {/* Collapsible Trigger right next to title */}
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="p-1 h-6 w-6">
+                        <ChevronsUpDown className="h-4 w-4" />
+                        <span className="sr-only">Toggle markets</span>
+                      </Button>
+                    </CollapsibleTrigger>
+                  </div>
+                  
                     {/* Metrics on the right - Responsive */}
                     {/* Desktop Layout (md and up) */}
                     <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
-                      <div className="text-center">
-                        <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
-                        <div className="font-medium">{formatVolume(totalVolume)}</div>
-                      </div>
-
-                      <div className="text-center">
-                        <div className="text-xs text-muted-foreground mb-1">Ends</div>
-                        <div className="font-medium">{formatDate(event.endDate)}</div>
-                      </div>
+                    <div className="text-center">
+                      <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
+                      <div className="font-medium">{formatVolume(totalVolume)}</div>
                     </div>
+
+                    <div className="text-center">
+                      <div className="text-xs text-muted-foreground mb-1">Ends</div>
+                      <div className="font-medium">{formatDate(event.endDate)}</div>
+                    </div>
+                  </div>
 
                     {/* Mobile Layout (below md) - Only show volume */}
                     <div className="flex md:hidden items-center text-sm ml-2 flex-shrink-0">
@@ -298,7 +298,7 @@ function EventCard({ event }: { event: Event }) {
                         <div className="font-medium">{formatVolume(totalVolume)}</div>
                       </div>
                     </div>
-                  </div>
+                </div>
                 
                 {/* Tags */}
                 <div className="flex flex-wrap gap-1">
@@ -565,11 +565,11 @@ export default function MarketsPage() {
           case 'question':
             comparison = a.title.localeCompare(b.title)
             break
-                      case 'endDate':
+          case 'endDate':
               const aEndDate = a.endDate || '2099-12-31'
               const bEndDate = b.endDate || '2099-12-31'
               comparison = new Date(aEndDate).getTime() - new Date(bEndDate).getTime()
-              break
+            break
           default:
             return 0
         }
@@ -999,11 +999,11 @@ export default function MarketsPage() {
           ) : (
             viewMode === 'events' 
               ? (paginatedData as Event[]).map((event) => (
-                  <EventCard key={event.id} event={event} />
+              <EventCard key={event.id} event={event} />
                 ))
                               : (paginatedData as (Market & { eventTitle: string; eventSlug: string; eventIcon?: string })[]).map((market) => (
                   <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug} />
-                ))
+            ))
           )}
         </div>
 

@@ -32,7 +32,7 @@ export default function EventDetailClient({
       
       const activeMarkets = event.markets.filter(market => 
         market.active && !market.archived && !market.closed
-      )
+        )
       if (activeMarkets.length > 0) {
         setSelectedMarket(activeMarkets[0])
       }
@@ -57,7 +57,7 @@ export default function EventDetailClient({
       <div className="space-y-6">
         {/* Event Info Banner */}
         <EventInfoBanner event={event} />
-        
+
         {/* Mobile Layout */}
         <div className="lg:hidden space-y-6">
           <MarketInsightCard 
@@ -65,14 +65,14 @@ export default function EventDetailClient({
             selectedToken={selectedToken}
             event={event}
           />
-          <MarketListCard 
-            markets={event.markets}
-            selectedMarket={selectedMarket}
+              <MarketListCard
+                markets={event.markets}
+                selectedMarket={selectedMarket}
             onMarketSelect={handleMarketSelect}
-            selectedToken={selectedToken}
-            onTokenChange={handleTokenChange}
-            event={event}
-          />
+                selectedToken={selectedToken}
+                onTokenChange={handleTokenChange}
+                event={event}
+              />
           <OperationsCard 
             selectedMarket={selectedMarket}
             selectedToken={selectedToken}
@@ -82,7 +82,7 @@ export default function EventDetailClient({
             selectedMarket={selectedMarket}
             event={event}
           />
-        </div>
+          </div>
 
         {/* Desktop Layout - 3 Column Grid */}
         <div className="hidden lg:grid lg:grid-cols-12 gap-6">
@@ -90,7 +90,7 @@ export default function EventDetailClient({
           <div className="lg:col-span-3">
             <MarketListCard 
               markets={event.markets}
-              selectedMarket={selectedMarket}
+              selectedMarket={selectedMarket} 
               onMarketSelect={handleMarketSelect}
               selectedToken={selectedToken}
               onTokenChange={handleTokenChange}
@@ -109,10 +109,10 @@ export default function EventDetailClient({
                 />
               </div>
               <div className="h-80">
-                <OperationsCard 
-                  selectedMarket={selectedMarket}
-                  selectedToken={selectedToken}
-                  onTokenChange={handleTokenChange}
+            <OperationsCard 
+              selectedMarket={selectedMarket}
+              selectedToken={selectedToken}
+              onTokenChange={handleTokenChange}
                 />
               </div>
             </div>

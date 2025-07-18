@@ -288,7 +288,7 @@ function MarketCard({ market }: { market: MarketDisplay }) {
             </div>
           </div>
         </div>
-
+        
         {/* Mobile Layout (below md) */}
         <div className="flex md:hidden items-center gap-3 text-sm ml-4 flex-shrink-0">
           <div className="text-center">
@@ -732,7 +732,7 @@ export default function HomePage() {
                 )}
               </>
             )}
-
+            
             {selectedTag === 'volume' && (
               <>
                 {isLoading.volume ? (
@@ -751,7 +751,7 @@ export default function HomePage() {
                 )}
               </>
             )}
-
+            
             {selectedTag === 'liquidity' && (
               <>
                 {isLoading.liquidity ? (
@@ -770,7 +770,7 @@ export default function HomePage() {
                 )}
               </>
             )}
-
+            
             {selectedTag === 'endingSoon' && (
               <>
                 {isLoading.endingSoon ? (
@@ -788,8 +788,8 @@ export default function HomePage() {
                   ))
                 )}
               </>
-            )}
-          </div>
+                )}
+              </div>
         </div>
         
         {/* View All Markets Button */}
