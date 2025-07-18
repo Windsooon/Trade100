@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     // Get parameters
     const market = searchParams.get('market')
     const user = searchParams.get('user')
+    const takerOnly = searchParams.get('takerOnly')
     
     if (!market) {
       return NextResponse.json(
@@ -21,8 +22,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Create cache key
-    const cacheKey = `trades_${market}_${user || 'all'}`
+    // Create cache key based on request type
+    const isUserTrades = user && user.trim() !== ''
+    const cacheKey = isUserTrades 
+      ? `my_trades_${market}_${user}` 
+      : `market_trades_${market}`
     
     // Check cache first
     const cached = globalTradesCache.get(cacheKey)
@@ -38,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Create new request promise
-    const requestPromise = fetchTradesData(market, user)
+    const requestPromise = fetchTradesData(market, user, takerOnly)
     globalTradesPromises.set(cacheKey, requestPromise)
 
     try {
@@ -65,7 +69,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function fetchTradesData(market: string, user?: string) {
+async function fetchTradesData(market: string, user?: string, takerOnly?: string) {
   try {
     // Build query parameters for Polymarket Data API
     const params = new URLSearchParams()
@@ -73,7 +77,13 @@ async function fetchTradesData(market: string, user?: string) {
     params.append('offset', '0')
     params.append('market', market)
     
-    if (user) {
+    // Add takerOnly parameter if provided
+    if (takerOnly !== null && takerOnly !== undefined) {
+      params.append('takerOnly', takerOnly)
+    }
+    
+    // Add user parameter if provided
+    if (user && user.trim() !== '') {
       params.append('user', user)
     }
 
