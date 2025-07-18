@@ -49,6 +49,10 @@ const globalRequestCache = new Map<string, { data: ProcessedTrade[]; timestamp: 
 const globalActiveRequests = new Map<string, Promise<ProcessedTrade[]>>()
 const CLIENT_CACHE_DURATION = 10 * 1000 // 10 seconds
 
+// Global synchronized refresh timer
+let globalRefreshInterval: NodeJS.Timeout | null = null
+const globalRefreshCallbacks = new Set<() => void>()
+
 const formatTime = (timestamp: number): string => {
   const date = new Date(timestamp * 1000)
   return date.toLocaleTimeString('en-US', { 
@@ -109,9 +113,9 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     setWalletAddress(savedWalletAddress || null)
   }, [])
 
-  // Fetch market trades with caching and deduplication
+  // Fetch market trades with caching and deduplication (default takerOnly behavior)
   const fetchMarketTrades = useCallback(async (conditionId: string) => {
-    const cacheKey = `market_${conditionId}`
+    const cacheKey = `market_trades_${conditionId}`
     
     // Check cache first
     const cached = globalRequestCache.get(cacheKey)
@@ -147,6 +151,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
 
     const requestPromise = (async (): Promise<ProcessedTrade[]> => {
       try {
+        // Market trades: default API behavior (no takerOnly parameter)
         const response = await fetch(`/api/trades?market=${conditionId}`)
         
         if (!response.ok) {
@@ -188,9 +193,9 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     }
   }, [])
 
-  // Fetch user trades with caching and deduplication
+  // Fetch user trades with caching and deduplication (takerOnly=false)
   const fetchUserTrades = useCallback(async (conditionId: string, userAddress: string) => {
-    const cacheKey = `user_${conditionId}_${userAddress}`
+    const cacheKey = `my_trades_${conditionId}_${userAddress}`
     
     // Check cache first
     const cached = globalRequestCache.get(cacheKey)
@@ -214,7 +219,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
       } catch (error) {
         if (isMountedRef.current) {
           console.error('Error from cached user trades request:', error)
-          setUserError('Failed to load your trades')
+          setUserError('Failed to load trades. Please check your wallet address.')
           setUserLoading(false)
         }
       }
@@ -226,7 +231,8 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
 
     const requestPromise = (async (): Promise<ProcessedTrade[]> => {
       try {
-        const response = await fetch(`/api/trades?market=${conditionId}&user=${userAddress}`)
+        // My trades: include both maker and taker orders (takerOnly=false)
+        const response = await fetch(`/api/trades?market=${conditionId}&user=${userAddress}&takerOnly=false`)
         
         if (!response.ok) {
           throw new Error('Failed to fetch user trades')
@@ -257,7 +263,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     } catch (error) {
       if (isMountedRef.current) {
         console.error('Error fetching user trades:', error)
-        setUserError('Failed to load your trades')
+        setUserError('Failed to load trades. Please check your wallet address.')
         setUserTrades([])
       }
     } finally {
@@ -266,6 +272,25 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
       }
     }
   }, [])
+
+  // Synchronized refresh function
+  const synchronizedRefresh = useCallback(() => {
+    if (!selectedMarket?.conditionId) return
+    
+    const conditionId = selectedMarket.conditionId
+    
+    // Clear cache for both tabs to ensure fresh data
+    globalRequestCache.delete(`market_trades_${conditionId}`)
+    if (walletAddress) {
+      globalRequestCache.delete(`my_trades_${conditionId}_${walletAddress}`)
+    }
+    
+    // Fetch fresh data for both tabs
+    fetchMarketTrades(conditionId)
+    if (walletAddress) {
+      fetchUserTrades(conditionId, walletAddress)
+    }
+  }, [selectedMarket?.conditionId, walletAddress, fetchMarketTrades, fetchUserTrades])
 
   // Effect for market changes - only fetch when market actually changes
   useEffect(() => {
@@ -300,29 +325,32 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     }
   }, [selectedMarket?.conditionId, walletAddress, fetchUserTrades])
 
-  // Auto-refresh interval - much simpler, no dependencies issues
+  // Global synchronized refresh timer - exactly every 10 seconds
   useEffect(() => {
     if (!selectedMarket?.conditionId) return
 
-    const interval = setInterval(() => {
-      const conditionId = selectedMarket.conditionId
-      if (conditionId) {
-        // Clear cache for auto-refresh
-        globalRequestCache.delete(`market_${conditionId}`)
-        if (walletAddress) {
-          globalRequestCache.delete(`user_${conditionId}_${walletAddress}`)
-        }
-        
-        // Fetch fresh data
-        fetchMarketTrades(conditionId)
-        if (walletAddress) {
-          fetchUserTrades(conditionId, walletAddress)
-        }
-      }
-    }, 30000) // Refresh every 30 seconds instead of 10
+    // Add this component's refresh function to the global set
+    globalRefreshCallbacks.add(synchronizedRefresh)
 
-    return () => clearInterval(interval)
-  }, [selectedMarket?.conditionId]) // Only depend on market ID, not the functions
+    // Start global timer if it doesn't exist
+    if (!globalRefreshInterval) {
+      globalRefreshInterval = setInterval(() => {
+        // Execute all registered refresh callbacks simultaneously
+        globalRefreshCallbacks.forEach(callback => callback())
+      }, 10000) // 10 seconds
+    }
+
+    return () => {
+      // Remove this component's callback
+      globalRefreshCallbacks.delete(synchronizedRefresh)
+      
+      // Clean up global timer if no components are using it
+      if (globalRefreshCallbacks.size === 0 && globalRefreshInterval) {
+        clearInterval(globalRefreshInterval)
+        globalRefreshInterval = null
+      }
+    }
+  }, [synchronizedRefresh])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -338,9 +366,9 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     const conditionId = selectedMarket.conditionId
     
     // Clear cache to force fresh requests
-    globalRequestCache.delete(`market_${conditionId}`)
+    globalRequestCache.delete(`market_trades_${conditionId}`)
     if (walletAddress) {
-      globalRequestCache.delete(`user_${conditionId}_${walletAddress}`)
+      globalRequestCache.delete(`my_trades_${conditionId}_${walletAddress}`)
     }
     
     // Fetch fresh data
@@ -394,23 +422,36 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     return (
       <div className="space-y-1">
         {/* Header */}
-        <div className="grid grid-cols-3 gap-4 pb-2 border-b text-xs font-medium text-muted-foreground">
-          <div>Price (USDT)</div>
-          <div>Amount</div>
+        <div className="grid grid-cols-3 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
+          <div>Side</div>
+          <div>Price / Share</div>
           <div>Time</div>
         </div>
         
-        {/* Trades List */}
-        <div className="space-y-1 max-h-[300px] overflow-y-auto">
+        {/* Trades list */}
+        <div className="max-h-64 overflow-y-auto">
           {trades.map((trade, index) => (
-            <div key={`${trade.transactionHash}-${index}`} className="grid grid-cols-3 gap-4 py-2 text-sm hover:bg-muted/50 rounded">
-              <div className={`font-medium ${trade.displaySide === 'BUY' ? 'text-green-500' : 'text-red-500'}`}>
-                {formatNumber(trade.displayPrice)}
+            <div 
+              key={`${trade.transactionHash}-${index}`} 
+              className="grid grid-cols-3 gap-4 px-4 py-2 text-sm hover:bg-muted/50 group"
+              title={`Trader: ${trade.name}`}
+            >
+              <div>
+                <span 
+                  className={`text-xs font-medium ${
+                    trade.displaySide === "BUY" 
+                      ? "text-price-positive" 
+                      : "text-price-negative"
+                  }`}
+                >
+                  {trade.displaySide}
+                </span>
               </div>
-              <div className="text-muted-foreground">
-                {formatNumber(trade.size)}
+              <div className="font-mono text-sm">
+                <div>${formatNumber(trade.displayPrice)}</div>
+                <div className="text-xs text-muted-foreground">{formatNumber(trade.size)}</div>
               </div>
-              <div className="text-muted-foreground">
+              <div className="text-muted-foreground font-mono text-xs">
                 {formatTime(trade.timestamp)}
               </div>
             </div>
@@ -437,7 +478,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
               <span className="hidden sm:inline">Market Trades</span>
               <span className="sm:hidden text-xs">Market</span>
             </TabsTrigger>
-            <TabsTrigger value="my" className="flex items-center gap-1">
+            <TabsTrigger value="user" className="flex items-center gap-1">
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">My Trades</span>
               <span className="sm:hidden text-xs">My</span>
@@ -447,18 +488,6 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
           {/* Market Trades Tab */}
           <TabsContent value="market" className="flex-1 mt-4 sm:mt-6">
             <div className="h-full flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium">Recent Market Trades</h3>
-                {selectedMarket && (
-                  <Badge variant="outline" className="text-xs">
-                    {selectedMarket.question.length > 30 
-                      ? `${selectedMarket.question.substring(0, 30)}...` 
-                      : selectedMarket.question
-                    }
-                  </Badge>
-                )}
-              </div>
-              
               {!selectedMarket ? (
                 <div className="flex-1 flex items-center justify-center text-center">
                   <div className="space-y-3">
@@ -469,23 +498,19 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
                   </div>
                 </div>
               ) : (
-                renderTradesList(marketTrades, marketLoading, marketError, "No trades found")
+                renderTradesList(
+                  marketTrades, 
+                  marketLoading, 
+                  marketError, 
+                  "No trades available for this market"
+                )
               )}
             </div>
           </TabsContent>
 
           {/* My Trades Tab */}
-          <TabsContent value="my" className="flex-1 mt-4 sm:mt-6">
+          <TabsContent value="user" className="flex-1 mt-4 sm:mt-6">
             <div className="h-full flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium">My Trading History</h3>
-                {selectedMarket && (
-                  <Badge variant="outline" className="text-xs">
-                    Personal Trades
-                  </Badge>
-                )}
-              </div>
-              
               {!selectedMarket ? (
                 <div className="flex-1 flex items-center justify-center text-center">
                   <div className="space-y-3">
@@ -500,12 +525,17 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
                   <div className="space-y-3">
                     <User className="h-12 w-12 mx-auto opacity-50 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      Add wallet address in settings to view your trades
+                      Connect your wallet to view your trades
                     </p>
                   </div>
                 </div>
               ) : (
-                renderTradesList(userTrades, userLoading, userError, "No trades found")
+                renderTradesList(
+                  userTrades, 
+                  userLoading, 
+                  userError, 
+                  "You haven't made any trades for this market"
+                )
               )}
             </div>
           </TabsContent>
