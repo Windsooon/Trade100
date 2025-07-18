@@ -6,6 +6,12 @@ import { createChart, IChartApi, ISeriesApi, ColorType, CandlestickSeries, Histo
 import { ChartTabProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint, VolumeType } from './types'
 
 export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
+  console.log('📈 ChartTab: Component initialized', { 
+    marketId: selectedMarket?.conditionId,
+    selectedToken,
+    timestamp: Date.now() 
+  })
+  
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1h')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -35,6 +35,8 @@ interface StatusResult {
 }
 
 export function usePolymarketStatus() {
+  console.log('🔌 usePolymarketStatus: Hook initialized', { timestamp: Date.now() })
+  
   const [statusResult, setStatusResult] = useState<StatusResult>({
     status: null,
     responseTime: null,
