@@ -54,6 +54,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
   const isUnmountingRef = useRef(false)
   const retryAttemptRef = useRef(0)
   const lastTradePricesLoadedRef = useRef(false)
+  const fetchingLastTradePricesRef = useRef(false)
 
   // Retry configuration
   const MAX_RETRY_ATTEMPTS = 5
@@ -93,12 +94,13 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
   }, [])
 
   // Fetch initial last trade prices from API
-  const fetchLastTradePrices = useCallback(async () => {
-    if (!allActiveMarkets.length || isUnmountingRef.current || lastTradePricesLoadedRef.current) {
+  const fetchLastTradePrices = useCallback(async (markets: Market[] = allActiveMarkets) => {
+    if (!markets.length || isUnmountingRef.current || lastTradePricesLoadedRef.current || fetchingLastTradePricesRef.current) {
       return
     }
 
     setLastTradePricesLoading(true)
+    fetchingLastTradePricesRef.current = true
     lastTradePricesLoadedRef.current = true
 
     try {
@@ -106,7 +108,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
       const yesTokenIds: string[] = []
       const tokenToMarketMap: Record<string, { conditionId: string }> = {}
 
-      allActiveMarkets.forEach(market => {
+      markets.forEach(market => {
         if (market.clobTokenIds) {
           try {
             const ids = JSON.parse(market.clobTokenIds)
@@ -183,8 +185,9 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
       console.error('Error fetching last trade prices:', error)
     } finally {
       setLastTradePricesLoading(false)
+      fetchingLastTradePricesRef.current = false
     }
-  }, [allActiveMarkets])
+  }, [])
 
   // WebSocket connection
   const connect = useCallback(() => {
@@ -516,8 +519,8 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
   // Fetch initial last trade prices when markets change
   useEffect(() => {
-    if (allActiveMarkets.length > 0 && !lastTradePricesLoadedRef.current) {
-      fetchLastTradePrices()
+    if (allActiveMarkets.length > 0) {
+      fetchLastTradePrices(allActiveMarkets)
     }
   }, [allActiveMarkets.length])
 
@@ -526,6 +529,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
     return () => {
       isUnmountingRef.current = true
       lastTradePricesLoadedRef.current = false
+      fetchingLastTradePricesRef.current = false
       cleanup()
     }
   }, [cleanup])
