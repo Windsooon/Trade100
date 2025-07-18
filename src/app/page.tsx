@@ -7,6 +7,7 @@ import { Footer } from '@/components/ui/footer'
 import { BottomNavigation } from '@/components/ui/bottom-navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 
 import { TrendingUp, Clock, DollarSign, BarChart3, Activity, RefreshCw } from 'lucide-react'
 import { Event } from '@/lib/stores'
@@ -68,6 +69,85 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
+// Skeleton component for cards
+function CardSkeleton() {
+  return (
+    <Card className="bg-card text-card-foreground rounded-xl border shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Skeleton className="h-5 w-5 rounded" />
+          <Skeleton className="h-5 w-[140px]" />
+        </CardTitle>
+        <CardDescription>
+          <Skeleton className="h-4 w-[80px]" />
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4">
+          <Skeleton className="h-9 w-[120px]" />
+        </div>
+        <div className="h-[120px]">
+          <Skeleton className="h-full w-full" />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Skeleton component for market list
+function MarketCardSkeleton() {
+  return (
+    <div className="flex items-center justify-between rounded-md p-3">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {/* Market Icon */}
+        <div className="flex-shrink-0">
+          <Skeleton className="w-6 h-6 rounded-full" />
+        </div>
+        
+        {/* Market Question */}
+        <div className="flex-1 min-w-0">
+          <Skeleton className="h-4 w-[250px]" />
+        </div>
+      </div>
+      
+      {/* Prices and Change - Desktop Layout */}
+      <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
+        <div className="w-16 text-left space-y-1">
+          <Skeleton className="h-3 w-8" />
+          <Skeleton className="h-4 w-12" />
+        </div>
+        <div className="w-20 text-center space-y-1">
+          <Skeleton className="h-3 w-6 mx-auto" />
+          <Skeleton className="h-4 w-12 mx-auto" />
+        </div>
+      </div>
+      
+      {/* Mobile Layout */}
+      <div className="flex md:hidden items-center gap-3 text-sm ml-4 flex-shrink-0">
+        <div className="text-center space-y-1">
+          <Skeleton className="h-3 w-6 mx-auto" />
+          <Skeleton className="h-4 w-8 mx-auto" />
+        </div>
+        <div className="text-center space-y-1">
+          <Skeleton className="h-3 w-6 mx-auto" />
+          <Skeleton className="h-4 w-8 mx-auto" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Skeleton for multiple market cards
+function MarketListSkeleton({ count = 5 }: { count?: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: count }).map((_, index) => (
+        <MarketCardSkeleton key={index} />
+      ))}
+    </div>
+  )
+}
+
 function TradeCountCard() {
   // Fetch trade data from API
   const { data: tradeData, isLoading, isError } = useQuery<TradeApiResponse[]>({
@@ -86,6 +166,10 @@ function TradeCountCard() {
   const transformedData = tradeData ? transformTradeData(tradeData) : []
   const totalTrades = tradeData ? tradeData.reduce((sum, item) => sum + item.trade_count, 0) : 0
   
+  if (isLoading) {
+    return <CardSkeleton />
+  }
+  
   return (
     <Card className="bg-card text-card-foreground rounded-xl border shadow-sm">
       <CardHeader className="pb-2">
@@ -94,21 +178,17 @@ function TradeCountCard() {
           Last 24h Trade Count
         </CardTitle>
         <CardDescription className="text-sm text-muted-foreground">
-          {isLoading ? 'Loading...' : isError ? 'Error loading data' : 'All Markets'}
+          {isError ? 'Error loading data' : 'All Markets'}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="mb-4">
           <div className="text-3xl font-bold">
-            {isLoading ? '--' : isError ? 'Error' : totalTrades.toLocaleString()}
+            {isError ? 'Error' : totalTrades.toLocaleString()}
           </div>
         </div>
         <div className="h-[120px]">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : isError ? (
+          {isError ? (
             <div className="flex items-center justify-center h-full">
               <span className="text-sm text-muted-foreground">Failed to load chart</span>
             </div>
@@ -160,6 +240,10 @@ function TradingVolumeCard() {
   const transformedVolumeData = tradeData ? transformVolumeData(tradeData) : []
   const totalVolume = tradeData ? tradeData.reduce((sum, item) => sum + item.total_volume, 0) : 0
   
+  if (isLoading) {
+    return <CardSkeleton />
+  }
+  
   return (
     <Card className="bg-card text-card-foreground rounded-xl border shadow-sm">
       <CardHeader className="pb-2">
@@ -168,21 +252,17 @@ function TradingVolumeCard() {
           Last 24h Volume
         </CardTitle>
         <CardDescription className="text-sm text-muted-foreground">
-          {isLoading ? 'Loading...' : isError ? 'Error loading data' : 'All Markets'}
+          {isError ? 'Error loading data' : 'All Markets'}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="mb-4">
           <div className="text-3xl font-bold">
-            {isLoading ? '--' : isError ? 'Error' : formatVolumeDisplay(totalVolume)}
+            {isError ? 'Error' : formatVolumeDisplay(totalVolume)}
           </div>
         </div>
         <div className="h-[120px]">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : isError ? (
+          {isError ? (
             <div className="flex items-center justify-center h-full">
               <span className="text-sm text-muted-foreground">Failed to load chart</span>
             </div>
@@ -717,10 +797,7 @@ export default function HomePage() {
             {selectedTag === 'newest' && (
               <>
                 {isLoading.newest ? (
-                  <div className="text-center py-8">
-                    <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Loading markets...</p>
-                  </div>
+                  <MarketListSkeleton count={6} />
                 ) : marketData.newest.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-muted-foreground">No markets available</p>
@@ -736,10 +813,7 @@ export default function HomePage() {
             {selectedTag === 'volume' && (
               <>
                 {isLoading.volume ? (
-                  <div className="text-center py-8">
-                    <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Loading markets...</p>
-                  </div>
+                  <MarketListSkeleton count={6} />
                 ) : marketData.volume.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-muted-foreground">No markets available</p>
@@ -755,10 +829,7 @@ export default function HomePage() {
             {selectedTag === 'liquidity' && (
               <>
                 {isLoading.liquidity ? (
-                  <div className="text-center py-8">
-                    <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Loading markets...</p>
-                  </div>
+                  <MarketListSkeleton count={6} />
                 ) : marketData.liquidity.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-muted-foreground">No markets available</p>
@@ -774,10 +845,7 @@ export default function HomePage() {
             {selectedTag === 'endingSoon' && (
               <>
                 {isLoading.endingSoon ? (
-                  <div className="text-center py-8">
-                    <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Loading markets...</p>
-                  </div>
+                  <MarketListSkeleton count={6} />
                 ) : marketData.endingSoon.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-muted-foreground">No markets available</p>
