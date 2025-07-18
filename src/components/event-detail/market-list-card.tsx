@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { useState, useMemo } from 'react'
 import { usePolymarketStatus } from '@/hooks/use-polymarket-status'
 import { OrderBookDisplay } from './order-book-display'
-import { SharedOrderBookProvider, useSharedOrderBook } from './shared-order-book-provider'
+import { useSharedOrderBook } from './shared-order-book-provider'
 
 interface MarketListCardProps {
   markets: Market[]
@@ -53,13 +53,7 @@ export function MarketListCard({
     }
   }, [markets])
 
-  // Memoize allActiveMarkets to prevent unnecessary WebSocket reconnections
-  const allActiveMarketsForWebSocket = useMemo(() => {
-    return activeMarkets.map(m => ({ 
-      conditionId: m.conditionId, 
-      clobTokenIds: m.clobTokenIds 
-    }))
-  }, [activeMarkets])
+
 
   const formatPriceChange = (change: number | undefined): string => {
     if (change === undefined || change === null) return '0.00%'
@@ -92,8 +86,7 @@ export function MarketListCard({
   }
 
   return (
-    <SharedOrderBookProvider allActiveMarkets={allActiveMarketsForWebSocket}>
-      <Card className="h-full flex flex-col">
+    <Card className="h-full flex flex-col">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-sm">
@@ -164,7 +157,6 @@ export function MarketListCard({
           </div>
         </CardContent>
       </Card>
-    </SharedOrderBookProvider>
   )
 }
 
