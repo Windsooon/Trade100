@@ -422,40 +422,36 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     return (
       <div className="space-y-1">
         {/* Header */}
-        <div className="grid grid-cols-5 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
-          <div>Trader</div>
+        <div className="grid grid-cols-3 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
           <div>Side</div>
-          <div>Price</div>
-          <div>Share</div>
+          <div>Price / Share</div>
           <div>Time</div>
         </div>
         
         {/* Trades list */}
         <div className="max-h-64 overflow-y-auto">
           {trades.map((trade, index) => (
-            <div key={`${trade.transactionHash}-${index}`} className="grid grid-cols-5 gap-4 px-4 py-2 text-sm hover:bg-muted/50">
-              <div className="font-medium text-foreground truncate">
-                {trade.name}
-              </div>
+            <div 
+              key={`${trade.transactionHash}-${index}`} 
+              className="grid grid-cols-3 gap-4 px-4 py-2 text-sm hover:bg-muted/50 group"
+              title={`Trader: ${trade.name}`}
+            >
               <div>
-                <Badge 
-                  variant={trade.displaySide === "BUY" ? "default" : "destructive"}
-                  className={`text-xs ${
+                <span 
+                  className={`text-xs font-medium ${
                     trade.displaySide === "BUY" 
-                      ? "bg-green-100 text-green-800 hover:bg-green-200" 
-                      : "bg-red-100 text-red-800 hover:bg-red-200"
+                      ? "text-price-positive" 
+                      : "text-price-negative"
                   }`}
                 >
                   {trade.displaySide}
-                </Badge>
+                </span>
               </div>
-              <div className="font-mono">
-                ${formatNumber(trade.displayPrice)}
+              <div className="font-mono text-sm">
+                <div>${formatNumber(trade.displayPrice)}</div>
+                <div className="text-xs text-muted-foreground">{formatNumber(trade.size)}</div>
               </div>
-              <div className="font-mono">
-                {formatNumber(trade.size)}
-              </div>
-              <div className="text-muted-foreground font-mono">
+              <div className="text-muted-foreground font-mono text-xs">
                 {formatTime(trade.timestamp)}
               </div>
             </div>
@@ -466,53 +462,82 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
   }
 
   return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Card className="w-full h-full flex flex-col">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-lg">
           <Activity className="h-5 w-5" />
-          Trading Activity
+          <span className="hidden sm:inline">Trading Activity</span>
+          <span className="sm:hidden">Activity</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 p-0">
-        <Tabs defaultValue="market" className="h-full flex flex-col">
-          <TabsList className="grid w-full grid-cols-2 mx-6">
-            <TabsTrigger value="market" className="flex items-center gap-2">
+      <CardContent className="pt-0 flex-1">
+        <Tabs defaultValue="market" className="w-full h-full flex flex-col">
+          <TabsList className="grid w-full grid-cols-2 bg-transparent">
+            <TabsTrigger value="market" className="flex items-center gap-1">
               <Users className="h-4 w-4" />
-              Market Trades
+              <span className="hidden sm:inline">Market Trades</span>
+              <span className="sm:hidden text-xs">Market</span>
             </TabsTrigger>
-            <TabsTrigger value="user" className="flex items-center gap-2">
+            <TabsTrigger value="user" className="flex items-center gap-1">
               <User className="h-4 w-4" />
-              My Trades
+              <span className="hidden sm:inline">My Trades</span>
+              <span className="sm:hidden text-xs">My</span>
             </TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="market" className="flex-1 mt-0">
-            {renderTradesList(
-              marketTrades, 
-              marketLoading, 
-              marketError, 
-              "No trades available for this market"
-            )}
-          </TabsContent>
-          
-          <TabsContent value="user" className="flex-1 mt-0">
-            {!walletAddress ? (
-              <div className="flex-1 flex items-center justify-center text-center">
-                <div className="space-y-3">
-                  <User className="h-12 w-12 mx-auto opacity-50 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    Connect your wallet to view your trades
-                  </p>
+
+          {/* Market Trades Tab */}
+          <TabsContent value="market" className="flex-1 mt-4 sm:mt-6">
+            <div className="h-full flex flex-col">
+              {!selectedMarket ? (
+                <div className="flex-1 flex items-center justify-center text-center">
+                  <div className="space-y-3">
+                    <Users className="h-12 w-12 mx-auto opacity-50 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Select a market to view trading activity
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              renderTradesList(
-                userTrades, 
-                userLoading, 
-                userError, 
-                "You haven't made any trades for this market"
-              )
-            )}
+              ) : (
+                renderTradesList(
+                  marketTrades, 
+                  marketLoading, 
+                  marketError, 
+                  "No trades available for this market"
+                )
+              )}
+            </div>
+          </TabsContent>
+
+          {/* My Trades Tab */}
+          <TabsContent value="user" className="flex-1 mt-4 sm:mt-6">
+            <div className="h-full flex flex-col">
+              {!selectedMarket ? (
+                <div className="flex-1 flex items-center justify-center text-center">
+                  <div className="space-y-3">
+                    <User className="h-12 w-12 mx-auto opacity-50 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Select a market to view your trades
+                    </p>
+                  </div>
+                </div>
+              ) : !walletAddress ? (
+                <div className="flex-1 flex items-center justify-center text-center">
+                  <div className="space-y-3">
+                    <User className="h-12 w-12 mx-auto opacity-50 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Connect your wallet to view your trades
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                renderTradesList(
+                  userTrades, 
+                  userLoading, 
+                  userError, 
+                  "You haven't made any trades for this market"
+                )
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       </CardContent>
