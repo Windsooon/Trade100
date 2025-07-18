@@ -512,13 +512,23 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     const marketId = selectedMarket.conditionId
     const requestKey = `${marketId}-${selectedPeriod}-${fidelity}`
 
+    console.log('📈 ChartTab: Attempting to fetch market history', {
+      marketId,
+      selectedPeriod,
+      requestKey,
+      activeRequests: Array.from(activeRequestsRef.current),
+      timestamp: Date.now()
+    })
+
     // Check if this exact request is already active (StrictMode protection)
     if (activeRequestsRef.current.has(requestKey)) {
+      console.log('📈 ChartTab: Request already active, skipping', { requestKey })
       return
     }
 
     // Mark this request as active immediately
     activeRequestsRef.current.add(requestKey)
+    console.log('📈 ChartTab: Starting API call', { requestKey })
     setLoading(true)
     setError(null)
     setVolumeError(null)

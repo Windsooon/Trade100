@@ -43,10 +43,6 @@ interface SharedOrderBookProviderProps {
 }
 
 export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOrderBookProviderProps) {
-  console.log('🏗️ SharedOrderBookProvider: Component mounting/re-rendering', {
-    allActiveMarketsCount: allActiveMarkets.length,
-    timestamp: Date.now()
-  })
 
   const [orderBooks, setOrderBooks] = useState<Record<string, BookData>>({})
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
@@ -547,10 +543,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
   // Cleanup on unmount
   useEffect(() => {
-    console.log('🏗️ SharedOrderBookProvider: Component mounted')
-    
     return () => {
-      console.log('🏗️ SharedOrderBookProvider: Component unmounting')
       isUnmountingRef.current = true
       lastTradePricesLoadedRef.current = false
       fetchingLastTradePricesRef.current = false

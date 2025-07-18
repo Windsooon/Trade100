@@ -34,20 +34,52 @@ interface StatusResult {
   isChecking: boolean
 }
 
+// Global cache to prevent duplicate API calls
+let globalCache: { result: StatusResult; timestamp: number } | null = null
+let globalPromise: Promise<StatusResult> | null = null
+const CACHE_DURATION = 5000 // 5 seconds
+
 export function usePolymarketStatus() {
   console.log('🔌 usePolymarketStatus: Hook initialized', { timestamp: Date.now() })
   
-  const [statusResult, setStatusResult] = useState<StatusResult>({
-    status: null,
-    responseTime: null,
-    lastChecked: null,
-    error: null,
-    isChecking: false
+  const [statusResult, setStatusResult] = useState<StatusResult>(() => {
+    const now = Date.now()
+    if (globalCache && (now - globalCache.timestamp) < CACHE_DURATION) {
+      console.log('🔌 usePolymarketStatus: Using cached result')
+      return globalCache.result
+    }
+    return {
+      status: null,
+      responseTime: null,
+      lastChecked: null,
+      error: null,
+      isChecking: false
+    }
   })
 
   const checkStatus = async () => {
+    // Check cache first
+    const now = Date.now()
+    if (globalCache && (now - globalCache.timestamp) < CACHE_DURATION) {
+      console.log('🔌 usePolymarketStatus: Using cached result instead of API call')
+      setStatusResult(globalCache.result)
+      return
+    }
+
+    // If already fetching, wait for that result
+    if (globalPromise) {
+      console.log('🔌 usePolymarketStatus: Waiting for existing API call')
+      const result = await globalPromise
+      setStatusResult(result)
+      return
+    }
+
+    console.log('🔌 usePolymarketStatus: Making new API call')
     setStatusResult(prev => ({ ...prev, isChecking: true }))
-    const startTime = performance.now()
+    
+    // Create shared promise
+    globalPromise = (async (): Promise<StatusResult> => {
+      const startTime = performance.now()
 
     try {
       const response = await fetch('/api/polymarket-status', {
@@ -71,28 +103,42 @@ export function usePolymarketStatus() {
         throw new Error(result.error || 'Failed to fetch status')
       }
 
-      const data: PolymarketStatus = result.data
+        const data: PolymarketStatus = result.data
 
-      setStatusResult({
-        status: data,
-        responseTime,
-        lastChecked: new Date(),
-        error: null,
-        isChecking: false
-      })
+        const finalResult: StatusResult = {
+          status: data,
+          responseTime,
+          lastChecked: new Date(),
+          error: null,
+          isChecking: false
+        }
 
-    } catch (error) {
-      const endTime = performance.now()
-      const responseTime = Math.round(endTime - startTime)
+        // Cache the result
+        globalCache = { result: finalResult, timestamp: Date.now() }
+        return finalResult
 
-      setStatusResult({
-        status: null,
-        responseTime: responseTime > 10000 ? null : responseTime,
-        lastChecked: new Date(),
-        error: error instanceof Error ? error.message : 'Unknown error',
-        isChecking: false
-      })
-    }
+      } catch (error) {
+        const endTime = performance.now()
+        const responseTime = Math.round(endTime - startTime)
+
+        const finalResult: StatusResult = {
+          status: null,
+          responseTime: responseTime > 10000 ? null : responseTime,
+          lastChecked: new Date(),
+          error: error instanceof Error ? error.message : 'Unknown error',
+          isChecking: false
+        }
+
+        // Cache the error result too (for shorter time)
+        globalCache = { result: finalResult, timestamp: Date.now() }
+        return finalResult
+      } finally {
+        globalPromise = null
+      }
+    })()
+
+    const result = await globalPromise
+    setStatusResult(result)
   }
 
   // Check status on component mount and set up interval
