@@ -43,6 +43,11 @@ interface SharedOrderBookProviderProps {
 }
 
 export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOrderBookProviderProps) {
+  console.log('🏗️ SharedOrderBookProvider: Component mounting/re-rendering', {
+    allActiveMarketsCount: allActiveMarkets.length,
+    timestamp: Date.now()
+  })
+
   const [orderBooks, setOrderBooks] = useState<Record<string, BookData>>({})
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
   const [retryCount, setRetryCount] = useState(0)
@@ -95,10 +100,21 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
   // Fetch initial last trade prices from API
   const fetchLastTradePrices = useCallback(async (markets: Market[] = allActiveMarkets) => {
+    console.log('📞 fetchLastTradePrices: Called with', {
+      marketsCount: markets.length,
+      isUnmounting: isUnmountingRef.current,
+      alreadyLoaded: lastTradePricesLoadedRef.current,
+      currentlyFetching: fetchingLastTradePricesRef.current,
+      loading: lastTradePricesLoading,
+      timestamp: Date.now()
+    })
+
     if (!markets.length || isUnmountingRef.current || lastTradePricesLoadedRef.current || fetchingLastTradePricesRef.current) {
+      console.log('📞 fetchLastTradePrices: Skipping call due to conditions')
       return
     }
 
+    console.log('📞 fetchLastTradePrices: Proceeding with API call')
     setLastTradePricesLoading(true)
     fetchingLastTradePricesRef.current = true
     lastTradePricesLoadedRef.current = true
@@ -128,7 +144,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
       // Prepare API payload
       const payload = yesTokenIds.map(tokenId => ({ token_id: tokenId }))
-
+      console.log('🚀 Calling last-trade-prices API with payload:', payload)
 
       // Call our API route
       const response = await fetch('/api/last-trade-prices', {
@@ -519,6 +535,11 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
   // Fetch initial last trade prices when markets change
   useEffect(() => {
+    console.log('🔄 useEffect for fetchLastTradePrices triggered', {
+      allActiveMarketsLength: allActiveMarkets.length,
+      timestamp: Date.now()
+    })
+    
     if (allActiveMarkets.length > 0) {
       fetchLastTradePrices(allActiveMarkets)
     }
@@ -526,7 +547,10 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
   // Cleanup on unmount
   useEffect(() => {
+    console.log('🏗️ SharedOrderBookProvider: Component mounted')
+    
     return () => {
+      console.log('🏗️ SharedOrderBookProvider: Component unmounting')
       isUnmountingRef.current = true
       lastTradePricesLoadedRef.current = false
       fetchingLastTradePricesRef.current = false
