@@ -126,7 +126,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
       // Prepare API payload
       const payload = yesTokenIds.map(tokenId => ({ token_id: tokenId }))
-      console.log('🚀 Calling last-trade-prices API with payload:', payload)
+
 
       // Call our API route
       const response = await fetch('/api/last-trade-prices', {
@@ -143,29 +143,17 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
       }
 
       const tradePrices = await response.json()
-      console.log('📊 Last trade prices API response:', tradePrices)
 
       // Process the response and update order books
       setOrderBooks(prev => {
         const newOrderBooks = { ...prev }
 
-        tradePrices.forEach((tradeData: { price: string, side: 'BUY' | 'SELL', token_id: string }) => {
-          const marketInfo = tokenToMarketMap[tradeData.token_id]
-          if (!marketInfo) {
-            console.log('❌ No market info found for token:', tradeData.token_id)
-            return
-          }
+                  tradePrices.forEach((tradeData: { price: string, side: 'BUY' | 'SELL', token_id: string }) => {
+            const marketInfo = tokenToMarketMap[tradeData.token_id]
+            if (!marketInfo) return
 
-          const yesPrice = parseFloat(tradeData.price)
-          const noPrice = 1 - yesPrice
-
-          console.log('📈 Processing trade data:', {
-            tokenId: tradeData.token_id,
-            conditionId: marketInfo.conditionId,
-            yesPrice,
-            noPrice,
-            side: tradeData.side
-          })
+            const yesPrice = parseFloat(tradeData.price)
+            const noPrice = 1 - yesPrice
 
           // Update YES token data
           const yesKey = `${marketInfo.conditionId}_yes`
@@ -186,12 +174,8 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
             lastTradeSideFromAPI: oppositeSide
           }
 
-          console.log('✅ Updated order books for:', { yesKey, noKey })
-          console.log('📋 Final yesBook:', newOrderBooks[yesKey])
-          console.log('📋 Final noBook:', newOrderBooks[noKey])
         })
 
-        console.log('🔄 Returning updated order books state')
         return newOrderBooks
       })
 
@@ -307,7 +291,9 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
                       asks: processedAsks,
                       lastTradePrice: prev[`${market.conditionId}_${tokenType}`]?.lastTradePrice,
                       lastTradeSide: prev[`${market.conditionId}_${tokenType}`]?.lastTradeSide,
-                      lastTradeTimestamp: prev[`${market.conditionId}_${tokenType}`]?.lastTradeTimestamp
+                      lastTradeTimestamp: prev[`${market.conditionId}_${tokenType}`]?.lastTradeTimestamp,
+                      lastTradePriceFromAPI: prev[`${market.conditionId}_${tokenType}`]?.lastTradePriceFromAPI,
+                      lastTradeSideFromAPI: prev[`${market.conditionId}_${tokenType}`]?.lastTradeSideFromAPI
                     }
                   }))
                 }
@@ -348,7 +334,9 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
                       // Preserve last trade price data
                       lastTradePrice: currentBook.lastTradePrice,
                       lastTradeSide: currentBook.lastTradeSide,
-                      lastTradeTimestamp: currentBook.lastTradeTimestamp
+                      lastTradeTimestamp: currentBook.lastTradeTimestamp,
+                      lastTradePriceFromAPI: currentBook.lastTradePriceFromAPI,
+                      lastTradeSideFromAPI: currentBook.lastTradeSideFromAPI
                     }
                     
                     // Apply price changes
@@ -430,7 +418,10 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
                         ...currentBook,
                         lastTradePrice: parseFloat(item.price),
                         lastTradeSide: item.side,
-                        lastTradeTimestamp: parseInt(item.timestamp) || Date.now()
+                        lastTradeTimestamp: parseInt(item.timestamp) || Date.now(),
+                        // Preserve API data
+                        lastTradePriceFromAPI: currentBook.lastTradePriceFromAPI,
+                        lastTradeSideFromAPI: currentBook.lastTradeSideFromAPI
                       }
                     }
                   })

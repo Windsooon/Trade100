@@ -36,17 +36,7 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
   // Get current market's order book for the selected token
   const displayOrderBook = useMemo(() => {
     const orderBookKey = `${conditionId}_${selectedToken}`
-    const orderBookData = orderBooks[orderBookKey]
-    console.log('🔍 OrderBook lookup:', {
-      orderBookKey,
-      availableKeys: Object.keys(orderBooks),
-      foundOrderBook: !!orderBookData,
-      orderBookData: orderBookData,
-      lastTradePriceFromAPI: orderBookData?.lastTradePriceFromAPI,
-      lastTradeSideFromAPI: orderBookData?.lastTradeSideFromAPI,
-      hasLastTradePrice: orderBookData?.lastTradePrice,
-      allOrderBooks: orderBooks
-    })
+
     return orderBooks[orderBookKey] || null
   }, [orderBooks, conditionId, selectedToken])
 
@@ -54,20 +44,7 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
   const { bids, asks, lastTradePrice, lastTradeSide, lastTradeTimestamp } = useMemo(() => {
     if (!displayOrderBook) return { bids: [], asks: [], lastTradePrice: null, lastTradeSide: null, lastTradeTimestamp: null }
 
-    // Debug logging
-    console.log('🎯 OrderBookDisplay Debug:', {
-      conditionId,
-      selectedToken,
-      expectedKey: `${conditionId}_${selectedToken}`,
-      displayOrderBook: {
-        lastTradePrice: displayOrderBook.lastTradePrice,
-        lastTradePriceFromAPI: displayOrderBook.lastTradePriceFromAPI,
-        lastTradeSide: displayOrderBook.lastTradeSide,
-        lastTradeSideFromAPI: displayOrderBook.lastTradeSideFromAPI,
-        hasOrderBook: !!displayOrderBook,
-        fullOrderBook: displayOrderBook
-      }
-    })
+
 
     const processLevels = (levels: BookLevel[], shouldReverse: boolean = false) => {
       let cumulativeSize = 0
@@ -110,14 +87,7 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
     const effectiveLastTradeSide = displayOrderBook.lastTradeSide ?? displayOrderBook.lastTradeSideFromAPI ?? null
     const effectiveLastTradeTimestamp = displayOrderBook.lastTradeTimestamp ?? null
 
-    console.log('💰 Price calculation:', {
-      wsPrice: displayOrderBook.lastTradePrice,
-      apiPrice: displayOrderBook.lastTradePriceFromAPI,
-      effectivePrice: effectiveLastTradePrice,
-      wsSide: displayOrderBook.lastTradeSide,
-      apiSide: displayOrderBook.lastTradeSideFromAPI,
-      effectiveSide: effectiveLastTradeSide
-    })
+
 
     return {
       bids: processedBids,
