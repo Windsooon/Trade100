@@ -935,6 +935,47 @@ export default function MarketsPage() {
                     </div>
                   </div>
 
+                  {/* Price Filters */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground">PRICE FILTERS</h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          value={minPrice}
+                          onChange={(e) => handlePriceChange('min', e.target.value)}
+                          className="w-full"
+                          placeholder="Min price (0.00)"
+                        />
+                        <span className="text-sm text-muted-foreground">to</span>
+                        <Input
+                          type="text"
+                          value={maxPrice}
+                          onChange={(e) => handlePriceChange('max', e.target.value)}
+                          className="w-full"
+                          placeholder="Max price (1.00)"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          value={minBestAsk}
+                          onChange={(e) => handleBestAskChange('min', e.target.value)}
+                          className="w-full"
+                          placeholder="Min ask (0.00)"
+                        />
+                        <span className="text-sm text-muted-foreground">to</span>
+                        <Input
+                          type="text"
+                          value={maxBestAsk}
+                          onChange={(e) => handleBestAskChange('max', e.target.value)}
+                          className="w-full"
+                          placeholder="Max ask (1.00)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Sort */}
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold text-muted-foreground">SORT</h3>
@@ -949,6 +990,13 @@ export default function MarketsPage() {
                         <SelectItem value="liquidity">Liquidity</SelectItem>
                         <SelectItem value="question">Title (A-Z)</SelectItem>
                         <SelectItem value="endDate">End Date</SelectItem>
+                        {viewMode === 'markets' && (
+                          <>
+                            <SelectItem value="yesPrice">Yes Price</SelectItem>
+                            <SelectItem value="priceChange24h">24h Price Change</SelectItem>
+                            <SelectItem value="priceChange1h">1h Price Change</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     <Button
