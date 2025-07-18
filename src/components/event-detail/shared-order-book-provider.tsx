@@ -53,6 +53,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isUnmountingRef = useRef(false)
   const retryAttemptRef = useRef(0)
+  const lastTradePricesLoadedRef = useRef(false)
 
   // Retry configuration
   const MAX_RETRY_ATTEMPTS = 5
@@ -93,11 +94,12 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
   // Fetch initial last trade prices from API
   const fetchLastTradePrices = useCallback(async () => {
-    if (!allActiveMarkets.length || isUnmountingRef.current) {
+    if (!allActiveMarkets.length || isUnmountingRef.current || lastTradePricesLoadedRef.current) {
       return
     }
 
     setLastTradePricesLoading(true)
+    lastTradePricesLoadedRef.current = true
 
     try {
       // Get all YES token IDs from active markets

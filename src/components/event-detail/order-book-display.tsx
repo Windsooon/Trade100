@@ -36,6 +36,12 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
   // Get current market's order book for the selected token
   const displayOrderBook = useMemo(() => {
     const orderBookKey = `${conditionId}_${selectedToken}`
+    console.log('🔍 OrderBook lookup:', {
+      orderBookKey,
+      availableKeys: Object.keys(orderBooks),
+      foundOrderBook: !!orderBooks[orderBookKey],
+      orderBookData: orderBooks[orderBookKey]
+    })
     return orderBooks[orderBookKey] || null
   }, [orderBooks, conditionId, selectedToken])
 
