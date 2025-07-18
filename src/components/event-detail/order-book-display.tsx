@@ -36,11 +36,16 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
   // Get current market's order book for the selected token
   const displayOrderBook = useMemo(() => {
     const orderBookKey = `${conditionId}_${selectedToken}`
+    const orderBookData = orderBooks[orderBookKey]
     console.log('🔍 OrderBook lookup:', {
       orderBookKey,
       availableKeys: Object.keys(orderBooks),
-      foundOrderBook: !!orderBooks[orderBookKey],
-      orderBookData: orderBooks[orderBookKey]
+      foundOrderBook: !!orderBookData,
+      orderBookData: orderBookData,
+      lastTradePriceFromAPI: orderBookData?.lastTradePriceFromAPI,
+      lastTradeSideFromAPI: orderBookData?.lastTradeSideFromAPI,
+      hasLastTradePrice: orderBookData?.lastTradePrice,
+      allOrderBooks: orderBooks
     })
     return orderBooks[orderBookKey] || null
   }, [orderBooks, conditionId, selectedToken])
@@ -104,6 +109,15 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
     const effectiveLastTradePrice = displayOrderBook.lastTradePrice ?? displayOrderBook.lastTradePriceFromAPI ?? null
     const effectiveLastTradeSide = displayOrderBook.lastTradeSide ?? displayOrderBook.lastTradeSideFromAPI ?? null
     const effectiveLastTradeTimestamp = displayOrderBook.lastTradeTimestamp ?? null
+
+    console.log('💰 Price calculation:', {
+      wsPrice: displayOrderBook.lastTradePrice,
+      apiPrice: displayOrderBook.lastTradePriceFromAPI,
+      effectivePrice: effectiveLastTradePrice,
+      wsSide: displayOrderBook.lastTradeSide,
+      apiSide: displayOrderBook.lastTradeSideFromAPI,
+      effectiveSide: effectiveLastTradeSide
+    })
 
     return {
       bids: processedBids,

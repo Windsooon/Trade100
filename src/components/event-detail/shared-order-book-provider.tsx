@@ -525,15 +525,16 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
   // Fetch initial last trade prices when markets change
   useEffect(() => {
-    if (allActiveMarkets.length > 0) {
+    if (allActiveMarkets.length > 0 && !lastTradePricesLoadedRef.current) {
       fetchLastTradePrices()
     }
-  }, [fetchLastTradePrices, allActiveMarkets.length])
+  }, [allActiveMarkets.length])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       isUnmountingRef.current = true
+      lastTradePricesLoadedRef.current = false
       cleanup()
     }
   }, [cleanup])
