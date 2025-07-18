@@ -6,33 +6,6 @@ const globalTradesCache = new Map<string, { data: any; timestamp: number }>()
 const globalTradesPromises = new Map<string, Promise<any>>()
 const CACHE_DURATION = 30 * 1000 // 30 seconds
 
-// Mock trade data for demonstration (remove when authentication is available)
-const generateMockTrades = (market: string, user?: string): any[] => {
-  const now = Date.now()
-  const trades = []
-  
-  for (let i = 0; i < 10; i++) {
-    const timestamp = now - (i * 60000) // 1 minute apart
-    const isYes = Math.random() > 0.5
-    const side = Math.random() > 0.5 ? 'BUY' : 'SELL'
-    const price = 0.3 + (Math.random() * 0.4) // 0.3 to 0.7
-    const size = 10 + (Math.random() * 190) // 10 to 200
-    
-    trades.push({
-      id: `mock_${i}_${timestamp}`,
-      side,
-      price: price.toString(),
-      size: size.toString(),
-      timestamp: Math.floor(timestamp / 1000),
-      outcomeIndex: isYes ? 0 : 1,
-      market,
-      user: user || `0x${'1234567890abcdef'.repeat(2).slice(0, 40)}`
-    })
-  }
-  
-  return trades
-}
-
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -93,42 +66,40 @@ export async function GET(request: NextRequest) {
 }
 
 async function fetchTradesData(market: string, user?: string) {
-  // TODO: Replace this mock implementation with real API calls when authentication is available
-  // 
-  // AUTHENTICATION REQUIRED:
-  // The Polymarket CLOB trades endpoint requires either L1 or L2 authentication headers:
-  // - L1: POLY_ADDRESS, POLY_SIGNATURE, POLY_TIMESTAMP, POLY_NONCE
-  // - L2: POLY_ADDRESS, POLY_SIGNATURE, POLY_TIMESTAMP, POLY_API_KEY, POLY_PASSPHRASE
-  //
-  // For now, we return mock data to demonstrate the functionality.
-  // When implementing authentication, use this structure:
-  //
-  // const params = new URLSearchParams()
-  // params.append('limit', '40')
-  // params.append('offset', '0')
-  // params.append('market', market)
-  // if (user) params.append('user', user)
-  //
-  // const response = await proxyFetch(`https://clob.polymarket.com/trades?${params.toString()}`, {
-  //   method: 'GET',
-  //   headers: {
-  //     'Accept': 'application/json',
-  //     'Content-Type': 'application/json',
-  //     // Add authentication headers here
-  //   }
-  // })
-  //
-  // if (!response.ok) {
-  //   throw new Error(`Polymarket API responded with status: ${response.status}`)
-  // }
-  //
-  // return await response.json()
+  try {
+    // Build query parameters for Polymarket Data API
+    const params = new URLSearchParams()
+    params.append('limit', '40')
+    params.append('offset', '0')
+    params.append('market', market)
+    
+    if (user) {
+      params.append('user', user)
+    }
 
-  // Mock implementation for demonstration
-  console.log(`[TRADES API] Returning mock data for market: ${market}, user: ${user || 'all'}`)
-  
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 100))
-  
-  return generateMockTrades(market, user)
+    const url = `https://data-api.polymarket.com/trades?${params.toString()}`
+    
+    console.log(`[TRADES API] Fetching from: ${url}`)
+    
+    const response = await proxyFetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Polymarket Dashboard'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Polymarket Data API responded with status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log(`[TRADES API] Successfully fetched ${data.length} trades`)
+    
+    return data
+  } catch (error) {
+    console.error('Error fetching trades data:', error)
+    throw error
+  }
 } 

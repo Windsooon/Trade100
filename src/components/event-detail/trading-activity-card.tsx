@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +43,11 @@ interface TradingActivityCardProps {
   selectedMarket: Market | null
   event: Event
 }
+
+// Global cache for client-side deduplication
+const globalRequestCache = new Map<string, { data: ProcessedTrade[]; timestamp: number }>()
+const globalActiveRequests = new Map<string, Promise<ProcessedTrade[]>>()
+const CLIENT_CACHE_DURATION = 10 * 1000 // 10 seconds
 
 const formatTime = (timestamp: number): string => {
   const date = new Date(timestamp * 1000)
@@ -92,6 +97,11 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
   const [marketError, setMarketError] = useState<string | null>(null)
   const [userError, setUserError] = useState<string | null>(null)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  
+  // Refs to track component lifecycle and prevent duplicate requests
+  const isMountedRef = useRef(true)
+  const lastMarketRef = useRef<string | null>(null)
+  const lastUserRef = useRef<string | null>(null)
 
   // Get wallet address from localStorage
   useEffect(() => {
@@ -99,80 +109,245 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     setWalletAddress(savedWalletAddress || null)
   }, [])
 
-  // Fetch market trades
-  const fetchMarketTrades = useCallback(async () => {
-    if (!selectedMarket?.conditionId) return
+  // Fetch market trades with caching and deduplication
+  const fetchMarketTrades = useCallback(async (conditionId: string) => {
+    const cacheKey = `market_${conditionId}`
+    
+    // Check cache first
+    const cached = globalRequestCache.get(cacheKey)
+    if (cached && (Date.now() - cached.timestamp) < CLIENT_CACHE_DURATION) {
+      setMarketTrades(cached.data)
+      setMarketLoading(false)
+      setMarketError(null)
+      return
+    }
+
+    // Check if request is already in progress
+    const activeRequest = globalActiveRequests.get(cacheKey)
+    if (activeRequest) {
+      try {
+        const trades = await activeRequest
+        if (isMountedRef.current) {
+          setMarketTrades(trades)
+          setMarketLoading(false)
+          setMarketError(null)
+        }
+      } catch (error) {
+        if (isMountedRef.current) {
+          console.error('Error from cached market trades request:', error)
+          setMarketError('Failed to load market trades')
+          setMarketLoading(false)
+        }
+      }
+      return
+    }
 
     setMarketLoading(true)
     setMarketError(null)
 
-    try {
-      const response = await fetch(`/api/trades?market=${selectedMarket.conditionId}`)
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch market trades')
+    const requestPromise = (async (): Promise<ProcessedTrade[]> => {
+      try {
+        const response = await fetch(`/api/trades?market=${conditionId}`)
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch market trades')
+        }
+
+        const trades: Trade[] = await response.json()
+        const processedTrades = trades.map(processTrade)
+        
+        // Cache the result
+        globalRequestCache.set(cacheKey, {
+          data: processedTrades,
+          timestamp: Date.now()
+        })
+        
+        return processedTrades
+      } finally {
+        globalActiveRequests.delete(cacheKey)
       }
+    })()
 
-      const trades: Trade[] = await response.json()
-      const processedTrades = trades.map(processTrade)
-      setMarketTrades(processedTrades)
+    globalActiveRequests.set(cacheKey, requestPromise)
+
+    try {
+      const trades = await requestPromise
+      if (isMountedRef.current) {
+        setMarketTrades(trades)
+      }
     } catch (error) {
-      console.error('Error fetching market trades:', error)
-      setMarketError('Failed to load market trades')
-      setMarketTrades([])
+      if (isMountedRef.current) {
+        console.error('Error fetching market trades:', error)
+        setMarketError('Failed to load market trades')
+        setMarketTrades([])
+      }
     } finally {
-      setMarketLoading(false)
+      if (isMountedRef.current) {
+        setMarketLoading(false)
+      }
     }
-  }, [selectedMarket?.conditionId])
+  }, [])
 
-  // Fetch user trades
-  const fetchUserTrades = useCallback(async () => {
-    if (!selectedMarket?.conditionId || !walletAddress) return
+  // Fetch user trades with caching and deduplication
+  const fetchUserTrades = useCallback(async (conditionId: string, userAddress: string) => {
+    const cacheKey = `user_${conditionId}_${userAddress}`
+    
+    // Check cache first
+    const cached = globalRequestCache.get(cacheKey)
+    if (cached && (Date.now() - cached.timestamp) < CLIENT_CACHE_DURATION) {
+      setUserTrades(cached.data)
+      setUserLoading(false)
+      setUserError(null)
+      return
+    }
+
+    // Check if request is already in progress
+    const activeRequest = globalActiveRequests.get(cacheKey)
+    if (activeRequest) {
+      try {
+        const trades = await activeRequest
+        if (isMountedRef.current) {
+          setUserTrades(trades)
+          setUserLoading(false)
+          setUserError(null)
+        }
+      } catch (error) {
+        if (isMountedRef.current) {
+          console.error('Error from cached user trades request:', error)
+          setUserError('Failed to load your trades')
+          setUserLoading(false)
+        }
+      }
+      return
+    }
 
     setUserLoading(true)
     setUserError(null)
 
+    const requestPromise = (async (): Promise<ProcessedTrade[]> => {
+      try {
+        const response = await fetch(`/api/trades?market=${conditionId}&user=${userAddress}`)
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch user trades')
+        }
+
+        const trades: Trade[] = await response.json()
+        const processedTrades = trades.map(processTrade)
+        
+        // Cache the result
+        globalRequestCache.set(cacheKey, {
+          data: processedTrades,
+          timestamp: Date.now()
+        })
+        
+        return processedTrades
+      } finally {
+        globalActiveRequests.delete(cacheKey)
+      }
+    })()
+
+    globalActiveRequests.set(cacheKey, requestPromise)
+
     try {
-      const response = await fetch(`/api/trades?market=${selectedMarket.conditionId}&user=${walletAddress}`)
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch user trades')
+      const trades = await requestPromise
+      if (isMountedRef.current) {
+        setUserTrades(trades)
       }
-
-      const trades: Trade[] = await response.json()
-      const processedTrades = trades.map(processTrade)
-      setUserTrades(processedTrades)
     } catch (error) {
-      console.error('Error fetching user trades:', error)
-      setUserError('Failed to load your trades')
-      setUserTrades([])
+      if (isMountedRef.current) {
+        console.error('Error fetching user trades:', error)
+        setUserError('Failed to load your trades')
+        setUserTrades([])
+      }
     } finally {
-      setUserLoading(false)
-    }
-  }, [selectedMarket?.conditionId, walletAddress])
-
-  // Initial fetch when market changes
-  useEffect(() => {
-    if (selectedMarket?.conditionId) {
-      fetchMarketTrades()
-      if (walletAddress) {
-        fetchUserTrades()
+      if (isMountedRef.current) {
+        setUserLoading(false)
       }
     }
-  }, [selectedMarket?.conditionId, walletAddress, fetchMarketTrades, fetchUserTrades])
+  }, [])
 
-  // Auto-refresh every 10 seconds
+  // Effect for market changes - only fetch when market actually changes
+  useEffect(() => {
+    if (!selectedMarket?.conditionId) {
+      return
+    }
+
+    const conditionId = selectedMarket.conditionId
+    
+    // Only fetch if market actually changed
+    if (lastMarketRef.current !== conditionId) {
+      lastMarketRef.current = conditionId
+      fetchMarketTrades(conditionId)
+    }
+  }, [selectedMarket?.conditionId, fetchMarketTrades])
+
+  // Effect for user trades - only fetch when market or user changes
+  useEffect(() => {
+    if (!selectedMarket?.conditionId || !walletAddress) {
+      setUserTrades([])
+      setUserError(null)
+      return
+    }
+
+    const conditionId = selectedMarket.conditionId
+    const userKey = `${conditionId}_${walletAddress}`
+    
+    // Only fetch if market or user actually changed
+    if (lastUserRef.current !== userKey) {
+      lastUserRef.current = userKey
+      fetchUserTrades(conditionId, walletAddress)
+    }
+  }, [selectedMarket?.conditionId, walletAddress, fetchUserTrades])
+
+  // Auto-refresh interval - much simpler, no dependencies issues
   useEffect(() => {
     if (!selectedMarket?.conditionId) return
 
     const interval = setInterval(() => {
-      fetchMarketTrades()
-      if (walletAddress) {
-        fetchUserTrades()
+      const conditionId = selectedMarket.conditionId
+      if (conditionId) {
+        // Clear cache for auto-refresh
+        globalRequestCache.delete(`market_${conditionId}`)
+        if (walletAddress) {
+          globalRequestCache.delete(`user_${conditionId}_${walletAddress}`)
+        }
+        
+        // Fetch fresh data
+        fetchMarketTrades(conditionId)
+        if (walletAddress) {
+          fetchUserTrades(conditionId, walletAddress)
+        }
       }
-    }, 10000)
+    }, 30000) // Refresh every 30 seconds instead of 10
 
     return () => clearInterval(interval)
+  }, [selectedMarket?.conditionId]) // Only depend on market ID, not the functions
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  // Retry function
+  const handleRetry = useCallback(() => {
+    if (!selectedMarket?.conditionId) return
+    
+    const conditionId = selectedMarket.conditionId
+    
+    // Clear cache to force fresh requests
+    globalRequestCache.delete(`market_${conditionId}`)
+    if (walletAddress) {
+      globalRequestCache.delete(`user_${conditionId}_${walletAddress}`)
+    }
+    
+    // Fetch fresh data
+    fetchMarketTrades(conditionId)
+    if (walletAddress) {
+      fetchUserTrades(conditionId, walletAddress)
+    }
   }, [selectedMarket?.conditionId, walletAddress, fetchMarketTrades, fetchUserTrades])
 
   const renderTradesList = (trades: ProcessedTrade[], loading: boolean, error: string | null, emptyMessage: string) => {
@@ -194,11 +369,8 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
             <Activity className="h-12 w-12 mx-auto opacity-50 text-muted-foreground" />
             <p className="text-sm text-red-500">{error}</p>
             <button 
-              onClick={() => {
-                fetchMarketTrades()
-                if (walletAddress) fetchUserTrades()
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+              onClick={handleRetry}
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mx-auto"
             >
               <RefreshCw className="h-3 w-3" />
               Try again
