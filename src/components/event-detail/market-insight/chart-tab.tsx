@@ -512,19 +512,10 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     const marketId = selectedMarket.conditionId
     const requestKey = `${marketId}-${selectedPeriod}-${fidelity}`
 
-    console.log('📈 ChartTab: Attempting to fetch market history', {
-      marketId,
-      selectedPeriod,
-      requestKey,
-      activeRequests: Array.from(activeRequestsRef.current),
-      timestamp: Date.now()
-    })
-
     // Check global cache first
     const now = Date.now()
     const cachedData = globalMarketHistoryCache.get(requestKey)
     if (cachedData && (now - cachedData.timestamp) < MARKET_HISTORY_CACHE_DURATION) {
-      console.log('📈 ChartTab: Using global cached data', { requestKey })
       // Process cached data
       const result = cachedData.data
       const processedData = result.data.map(point => ({
@@ -555,10 +546,8 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     // Check if request is already in progress globally
     const existingPromise = globalMarketHistoryPromises.get(requestKey)
     if (existingPromise) {
-      console.log('📈 ChartTab: Waiting for existing global request', { requestKey })
       try {
         const result = await existingPromise
-        console.log('📈 ChartTab: Using data from global request', { requestKey })
         // Process data same as above
         const processedData = result.data.map(point => ({
           time: point.timestamp as any,
@@ -591,13 +580,11 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
     // Check if this exact request is already active locally (legacy protection)
     if (activeRequestsRef.current.has(requestKey)) {
-      console.log('📈 ChartTab: Request already active locally, skipping', { requestKey })
       return
     }
 
     // Mark this request as active immediately
     activeRequestsRef.current.add(requestKey)
-    console.log('📈 ChartTab: Starting new global API call', { requestKey })
     setLoading(true)
     setError(null)
     setVolumeError(null)
@@ -645,7 +632,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
       const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
       
-      console.log('📈 ChartTab: Making actual API call to', url)
       const response = await fetch(url)
       
       if (!response.ok) {
@@ -660,7 +646,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       
       // Store in global cache
       globalMarketHistoryCache.set(requestKey, { data: result, timestamp: Date.now() })
-      console.log('📈 ChartTab: Cached data globally for', requestKey)
       
       // Store raw data and cache it locally too
       rawDataRef.current = result.data
@@ -670,7 +655,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
              return result
        
        } catch (error) {
-         console.error('📈 ChartTab: API call failed:', error)
          throw error
        } finally {
          globalMarketHistoryPromises.delete(requestKey)

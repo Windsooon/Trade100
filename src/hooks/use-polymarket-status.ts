@@ -40,12 +40,9 @@ let globalPromise: Promise<StatusResult> | null = null
 const CACHE_DURATION = 5000 // 5 seconds
 
 export function usePolymarketStatus() {
-  console.log('🔌 usePolymarketStatus: Hook initialized', { timestamp: Date.now() })
-  
   const [statusResult, setStatusResult] = useState<StatusResult>(() => {
     const now = Date.now()
     if (globalCache && (now - globalCache.timestamp) < CACHE_DURATION) {
-      console.log('🔌 usePolymarketStatus: Using cached result')
       return globalCache.result
     }
     return {
@@ -61,20 +58,16 @@ export function usePolymarketStatus() {
     // Check cache first
     const now = Date.now()
     if (globalCache && (now - globalCache.timestamp) < CACHE_DURATION) {
-      console.log('🔌 usePolymarketStatus: Using cached result instead of API call')
       setStatusResult(globalCache.result)
       return
     }
 
     // If already fetching, wait for that result
     if (globalPromise) {
-      console.log('🔌 usePolymarketStatus: Waiting for existing API call')
       const result = await globalPromise
       setStatusResult(result)
       return
     }
-
-    console.log('🔌 usePolymarketStatus: Making new API call')
     setStatusResult(prev => ({ ...prev, isChecking: true }))
     
     // Create shared promise
