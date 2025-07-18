@@ -3,48 +3,48 @@ import { proxyFetch } from '@/lib/fetch'
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const user = searchParams.get('user')
-    const market = searchParams.get('market')
+    const searchParams = request.nextUrl.searchParams
     
-    if (!user) {
-      return NextResponse.json({ 
-        error: 'User parameter is required' 
-      }, { status: 400 })
+    // Build query parameters
+    const params = new URLSearchParams()
+    
+    // Add default limit and offset
+    params.append('limit', '40')
+    params.append('offset', '0')
+    
+    // Add market (conditionId) if provided
+    const market = searchParams.get('market')
+    if (market) {
+      params.append('market', market)
     }
-
-    if (!market) {
-      return NextResponse.json({ 
-        error: 'Market parameter is required' 
-      }, { status: 400 })
+    
+    // Add user wallet address if provided
+    const user = searchParams.get('user')
+    if (user) {
+      params.append('user', user)
     }
-
-    // Use the new activity endpoint with limit=100 and no type filter
-    const url = `http://data-api.polymarket.com/activity?user=${encodeURIComponent(user)}&market=${encodeURIComponent(market)}&limit=100`
+    
+    const url = `https://clob.polymarket.com/trades?${params.toString()}`
     
     const response = await proxyFetch(url, {
+      method: 'GET',
       headers: {
-        'User-Agent': 'Polymarket Dashboard',
         'Accept': 'application/json',
-      },
+        'Content-Type': 'application/json'
+      }
     })
 
     if (!response.ok) {
-      throw new Error(`Polymarket API error: ${response.status} ${response.statusText}`)
+      throw new Error(`Polymarket API responded with status: ${response.status}`)
     }
 
     const data = await response.json()
-    
-    return NextResponse.json({
-      success: true,
-      data: data
-    })
+    return NextResponse.json(data)
   } catch (error) {
-    console.error('Activity API error:', error)
-    return NextResponse.json({ 
-      success: false,
-      error: 'Failed to fetch activity data',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    console.error('Error fetching trades:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch trades data' },
+      { status: 500 }
+    )
   }
 } 
