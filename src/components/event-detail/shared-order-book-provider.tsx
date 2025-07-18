@@ -18,6 +18,8 @@ type BookData = {
   lastTradePrice?: number
   lastTradeSide?: 'BUY' | 'SELL'
   lastTradeTimestamp?: number
+  lastTradePriceFromAPI?: number
+  lastTradeSideFromAPI?: 'BUY' | 'SELL'
 }
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'retrying'
@@ -29,6 +31,8 @@ interface SharedOrderBookContextType {
   retryAttempt: number
   maxRetryAttempts: number
   manualRetry: () => void
+  fetchLastTradePrices: () => Promise<void>
+  lastTradePricesLoading: boolean
 }
 
 const SharedOrderBookContext = createContext<SharedOrderBookContextType | null>(null)
@@ -39,15 +43,19 @@ interface SharedOrderBookProviderProps {
 }
 
 export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOrderBookProviderProps) {
+
   const [orderBooks, setOrderBooks] = useState<Record<string, BookData>>({})
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
   const [retryCount, setRetryCount] = useState(0)
   const [retryAttempt, setRetryAttempt] = useState(0)
+  const [lastTradePricesLoading, setLastTradePricesLoading] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isUnmountingRef = useRef(false)
   const retryAttemptRef = useRef(0)
+  const lastTradePricesLoadedRef = useRef(false)
+  const fetchingLastTradePricesRef = useRef(false)
 
   // Retry configuration
   const MAX_RETRY_ATTEMPTS = 5
@@ -83,6 +91,100 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current)
       retryTimeoutRef.current = null
+    }
+  }, [])
+
+  // Fetch initial last trade prices from API
+  const fetchLastTradePrices = useCallback(async (markets: Market[] = allActiveMarkets) => {
+    if (!markets.length || isUnmountingRef.current || lastTradePricesLoadedRef.current || fetchingLastTradePricesRef.current) {
+      return
+    }
+    setLastTradePricesLoading(true)
+    fetchingLastTradePricesRef.current = true
+    lastTradePricesLoadedRef.current = true
+
+    try {
+      // Get all YES token IDs from active markets
+      const yesTokenIds: string[] = []
+      const tokenToMarketMap: Record<string, { conditionId: string }> = {}
+
+      markets.forEach(market => {
+        if (market.clobTokenIds) {
+          try {
+            const ids = JSON.parse(market.clobTokenIds)
+            if (ids[0]) { // YES token
+              yesTokenIds.push(ids[0])
+              tokenToMarketMap[ids[0]] = { conditionId: market.conditionId }
+            }
+          } catch {
+            // Skip invalid token IDs
+          }
+        }
+      })
+
+      if (yesTokenIds.length === 0) {
+        return
+      }
+
+      // Prepare API payload
+      const payload = yesTokenIds.map(tokenId => ({ token_id: tokenId }))
+
+      // Call our API route
+      const response = await fetch('/api/last-trade-prices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        console.error('Failed to fetch last trade prices:', response.status, response.statusText)
+        return
+      }
+
+      const tradePrices = await response.json()
+
+      // Process the response and update order books
+      setOrderBooks(prev => {
+        const newOrderBooks = { ...prev }
+
+                  tradePrices.forEach((tradeData: { price: string, side: 'BUY' | 'SELL', token_id: string }) => {
+            const marketInfo = tokenToMarketMap[tradeData.token_id]
+            if (!marketInfo) return
+
+            const yesPrice = parseFloat(tradeData.price)
+            const noPrice = 1 - yesPrice
+
+          // Update YES token data
+          const yesKey = `${marketInfo.conditionId}_yes`
+          const existingYesBook = newOrderBooks[yesKey] || { bids: [], asks: [] }
+          newOrderBooks[yesKey] = {
+            ...existingYesBook,
+            lastTradePriceFromAPI: yesPrice,
+            lastTradeSideFromAPI: tradeData.side
+          }
+
+          // Update NO token data (calculated from YES)
+          const noKey = `${marketInfo.conditionId}_no`
+          const oppositeSide = tradeData.side === 'BUY' ? 'SELL' : 'BUY'
+          const existingNoBook = newOrderBooks[noKey] || { bids: [], asks: [] }
+          newOrderBooks[noKey] = {
+            ...existingNoBook,
+            lastTradePriceFromAPI: noPrice,
+            lastTradeSideFromAPI: oppositeSide
+          }
+
+        })
+
+        return newOrderBooks
+      })
+
+    } catch (error) {
+      console.error('Error fetching last trade prices:', error)
+    } finally {
+      setLastTradePricesLoading(false)
+      fetchingLastTradePricesRef.current = false
     }
   }, [])
 
@@ -191,7 +293,9 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
                       asks: processedAsks,
                       lastTradePrice: prev[`${market.conditionId}_${tokenType}`]?.lastTradePrice,
                       lastTradeSide: prev[`${market.conditionId}_${tokenType}`]?.lastTradeSide,
-                      lastTradeTimestamp: prev[`${market.conditionId}_${tokenType}`]?.lastTradeTimestamp
+                      lastTradeTimestamp: prev[`${market.conditionId}_${tokenType}`]?.lastTradeTimestamp,
+                      lastTradePriceFromAPI: prev[`${market.conditionId}_${tokenType}`]?.lastTradePriceFromAPI,
+                      lastTradeSideFromAPI: prev[`${market.conditionId}_${tokenType}`]?.lastTradeSideFromAPI
                     }
                   }))
                 }
@@ -232,7 +336,9 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
                       // Preserve last trade price data
                       lastTradePrice: currentBook.lastTradePrice,
                       lastTradeSide: currentBook.lastTradeSide,
-                      lastTradeTimestamp: currentBook.lastTradeTimestamp
+                      lastTradeTimestamp: currentBook.lastTradeTimestamp,
+                      lastTradePriceFromAPI: currentBook.lastTradePriceFromAPI,
+                      lastTradeSideFromAPI: currentBook.lastTradeSideFromAPI
                     }
                     
                     // Apply price changes
@@ -314,7 +420,10 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
                         ...currentBook,
                         lastTradePrice: parseFloat(item.price),
                         lastTradeSide: item.side,
-                        lastTradeTimestamp: parseInt(item.timestamp) || Date.now()
+                        lastTradeTimestamp: parseInt(item.timestamp) || Date.now(),
+                        // Preserve API data
+                        lastTradePriceFromAPI: currentBook.lastTradePriceFromAPI,
+                        lastTradeSideFromAPI: currentBook.lastTradeSideFromAPI
                       }
                     }
                   })
@@ -407,10 +516,19 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
     }
   }, [connect, cleanup, allActiveTokenIds.join(',')]) // Use join to create stable dependency
 
+  // Fetch initial last trade prices when markets change
+  useEffect(() => {
+    if (allActiveMarkets.length > 0) {
+      fetchLastTradePrices(allActiveMarkets)
+    }
+  }, [allActiveMarkets.length])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       isUnmountingRef.current = true
+      lastTradePricesLoadedRef.current = false
+      fetchingLastTradePricesRef.current = false
       cleanup()
     }
   }, [cleanup])
@@ -421,8 +539,10 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
     retryCount,
     retryAttempt,
     maxRetryAttempts: MAX_RETRY_ATTEMPTS,
-    manualRetry
-  }), [orderBooks, connectionStatus, retryCount, retryAttempt, manualRetry])
+    manualRetry,
+    fetchLastTradePrices,
+    lastTradePricesLoading
+  }), [orderBooks, connectionStatus, retryCount, retryAttempt, manualRetry, fetchLastTradePrices, lastTradePricesLoading])
 
   return (
     <SharedOrderBookContext.Provider value={contextValue}>

@@ -5,7 +5,13 @@ import { AlertCircle, Loader2, TrendingUp } from 'lucide-react'
 import { createChart, IChartApi, ISeriesApi, ColorType, CandlestickSeries, HistogramSeries } from 'lightweight-charts'
 import { ChartTabProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint, VolumeType } from './types'
 
+// Global cache for market history to prevent duplicate API calls
+let globalMarketHistoryCache: Map<string, { data: MarketHistoryResponse; timestamp: number }> = new Map()
+let globalMarketHistoryPromises: Map<string, Promise<MarketHistoryResponse>> = new Map()
+const MARKET_HISTORY_CACHE_DURATION = 30000 // 30 seconds
+
 export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
+  
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1h')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -506,7 +512,73 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     const marketId = selectedMarket.conditionId
     const requestKey = `${marketId}-${selectedPeriod}-${fidelity}`
 
-    // Check if this exact request is already active (StrictMode protection)
+    // Check global cache first
+    const now = Date.now()
+    const cachedData = globalMarketHistoryCache.get(requestKey)
+    if (cachedData && (now - cachedData.timestamp) < MARKET_HISTORY_CACHE_DURATION) {
+      // Process cached data
+      const result = cachedData.data
+      const processedData = result.data.map(point => ({
+        time: point.timestamp as any,
+        open: point.price.open,
+        high: point.price.high,
+        low: point.price.low,
+        close: point.price.close
+      }))
+      
+      const volumeData = result.data.map(point => ({
+        time: point.timestamp as any,
+        value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
+        color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
+      }))
+      
+      if (seriesRef.current) {
+        seriesRef.current.setData(processedData)
+      }
+      if (volumeSeriesRef.current) {
+        volumeSeriesRef.current.setData(volumeData)
+      }
+      
+      setLoading(false)
+      return
+    }
+
+    // Check if request is already in progress globally
+    const existingPromise = globalMarketHistoryPromises.get(requestKey)
+    if (existingPromise) {
+      try {
+        const result = await existingPromise
+        // Process data same as above
+        const processedData = result.data.map(point => ({
+          time: point.timestamp as any,
+          open: point.price.open,
+          high: point.price.high,
+          low: point.price.low,
+          close: point.price.close
+        }))
+        
+        const volumeData = result.data.map(point => ({
+          time: point.timestamp as any,
+          value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
+          color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
+        }))
+        
+        if (seriesRef.current) {
+          seriesRef.current.setData(processedData)
+        }
+        if (volumeSeriesRef.current) {
+          volumeSeriesRef.current.setData(volumeData)
+        }
+        
+        setLoading(false)
+      } catch (error) {
+        setError('Failed to load market data')
+        setLoading(false)
+      }
+      return
+    }
+
+    // Check if this exact request is already active locally (legacy protection)
     if (activeRequestsRef.current.has(requestKey)) {
       return
     }
@@ -517,11 +589,13 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     setError(null)
     setVolumeError(null)
     
-    try {
-      const cacheKey = requestKey
+    // Store this request in global promises
+    const apiPromise = (async (): Promise<MarketHistoryResponse> => {
+      try {
+        const cacheKey = requestKey
 
-      // Check cache first
-      const cachedData = getCachedData(cacheKey)
+        // Check local cache first (existing logic)
+        const cachedData = getCachedData(cacheKey)
       if (cachedData) {
         rawDataRef.current = cachedData
         volumeDataRef.current = cachedData // Same data contains both price and volume
@@ -567,17 +641,33 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       const result: MarketHistoryResponse = await response.json()
       
       if (!result.data || result.data.length === 0) {
-        setError('No market history data available for this period.')
-        setLoading(false)
-        return
+        throw new Error('No market history data available for this period.')
       }
       
-      // Store raw data and cache it
+      // Store in global cache
+      globalMarketHistoryCache.set(requestKey, { data: result, timestamp: Date.now() })
+      
+      // Store raw data and cache it locally too
       rawDataRef.current = result.data
       volumeDataRef.current = result.data // Same data contains both price and volume
       setCachedData(cacheKey, result.data)
       
-      // Convert to chart format
+             return result
+       
+       } catch (error) {
+         throw error
+       } finally {
+         globalMarketHistoryPromises.delete(requestKey)
+       }
+     })()
+     
+     // Register the global promise
+     globalMarketHistoryPromises.set(requestKey, apiPromise)
+     
+     try {
+       const result = await apiPromise
+       
+       // Convert to chart format
       const chartData = result.data.map(point => ({
         time: point.timestamp as any,
         open: point.price.open,
