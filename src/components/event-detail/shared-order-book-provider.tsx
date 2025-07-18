@@ -124,6 +124,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
       // Prepare API payload
       const payload = yesTokenIds.map(tokenId => ({ token_id: tokenId }))
+      console.log('🚀 Calling last-trade-prices API with payload:', payload)
 
       // Call our API route
       const response = await fetch('/api/last-trade-prices', {
@@ -140,6 +141,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
       }
 
       const tradePrices = await response.json()
+      console.log('📊 Last trade prices API response:', tradePrices)
 
       // Process the response and update order books
       setOrderBooks(prev => {
@@ -147,10 +149,21 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
         tradePrices.forEach((tradeData: { price: string, side: 'BUY' | 'SELL', token_id: string }) => {
           const marketInfo = tokenToMarketMap[tradeData.token_id]
-          if (!marketInfo) return
+          if (!marketInfo) {
+            console.log('❌ No market info found for token:', tradeData.token_id)
+            return
+          }
 
           const yesPrice = parseFloat(tradeData.price)
           const noPrice = 1 - yesPrice
+
+          console.log('📈 Processing trade data:', {
+            tokenId: tradeData.token_id,
+            conditionId: marketInfo.conditionId,
+            yesPrice,
+            noPrice,
+            side: tradeData.side
+          })
 
           // Update YES token data
           const yesKey = `${marketInfo.conditionId}_yes`
@@ -172,6 +185,8 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
             lastTradePriceFromAPI: noPrice,
             lastTradeSideFromAPI: oppositeSide
           }
+
+          console.log('✅ Updated order books for:', { yesKey, noKey })
         })
 
         return newOrderBooks

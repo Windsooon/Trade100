@@ -43,6 +43,19 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
   const { bids, asks, lastTradePrice, lastTradeSide, lastTradeTimestamp } = useMemo(() => {
     if (!displayOrderBook) return { bids: [], asks: [], lastTradePrice: null, lastTradeSide: null, lastTradeTimestamp: null }
 
+    // Debug logging
+    console.log('OrderBookDisplay Debug:', {
+      conditionId,
+      selectedToken,
+      displayOrderBook: {
+        lastTradePrice: displayOrderBook.lastTradePrice,
+        lastTradePriceFromAPI: displayOrderBook.lastTradePriceFromAPI,
+        lastTradeSide: displayOrderBook.lastTradeSide,
+        lastTradeSideFromAPI: displayOrderBook.lastTradeSideFromAPI,
+        hasOrderBook: !!displayOrderBook
+      }
+    })
+
     const processLevels = (levels: BookLevel[], shouldReverse: boolean = false) => {
       let cumulativeSize = 0
       let cumulativeValue = 0
