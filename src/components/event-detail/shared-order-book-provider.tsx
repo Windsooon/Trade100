@@ -505,6 +505,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
   // Connect on mount and when active markets change
   useEffect(() => {
     if (allActiveTokenIds.length > 0) {
+      isUnmountingRef.current = false // Reset unmounting flag when effect runs
       retryAttemptRef.current = 0
       setRetryAttempt(0)
       connect()
@@ -523,15 +524,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
     }
   }, [allActiveMarkets.length])
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      isUnmountingRef.current = true
-      lastTradePricesLoadedRef.current = false
-      fetchingLastTradePricesRef.current = false
-      cleanup()
-    }
-  }, [cleanup])
+  // Note: Cleanup is handled by the main WebSocket useEffect above
 
   const contextValue = useMemo(() => ({
     orderBooks,
