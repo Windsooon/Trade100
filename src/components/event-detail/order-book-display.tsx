@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useSharedOrderBook } from './shared-order-book-provider'
+import { formatTimeAgo } from '@/lib/time-utils'
 
 interface OrderBookDisplayProps {
   conditionId: string
@@ -25,6 +26,8 @@ type BookData = {
   lastTradePrice?: number
   lastTradeSide?: 'BUY' | 'SELL'
   lastTradeTimestamp?: number
+  lastTradePriceFromAPI?: number
+  lastTradeSideFromAPI?: 'BUY' | 'SELL'
 }
 
 export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: OrderBookDisplayProps) {
@@ -76,12 +79,17 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
     const asksWithCumulative = processLevels(displayOrderBook.asks, false) // Process small→big order
     const processedAsks = asksWithCumulative.reverse() // Reverse entire processed array for display
     
+    // Prioritize WebSocket data (with timestamps) over API data
+    const effectiveLastTradePrice = displayOrderBook.lastTradePrice ?? displayOrderBook.lastTradePriceFromAPI ?? null
+    const effectiveLastTradeSide = displayOrderBook.lastTradeSide ?? displayOrderBook.lastTradeSideFromAPI ?? null
+    const effectiveLastTradeTimestamp = displayOrderBook.lastTradeTimestamp ?? null
+
     return {
       bids: processedBids,
       asks: processedAsks,
-      lastTradePrice: displayOrderBook.lastTradePrice || null,
-      lastTradeSide: displayOrderBook.lastTradeSide || null,
-      lastTradeTimestamp: displayOrderBook.lastTradeTimestamp || null
+      lastTradePrice: effectiveLastTradePrice,
+      lastTradeSide: effectiveLastTradeSide,
+      lastTradeTimestamp: effectiveLastTradeTimestamp
     }
   }, [displayOrderBook])
 
@@ -204,23 +212,31 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
                   {/* Spread and Last Trade */}
                   {asks.length > 0 && bids.length > 0 && (
                     <div className="border-t border-dashed border-muted-foreground/30 py-2">
-                      <div className="text-center text-xs">
-                        <span className="text-muted-foreground">Last: </span>
-                        {lastTradePrice ? (
-                          <span className={`font-medium ${
-                            lastTradeSide === 'BUY' ? 'text-price-positive' : 'text-price-negative'
-                          }`}>
-                            {lastTradePrice.toFixed(4)}
+                      <div className="text-center text-xs space-y-1">
+                        <div>
+                          <span className="text-muted-foreground">Last: </span>
+                          {lastTradePrice ? (
+                            <span className={`font-medium ${
+                              lastTradeSide === 'BUY' ? 'text-price-positive' : 'text-price-negative'
+                            }`}>
+                              {lastTradePrice.toFixed(4)}
+                            </span>
+                          ) : (
+                            <span className="font-medium text-muted-foreground">
+                              -
+                            </span>
+                          )}
+                          {lastTradeTimestamp && (
+                            <span className="ml-2 text-muted-foreground text-xs">
+                              {formatTimeAgo(lastTradeTimestamp)}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground font-medium">
+                            Spread: {Math.abs(asks[asks.length - 1]?.price - bids[0]?.price).toFixed(4)}
                           </span>
-                        ) : (
-                          <span className="font-medium text-muted-foreground">
-                            -
-                          </span>
-                        )}
-                        <span className="mx-3 text-muted-foreground">•</span>
-                        <span className="text-muted-foreground font-medium">
-                          Spread: {Math.abs(asks[asks.length - 1]?.price - bids[0]?.price).toFixed(4)}
-                        </span>
+                        </div>
                       </div>
                     </div>
                   )}
