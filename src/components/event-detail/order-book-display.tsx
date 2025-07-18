@@ -44,15 +44,17 @@ export function OrderBookDisplay({ conditionId, selectedToken, onTokenChange }: 
     if (!displayOrderBook) return { bids: [], asks: [], lastTradePrice: null, lastTradeSide: null, lastTradeTimestamp: null }
 
     // Debug logging
-    console.log('OrderBookDisplay Debug:', {
+    console.log('🎯 OrderBookDisplay Debug:', {
       conditionId,
       selectedToken,
+      expectedKey: `${conditionId}_${selectedToken}`,
       displayOrderBook: {
         lastTradePrice: displayOrderBook.lastTradePrice,
         lastTradePriceFromAPI: displayOrderBook.lastTradePriceFromAPI,
         lastTradeSide: displayOrderBook.lastTradeSide,
         lastTradeSideFromAPI: displayOrderBook.lastTradeSideFromAPI,
-        hasOrderBook: !!displayOrderBook
+        hasOrderBook: !!displayOrderBook,
+        fullOrderBook: displayOrderBook
       }
     })
 

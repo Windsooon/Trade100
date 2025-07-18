@@ -167,10 +167,9 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
           // Update YES token data
           const yesKey = `${marketInfo.conditionId}_yes`
+          const existingYesBook = newOrderBooks[yesKey] || { bids: [], asks: [] }
           newOrderBooks[yesKey] = {
-            ...newOrderBooks[yesKey],
-            bids: newOrderBooks[yesKey]?.bids || [],
-            asks: newOrderBooks[yesKey]?.asks || [],
+            ...existingYesBook,
             lastTradePriceFromAPI: yesPrice,
             lastTradeSideFromAPI: tradeData.side
           }
@@ -178,17 +177,19 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
           // Update NO token data (calculated from YES)
           const noKey = `${marketInfo.conditionId}_no`
           const oppositeSide = tradeData.side === 'BUY' ? 'SELL' : 'BUY'
+          const existingNoBook = newOrderBooks[noKey] || { bids: [], asks: [] }
           newOrderBooks[noKey] = {
-            ...newOrderBooks[noKey],
-            bids: newOrderBooks[noKey]?.bids || [],
-            asks: newOrderBooks[noKey]?.asks || [],
+            ...existingNoBook,
             lastTradePriceFromAPI: noPrice,
             lastTradeSideFromAPI: oppositeSide
           }
 
           console.log('✅ Updated order books for:', { yesKey, noKey })
+          console.log('📋 Final yesBook:', newOrderBooks[yesKey])
+          console.log('📋 Final noBook:', newOrderBooks[noKey])
         })
 
+        console.log('🔄 Returning updated order books state')
         return newOrderBooks
       })
 
