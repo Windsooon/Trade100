@@ -27,11 +27,6 @@ export function MarketListCard({
   onTokenChange, 
   event
 }: MarketListCardProps) {
-  console.log('📊 MarketListCard: Component initialized', { 
-    marketsCount: markets.length,
-    selectedMarketId: selectedMarket?.conditionId,
-    timestamp: Date.now() 
-  })
   
   const [showInactiveMarkets, setShowInactiveMarkets] = useState(false)
   const [expandedMarket, setExpandedMarket] = useState<string | null>(null)

@@ -17,11 +17,6 @@ import { MoneyFlowAnalysis } from './market-insight/money-flow-analysis'
 import { TraderAnalysis } from './market-insight/trader-analysis'
 
 export function MarketInsightCard({ selectedMarket, selectedToken, event }: MarketInsightCardProps) {
-  console.log('💡 MarketInsightCard: Component initialized', { 
-    selectedMarketId: selectedMarket?.conditionId,
-    selectedToken,
-    timestamp: Date.now() 
-  })
   
   const componentId = useRef(Math.random().toString(36).substr(2, 9))
   const renderCount = useRef(0)
