@@ -52,6 +52,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
   // Retry configuration
   const MAX_RETRY_ATTEMPTS = 5
   const RETRY_DELAYS = [1000, 2000, 4000, 8000, 16000] // Exponential backoff
+  const CONNECTION_TIMEOUT = 30000 // 30 seconds (increased from 10)
 
   // Get all active market token IDs for WebSocket subscription
   const allActiveTokenIds = useMemo(() => {
@@ -89,66 +90,127 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
   // WebSocket connection
   const connect = useCallback(() => {
     if (!allActiveTokenIds.length || isUnmountingRef.current) {
+      console.log('❌ WebSocket connection aborted: no tokens or unmounting')
       return
     }
     
     cleanup() // Clean up any existing connections
     setConnectionStatus('connecting')
+    
+    console.log('🔌 Attempting WebSocket connection...', {
+      tokenCount: allActiveTokenIds.length,
+      retryAttempt: retryAttemptRef.current
+    })
+
+    // Helper function to handle retries
+    const handleRetry = (reason: string) => {
+      console.log(`🔄 Retry needed: ${reason}`, {
+        currentAttempt: retryAttemptRef.current,
+        maxAttempts: MAX_RETRY_ATTEMPTS
+      })
+      
+      if (!isUnmountingRef.current && retryAttemptRef.current < MAX_RETRY_ATTEMPTS) {
+        const delay = RETRY_DELAYS[retryAttemptRef.current] || RETRY_DELAYS[RETRY_DELAYS.length - 1]
+        setConnectionStatus('retrying')
+        console.log(`⏳ Retrying in ${delay}ms...`)
+        retryTimeoutRef.current = setTimeout(() => {
+          if (!isUnmountingRef.current) {
+            retryAttemptRef.current += 1
+            setRetryAttempt(retryAttemptRef.current)
+            connect()
+          }
+        }, delay)
+      } else {
+        console.log('❌ Max retry attempts reached or component unmounting')
+        setConnectionStatus('error')
+      }
+    }
 
     try {
       const ws = new WebSocket('wss://ws-subscriptions-clob.polymarket.com/ws/market')
       wsRef.current = ws
 
-      // Connection timeout
+      // Connection timeout - increased to 30 seconds
       const connectionTimeout = setTimeout(() => {
+        console.log('⏰ WebSocket connection timeout')
         if (ws.readyState === WebSocket.CONNECTING) {
+          console.log('🔌 Closing connection due to timeout')
           ws.close()
-          if (!isUnmountingRef.current && retryAttemptRef.current < MAX_RETRY_ATTEMPTS) {
-            const delay = RETRY_DELAYS[retryAttemptRef.current] || RETRY_DELAYS[RETRY_DELAYS.length - 1]
-            setConnectionStatus('retrying')
-            retryTimeoutRef.current = setTimeout(() => {
-              if (!isUnmountingRef.current) {
-                retryAttemptRef.current += 1
-                setRetryAttempt(retryAttemptRef.current)
-                connect()
-              }
-            }, delay)
-          } else {
-            setConnectionStatus('error')
-          }
+          handleRetry('Connection timeout')
         }
-      }, 10000) // 10 second timeout
+      }, CONNECTION_TIMEOUT)
 
       ws.onopen = () => {
+        console.log('✅ WebSocket connection opened successfully')
         clearTimeout(connectionTimeout)
-        if (isUnmountingRef.current) return
+        if (isUnmountingRef.current) {
+          console.log('⚠️ Component unmounting, closing WebSocket')
+          ws.close()
+          return
+        }
         
         setConnectionStatus('connected')
         retryAttemptRef.current = 0 // Reset retry count on successful connection
         setRetryAttempt(0)
         setRetryCount(prev => prev + 1)
         
+        // Enhanced subscription message with initial_dump like the example
         const subscribeMessage = {
           assets_ids: allActiveTokenIds,
-          type: 'market'
+          type: 'market',
+          initial_dump: true,  // Request initial orderbook snapshot
+          markets: []          // Empty markets array for market type
         }
         
-        ws.send(JSON.stringify(subscribeMessage))
+        console.log('📤 Sending subscription message:', {
+          tokenCount: allActiveTokenIds.length,
+          message: subscribeMessage
+        })
         
+        // Send subscription with error handling
+        try {
+          ws.send(JSON.stringify(subscribeMessage))
+          console.log('✅ Subscription message sent successfully')
+        } catch (error) {
+          console.error('❌ Failed to send subscription message:', error)
+          handleRetry('Failed to send subscription')
+          return
+        }
+        
+        // Setup ping interval (using 50 seconds like the example, but keeping shorter for responsiveness)
         pingIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
+            console.log('🏓 Sending PING')
             ws.send('PING')
+          } else {
+            console.log('⚠️ WebSocket not open, clearing ping interval')
+            if (pingIntervalRef.current) {
+              clearInterval(pingIntervalRef.current)
+              pingIntervalRef.current = null
+            }
           }
-        }, 30000)
+        }, 30000) // Keep 30 seconds for better responsiveness
       }
 
       ws.onmessage = (event) => {
         if (isUnmountingRef.current) return
         
         try {
-          if (event.data === 'PONG') return
+          if (event.data === 'PONG') {
+            console.log('🏓 Received PONG')
+            return
+          }
           
           const data = JSON.parse(event.data)
+          
+          console.log('📨 Received WebSocket message:', {
+            type: Array.isArray(data) ? 'array' : typeof data,
+            length: Array.isArray(data) ? data.length : 'N/A',
+            sample: Array.isArray(data) && data.length > 0 ? {
+              event_type: data[0].event_type,
+              asset_id: data[0].asset_id
+            } : data
+          })
           
           // Handle array of messages (initial book snapshots and price_change events)
           if (Array.isArray(data)) {
@@ -323,66 +385,53 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
             })
           }
         } catch (error) {
-          // Error parsing WebSocket message
+          console.error('❌ Error parsing WebSocket message:', {
+            error,
+            rawData: event.data,
+            dataLength: event.data?.length
+          })
         }
       }
 
       ws.onerror = (error) => {
+        console.error('❌ WebSocket error:', error)
         clearTimeout(connectionTimeout)
-        if (isUnmountingRef.current) return
-        
-        if (retryAttemptRef.current < MAX_RETRY_ATTEMPTS) {
-          const delay = RETRY_DELAYS[retryAttemptRef.current] || RETRY_DELAYS[RETRY_DELAYS.length - 1]
-          setConnectionStatus('retrying')
-          retryTimeoutRef.current = setTimeout(() => {
-            if (!isUnmountingRef.current) {
-              retryAttemptRef.current += 1
-              setRetryAttempt(retryAttemptRef.current)
-              connect()
-            }
-          }, delay)
-        } else {
-          setConnectionStatus('error')
+        if (isUnmountingRef.current) {
+          console.log('⚠️ Component unmounting, ignoring error')
+          return
         }
+        
+        console.log('🔌 WebSocket readyState on error:', ws.readyState)
+        handleRetry(`WebSocket error: ${error}`)
       }
 
       ws.onclose = (event) => {
+        console.log('🔌 WebSocket connection closed', {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean
+        })
         clearTimeout(connectionTimeout)
-        if (isUnmountingRef.current) return
+        if (isUnmountingRef.current) {
+          console.log('⚠️ Component unmounting, not retrying')
+          cleanup()
+          return
+        }
         
         cleanup()
         
-        // Only retry if it wasn't a normal closure
-        if (event.code !== 1000 && retryAttemptRef.current < MAX_RETRY_ATTEMPTS) {
-          const delay = RETRY_DELAYS[retryAttemptRef.current] || RETRY_DELAYS[RETRY_DELAYS.length - 1]
-          setConnectionStatus('retrying')
-          retryTimeoutRef.current = setTimeout(() => {
-            if (!isUnmountingRef.current) {
-              retryAttemptRef.current += 1
-              setRetryAttempt(retryAttemptRef.current)
-              connect()
-            }
-          }, delay)
-        } else if (event.code !== 1000) {
-          setConnectionStatus('error')
+        // Only retry if it wasn't a normal closure (1000 = normal closure)
+        if (event.code !== 1000) {
+          console.log('🔄 WebSocket closed abnormally, attempting retry')
+          handleRetry(`Connection closed: ${event.code} - ${event.reason}`)
         } else {
+          console.log('✅ WebSocket closed normally')
           setConnectionStatus('disconnected')
         }
       }
     } catch (error) {
-      if (retryAttemptRef.current < MAX_RETRY_ATTEMPTS) {
-        const delay = RETRY_DELAYS[retryAttemptRef.current] || RETRY_DELAYS[RETRY_DELAYS.length - 1]
-        setConnectionStatus('retrying')
-        retryTimeoutRef.current = setTimeout(() => {
-          if (!isUnmountingRef.current) {
-            retryAttemptRef.current += 1
-            setRetryAttempt(retryAttemptRef.current)
-            connect()
-          }
-        }, delay)
-      } else {
-        setConnectionStatus('error')
-      }
+      console.error('❌ Failed to create WebSocket connection:', error)
+      handleRetry(`Connection creation failed: ${error}`)
     }
   }, [allActiveTokenIds, allActiveMarkets, cleanup])
 
