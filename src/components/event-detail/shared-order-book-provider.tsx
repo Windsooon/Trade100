@@ -64,7 +64,6 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
   // Get all active market token IDs for WebSocket subscription
   const allActiveTokenIds = useMemo(() => {
     const allTokens: string[] = []
-    console.log('🔌 Calculating allActiveTokenIds from markets:', allActiveMarkets)
     allActiveMarkets.forEach(market => {
       if (market.clobTokenIds) {
         try {
@@ -76,7 +75,6 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
         }
       }
     })
-    console.log('🔌 Calculated allActiveTokenIds:', allTokens)
     return allTokens.sort()
   }, [allActiveMarkets])
 
@@ -192,15 +190,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
 
   // WebSocket connection
   const connect = useCallback(() => {
-    console.log('🔌 WebSocket connect called', {
-      allActiveTokenIds: allActiveTokenIds,
-      tokenCount: allActiveTokenIds.length,
-      isUnmounting: isUnmountingRef.current,
-      timestamp: Date.now()
-    })
-    
     if (!allActiveTokenIds.length || isUnmountingRef.current) {
-      console.log('🔌 WebSocket connect: Skipping due to no tokens or unmounting')
       return
     }
     
@@ -232,7 +222,6 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
       }, 10000) // 10 second timeout
 
       ws.onopen = () => {
-        console.log('🔌 WebSocket opened successfully')
         clearTimeout(connectionTimeout)
         if (isUnmountingRef.current) return
         
@@ -246,7 +235,6 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
           type: 'market'
         }
         
-        console.log('🔌 WebSocket sending subscribe message:', subscribeMessage)
         ws.send(JSON.stringify(subscribeMessage))
         
         pingIntervalRef.current = setInterval(() => {
@@ -517,6 +505,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
   // Connect on mount and when active markets change
   useEffect(() => {
     if (allActiveTokenIds.length > 0) {
+      isUnmountingRef.current = false // Reset unmounting flag when effect runs
       retryAttemptRef.current = 0
       setRetryAttempt(0)
       connect()
@@ -535,15 +524,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
     }
   }, [allActiveMarkets.length])
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      isUnmountingRef.current = true
-      lastTradePricesLoadedRef.current = false
-      fetchingLastTradePricesRef.current = false
-      cleanup()
-    }
-  }, [cleanup])
+  // Note: Cleanup is handled by the main WebSocket useEffect above
 
   const contextValue = useMemo(() => ({
     orderBooks,
