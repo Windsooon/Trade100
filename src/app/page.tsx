@@ -8,8 +8,9 @@ import { BottomNavigation } from '@/components/ui/bottom-navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
-import { TrendingUp, Clock, DollarSign, BarChart3, Activity, RefreshCw } from 'lucide-react'
+import { TrendingUp, Clock, DollarSign, BarChart3, Activity, RefreshCw, AlertCircle } from 'lucide-react'
 import { Event } from '@/lib/stores'
 import Link from 'next/link'
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
@@ -25,6 +26,42 @@ interface TradeApiResponse {
   hour_start: number
   trade_count: number
   total_volume: number
+}
+
+// Interface for Recommend API response
+interface RecommendApiResponse {
+  success: boolean
+  data: {
+    whale_markets: Array<{
+      market_id: string
+      title: string
+      icon: string
+      whale_trades_count: number
+      average_whale_value: string
+      total_whale_volume: string
+      unique_whale_traders: number
+    }>
+    popular_markets: Array<{
+      market_id: string
+      title: string
+      icon: string
+      total_trades: number
+      total_volume: string
+      unique_traders: number
+    }>
+    high_probability_markets: Array<{
+      market_id: string
+      title: string
+      icon: string
+      trade_count: number
+      total_volume: string
+      price_range: string
+    }>
+  }
+  meta: {
+    hour_range: number
+    generated_at: string
+  }
 }
 
 // Transform API data for chart
@@ -387,6 +424,204 @@ function MarketCard({ market }: { market: MarketDisplay }) {
   )
 }
 
+// Recommend Market Card Components
+function PopularMarketCard({ market }: { market: any }) {
+  const formatVolume = (volume: string): string => {
+    const num = parseFloat(volume)
+    if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`
+    if (num >= 1000) return `$${(num / 1000).toFixed(1)}K`
+    return `$${num.toFixed(0)}`
+  }
+
+  return (
+    <Link href={`/events/market-${market.market_id}`} target="_blank" rel="noopener noreferrer">
+      <div className="flex cursor-pointer items-center justify-between rounded-md p-3 hover:bg-muted/50 transition-colors">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {/* Market Icon */}
+          <div className="flex-shrink-0">
+            {market.icon ? (
+              <img
+                src={market.icon}
+                alt={`${market.title} icon`}
+                className="w-6 h-6 rounded-full"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-muted flex-shrink-0" />
+            )}
+          </div>
+          
+          {/* Market Title */}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-medium truncate">{market.title}</h3>
+          </div>
+        </div>
+        
+        {/* Volume and Traders - Responsive Layout */}
+        {/* Desktop Layout (md and up) */}
+        <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
+          <div className="w-20 text-left">
+            <div className="text-xs text-muted-foreground mb-1">Volume</div>
+            <div className="font-medium">{formatVolume(market.total_volume)}</div>
+          </div>
+          <div className="w-20 text-center">
+            <div className="text-xs text-muted-foreground mb-1">Traders</div>
+            <div className="font-medium">{market.unique_traders}</div>
+          </div>
+        </div>
+        
+        {/* Mobile Layout (below md) */}
+        <div className="flex md:hidden items-center gap-3 text-sm ml-4 flex-shrink-0">
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Volume</div>
+            <div className="font-medium">{formatVolume(market.total_volume)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Traders</div>
+            <div className="font-medium">{market.unique_traders}</div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+function WhaleMarketCard({ market }: { market: any }) {
+  const formatVolume = (volume: string): string => {
+    const num = parseFloat(volume)
+    if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`
+    if (num >= 1000) return `$${(num / 1000).toFixed(1)}K`
+    return `$${num.toFixed(0)}`
+  }
+
+  return (
+    <Link href={`/events/market-${market.market_id}`} target="_blank" rel="noopener noreferrer">
+      <div className="flex cursor-pointer items-center justify-between rounded-md p-3 hover:bg-muted/50 transition-colors">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {/* Market Icon */}
+          <div className="flex-shrink-0">
+            {market.icon ? (
+              <img
+                src={market.icon}
+                alt={`${market.title} icon`}
+                className="w-6 h-6 rounded-full"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-muted flex-shrink-0" />
+            )}
+          </div>
+          
+          {/* Market Title */}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-medium truncate">{market.title}</h3>
+          </div>
+        </div>
+        
+        {/* Whale Volume and Trades - Responsive Layout */}
+        {/* Desktop Layout (md and up) */}
+        <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
+          <div className="w-20 text-left">
+            <div className="text-xs text-muted-foreground mb-1">Whale Vol</div>
+            <div className="font-medium">{formatVolume(market.total_whale_volume)}</div>
+          </div>
+          <div className="w-20 text-center">
+            <div className="text-xs text-muted-foreground mb-1">Trades</div>
+            <div className="font-medium">{market.whale_trades_count}</div>
+          </div>
+        </div>
+        
+        {/* Mobile Layout (below md) */}
+        <div className="flex md:hidden items-center gap-3 text-sm ml-4 flex-shrink-0">
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Whale Vol</div>
+            <div className="font-medium">{formatVolume(market.total_whale_volume)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Trades</div>
+            <div className="font-medium">{market.whale_trades_count}</div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+function HighProbabilityMarketCard({ market }: { market: any }) {
+  const formatVolume = (volume: string): string => {
+    const num = parseFloat(volume)
+    if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`
+    if (num >= 1000) return `$${(num / 1000).toFixed(1)}K`
+    return `$${num.toFixed(0)}`
+  }
+
+  const formatPriceRange = (priceRange: string): string => {
+    // Convert "0.001-0.002, 0.998-0.999" to a simpler format
+    if (priceRange.includes('0.99') || priceRange.includes('0.001')) {
+      return 'High Confidence'
+    }
+    return priceRange.split(',')[0] // Just show first range
+  }
+
+  return (
+    <Link href={`/events/market-${market.market_id}`} target="_blank" rel="noopener noreferrer">
+      <div className="flex cursor-pointer items-center justify-between rounded-md p-3 hover:bg-muted/50 transition-colors">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {/* Market Icon */}
+          <div className="flex-shrink-0">
+            {market.icon ? (
+              <img
+                src={market.icon}
+                alt={`${market.title} icon`}
+                className="w-6 h-6 rounded-full"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-muted flex-shrink-0" />
+            )}
+          </div>
+          
+          {/* Market Title */}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-medium truncate">{market.title}</h3>
+          </div>
+        </div>
+        
+        {/* Volume and Confidence - Responsive Layout */}
+        {/* Desktop Layout (md and up) */}
+        <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
+          <div className="w-20 text-left">
+            <div className="text-xs text-muted-foreground mb-1">Volume</div>
+            <div className="font-medium">{formatVolume(market.total_volume)}</div>
+          </div>
+          <div className="w-24 text-center">
+            <div className="text-xs text-muted-foreground mb-1">Confidence</div>
+            <div className="font-medium text-xs">{formatPriceRange(market.price_range)}</div>
+          </div>
+        </div>
+        
+        {/* Mobile Layout (below md) */}
+        <div className="flex md:hidden items-center gap-3 text-sm ml-4 flex-shrink-0">
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Volume</div>
+            <div className="font-medium">{formatVolume(market.total_volume)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Conf.</div>
+            <div className="font-medium text-xs">{formatPriceRange(market.price_range)}</div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
 // Helper functions
 const formatVolume = (volume: number | undefined): string => {
   if (typeof volume !== 'number' || volume === 0) return 'N/A'
@@ -421,11 +656,20 @@ export default function HomePage() {
 
   
   // Tag navigation
-  const [selectedTag, setSelectedTag] = useState('volume')
+  const [selectedTag, setSelectedTag] = useState('recommend')
+  
+  // Recommend nested tabs
+  const [selectedRecommendTab, setSelectedRecommendTab] = useState('popular')
+  
+  const RECOMMEND_TABS = [
+    { id: 'popular', label: 'Popular' },
+    { id: 'whale', label: 'Whale' },
+    { id: 'highProbability', label: 'High Probability' }
+  ]
   
   // Tag list for navigation
   const MARKET_TAGS = [
-    { id: 'recommend', label: 'Recommend (Soon)' },
+    { id: 'recommend', label: 'Recommend' },
     { id: 'newest', label: 'Newest' },
     { id: 'volume', label: '24h Volume' },
     { id: 'liquidity', label: 'Liquidity' },
@@ -438,6 +682,7 @@ export default function HomePage() {
     volume: true,
     liquidity: true,
     endingSoon: true,
+    recommend: true,
   })
   
   // Market data for tabs (cards now use mock data)
@@ -447,6 +692,19 @@ export default function HomePage() {
     liquidity: [] as MarketDisplay[],
     endingSoon: [] as MarketDisplay[],
   })
+  
+  // Recommend data state
+  const [recommendData, setRecommendData] = useState<{
+    popular: any[],
+    whale: any[],
+    highProbability: any[]
+  }>({
+    popular: [],
+    whale: [],
+    highProbability: []
+  })
+  
+  const [recommendError, setRecommendError] = useState<string | null>(null)
 
   useEffect(() => {
     // Fetch all data in parallel
@@ -455,6 +713,7 @@ export default function HomePage() {
       fetchTopVolume(),
       fetchEndingSoon(),
       fetchLiquidity(),
+      fetchRecommend(),
     ])
   }, [])
 
@@ -721,6 +980,32 @@ export default function HomePage() {
     }
   }
 
+  const fetchRecommend = async () => {
+    try {
+      setIsLoading(prev => ({ ...prev, recommend: true }))
+      setRecommendError(null)
+      
+      const response = await fetch('https://trade-analyze-production.up.railway.app/api/recommend?hour=12')
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      
+      const data: RecommendApiResponse = await response.json()
+      if (data.success) {
+        setRecommendData({
+          popular: data.data.popular_markets || [],
+          whale: data.data.whale_markets || [],
+          highProbability: data.data.high_probability_markets || []
+        })
+      } else {
+        throw new Error('Failed to fetch recommend data')
+      }
+    } catch (error) {
+      console.error('Failed to load recommend data:', error)
+      setRecommendError('Unable to load recommended markets. Please try again later.')
+    } finally {
+      setIsLoading(prev => ({ ...prev, recommend: false }))
+    }
+  }
+
   const transformApiEvents = (apiEvents: any[]): Event[] => {
     return apiEvents.map((apiEvent: any) => ({
       id: apiEvent.id,
@@ -781,16 +1066,86 @@ export default function HomePage() {
           {/* Content based on selected tag */}
           <div className="space-y-3 max-w-[800px] mx-auto">
             {selectedTag === 'recommend' && (
-              <div className="text-center py-12">
-                <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <h3 className="text-lg font-medium text-foreground mb-2">Personalized Recommendations</h3>
-                <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
-                  We're working on smart market recommendations based on your trading history and interests.
-                </p>
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground font-medium">Coming Soon</span>
+              <div className="space-y-6">
+                {/* Nested Recommend Tabs */}
+                <div className="border-b bg-background">
+                  <div className="flex items-center gap-4 py-3 overflow-x-auto scrollbar-hide justify-center">
+                    {RECOMMEND_TABS.map((tab) => (
+                      <Button
+                        key={tab.id}
+                        variant={selectedRecommendTab === tab.id ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setSelectedRecommendTab(tab.id)}
+                        className="whitespace-nowrap"
+                      >
+                        {tab.label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Error State */}
+                {recommendError && (
+                  <Alert className="max-w-[600px] mx-auto">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{recommendError}</AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Loading State */}
+                {isLoading.recommend && !recommendError && (
+                  <MarketListSkeleton count={6} />
+                )}
+
+                {/* Recommend Content */}
+                {!isLoading.recommend && !recommendError && (
+                  <>
+                    {/* Popular Tab */}
+                    {selectedRecommendTab === 'popular' && (
+                      <>
+                        {recommendData.popular.length === 0 ? (
+                          <div className="text-center py-8">
+                            <p className="text-sm text-muted-foreground">No popular markets available</p>
+                          </div>
+                        ) : (
+                          recommendData.popular.slice(0, 10).map((market) => (
+                            <PopularMarketCard key={market.market_id} market={market} />
+                          ))
+                        )}
+                      </>
+                    )}
+
+                    {/* Whale Tab */}
+                    {selectedRecommendTab === 'whale' && (
+                      <>
+                        {recommendData.whale.length === 0 ? (
+                          <div className="text-center py-8">
+                            <p className="text-sm text-muted-foreground">No whale markets available</p>
+                          </div>
+                        ) : (
+                          recommendData.whale.slice(0, 10).map((market) => (
+                            <WhaleMarketCard key={market.market_id} market={market} />
+                          ))
+                        )}
+                      </>
+                    )}
+
+                    {/* High Probability Tab */}
+                    {selectedRecommendTab === 'highProbability' && (
+                      <>
+                        {recommendData.highProbability.length === 0 ? (
+                          <div className="text-center py-8">
+                            <p className="text-sm text-muted-foreground">No high probability markets available</p>
+                          </div>
+                        ) : (
+                          recommendData.highProbability.slice(0, 10).map((market) => (
+                            <HighProbabilityMarketCard key={market.market_id} market={market} />
+                          ))
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
