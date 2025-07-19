@@ -65,7 +65,7 @@ export default function PortfolioPage() {
   const [chartData, setChartData] = React.useState<ChartDataPoint[]>([])
   const [isLoadingData, setIsLoadingData] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  const [chartMode, setChartMode] = React.useState<'accumulative' | 'singleDay'>('accumulative')
+  const [chartMode, setChartMode] = React.useState<'accumulative' | 'singleDay'>('singleDay')
   
   // Activity state
   const [selectedDate, setSelectedDate] = React.useState<string | null>(null)
@@ -318,14 +318,6 @@ export default function PortfolioPage() {
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1 border rounded-lg p-1">
                     <Button
-                      variant={chartMode === 'accumulative' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setChartMode('accumulative')}
-                      className="h-7 px-3 text-xs"
-                    >
-                      Accumulative P/L
-                    </Button>
-                    <Button
                       variant={chartMode === 'singleDay' ? 'default' : 'ghost'}
                       size="sm"
                       onClick={() => setChartMode('singleDay')}
@@ -333,13 +325,21 @@ export default function PortfolioPage() {
                     >
                       Single Day P/L
                     </Button>
+                    <Button
+                      variant={chartMode === 'accumulative' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setChartMode('accumulative')}
+                      className="h-7 px-3 text-xs"
+                    >
+                      Accumulative P/L
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
                 <ChartContainer
                   config={chartConfig}
-                  className="aspect-auto h-[250px] w-full"
+                  className="aspect-auto h-[250px] w-full cursor-pointer"
                 >
                   <AreaChart data={getChartData()} onClick={handleChartClick}>
                     <defs>

@@ -24,24 +24,46 @@ interface ActivitySectionProps {
   onSortDirectionChange: (direction: 'ASC' | 'DESC') => void
 }
 
-interface EventGroup {
-  eventSlug: string
-  eventTitle: string
+interface MarketGroup {
+  slug: string
+  title: string
   activities: ActivityItem[]
   totalTrades: number
   totalVolume: number
   totalShares: number
 }
 
-// Group activities by event
+interface EventGroup {
+  eventSlug: string
+  eventTitle: string
+  markets: MarketGroup[]
+  totalTrades: number
+  totalVolume: number
+  totalShares: number
+}
+
+// Group activities by event and then by market within each event
 function groupActivitiesByEvent(activities: ActivityItem[]): EventGroup[] {
-  const grouped = activities.reduce((acc, activity) => {
-    const key = activity.eventSlug || 'unknown'
+  const eventGrouped = activities.reduce((acc, activity) => {
+    const eventKey = activity.eventSlug || 'unknown'
     
-    if (!acc[key]) {
-      acc[key] = {
+    if (!acc[eventKey]) {
+      acc[eventKey] = {
         eventSlug: activity.eventSlug,
-        eventTitle: activity.eventSlug ? activity.eventSlug.replace(/-/g, ' ') : 'Unknown Event', // Format eventSlug by removing dashes
+        eventTitle: activity.eventSlug ? activity.eventSlug.replace(/-/g, ' ') : 'Unknown Event',
+        markets: {},
+        totalTrades: 0,
+        totalVolume: 0,
+        totalShares: 0
+      }
+    }
+    
+    const marketKey = activity.slug || 'unknown'
+    
+    if (!acc[eventKey].markets[marketKey]) {
+      acc[eventKey].markets[marketKey] = {
+        slug: activity.slug,
+        title: activity.title || activity.slug?.replace(/-/g, ' ') || 'Unknown Market',
         activities: [],
         totalTrades: 0,
         totalVolume: 0,
@@ -49,16 +71,23 @@ function groupActivitiesByEvent(activities: ActivityItem[]): EventGroup[] {
       }
     }
     
-    acc[key].activities.push(activity)
-    acc[key].totalTrades += 1
-    acc[key].totalVolume += activity.usdcSize
-    acc[key].totalShares += activity.size
+    acc[eventKey].markets[marketKey].activities.push(activity)
+    acc[eventKey].markets[marketKey].totalTrades += 1
+    acc[eventKey].markets[marketKey].totalVolume += activity.usdcSize
+    acc[eventKey].markets[marketKey].totalShares += activity.size
+    
+    acc[eventKey].totalTrades += 1
+    acc[eventKey].totalVolume += activity.usdcSize
+    acc[eventKey].totalShares += activity.size
     
     return acc
-  }, {} as Record<string, EventGroup>)
+  }, {} as Record<string, { eventSlug: string; eventTitle: string; markets: Record<string, MarketGroup>; totalTrades: number; totalVolume: number; totalShares: number }>)
   
-  // Sort events by total activity count (descending)
-  return Object.values(grouped).sort((a, b) => b.totalTrades - a.totalTrades)
+  // Convert to final structure and sort
+  return Object.values(eventGrouped).map(event => ({
+    ...event,
+    markets: Object.values(event.markets).sort((a, b) => b.totalTrades - a.totalTrades)
+  })).sort((a, b) => b.totalTrades - a.totalTrades)
 }
 
 export function ActivitySection({
@@ -217,6 +246,7 @@ export function ActivitySection({
                             <ChevronRight className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-90" />
                             <div>
                               <h3 className="font-medium text-sm">{eventGroup.eventTitle}</h3>
+                              <p className="text-xs text-muted-foreground">{eventGroup.markets.length} markets</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-4 text-xs">
@@ -237,12 +267,48 @@ export function ActivitySection({
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <div className="border-t">
-                          <div className="space-y-1 p-2">
-                            {eventGroup.activities.map((activity, activityIndex) => (
-                              <ActivityCard 
-                                key={`${activity.transactionHash}-${activityIndex}`} 
-                                activity={activity} 
-                              />
+                          <div className="space-y-2 p-2">
+                            {eventGroup.markets.map((marketGroup, marketIndex) => (
+                              <Collapsible key={marketGroup.slug} defaultOpen={true}>
+                                <div className="border rounded-md ml-4">
+                                  <CollapsibleTrigger asChild>
+                                    <div className="flex items-center justify-between p-3 hover:bg-muted/30 cursor-pointer">
+                                      <div className="flex items-center gap-2">
+                                        <ChevronRight className="h-3 w-3 transition-transform duration-200 data-[state=open]:rotate-90" />
+                                        <div>
+                                          <h4 className="font-medium text-xs">{marketGroup.title}</h4>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-3 text-xs">
+                                        <div className="text-center">
+                                          <div className="font-medium">{marketGroup.totalTrades}</div>
+                                          <div className="text-muted-foreground">Activities</div>
+                                        </div>
+                                        <div className="text-center">
+                                          <div className="font-medium">{marketGroup.totalShares.toLocaleString()}</div>
+                                          <div className="text-muted-foreground">Shares</div>
+                                        </div>
+                                        <div className="text-center">
+                                          <div className="font-medium">{formatCurrency(marketGroup.totalVolume)}</div>
+                                          <div className="text-muted-foreground">Volume</div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent>
+                                    <div className="border-t">
+                                      <div className="space-y-1 p-2">
+                                        {marketGroup.activities.map((activity, activityIndex) => (
+                                          <ActivityCard 
+                                            key={`${activity.transactionHash}-${activityIndex}`} 
+                                            activity={activity} 
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </CollapsibleContent>
+                                </div>
+                              </Collapsible>
                             ))}
                           </div>
                         </div>
