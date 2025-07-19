@@ -429,7 +429,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
         </div>
         
         {/* Trades list */}
-        <div className="max-h-64 overflow-y-auto">
+        <div className="max-h-128 overflow-y-auto">
           {trades.map((trade, index) => (
             <div 
               key={`${trade.transactionHash}-${index}`} 
