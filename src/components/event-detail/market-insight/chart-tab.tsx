@@ -33,7 +33,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
   
   // Real-time update refs
   const realtimeIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const latestDataPointRef = useRef<MarketHistoryDataPoint | null>(null)
 
   // Chart refs
   const chartContainerRef = useRef<HTMLDivElement>(null)
@@ -558,9 +557,8 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       // Process cached data
       const result = cachedData.data
       
-      // Update latest datapoint reference for real-time updates
+      // Store data for real-time updates
       if (result.data.length > 0) {
-        latestDataPointRef.current = result.data[result.data.length - 1]
         rawDataRef.current = result.data
         volumeDataRef.current = result.data
       }
@@ -597,9 +595,8 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       try {
         const result = await existingPromise
         
-        // Update latest datapoint reference for real-time updates
+        // Store data for real-time updates
         if (result.data.length > 0) {
-          latestDataPointRef.current = result.data[result.data.length - 1]
           rawDataRef.current = result.data
           volumeDataRef.current = result.data
         }
@@ -661,10 +658,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         rawDataRef.current = cachedData
         volumeDataRef.current = cachedData // Same data contains both price and volume
         
-        // Update latest datapoint reference for real-time updates
-        if (cachedData.length > 0) {
-          latestDataPointRef.current = cachedData[cachedData.length - 1]
-        }
+        // Data stored for real-time updates
         
         // Update chart with cached data
         const chartData = cachedData.map(point => ({
@@ -719,10 +713,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       volumeDataRef.current = result.data // Same data contains both price and volume
       setCachedData(cacheKey, result.data)
       
-      // Update latest datapoint reference for real-time updates
-      if (result.data.length > 0) {
-        latestDataPointRef.current = result.data[result.data.length - 1]
-      }
+      // Data stored for real-time updates
       
              return result
        
@@ -776,7 +767,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     }
   }, [selectedMarket?.conditionId, selectedPeriod, calculateTimeRange, volumeType, getCachedData, setCachedData])
 
-  // Real-time data fetch function
+  // Real-time data fetch function - Update/Insert based on timestamp
   const fetchRealtimeUpdate = useCallback(async () => {
     if (!selectedMarket?.conditionId || !seriesRef.current || !volumeSeriesRef.current) {
       return
@@ -802,86 +793,55 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         return
       }
 
-      // Get the newest datapoint from the result
-      const newestDataPoint = result.data[result.data.length - 1]
-      const currentLatest = latestDataPointRef.current
+      // Process each datapoint from API response (in order they appear)
+      let updatedCount = 0
+      let insertedCount = 0
 
-      if (!currentLatest) {
-        // No current data, this shouldn't happen but handle gracefully
-        latestDataPointRef.current = newestDataPoint
-        return
-      }
-
-      // Case 1: Same timestamp, check for value updates
-      if (newestDataPoint.timestamp === currentLatest.timestamp) {
-        // Check if any values have changed
-        const priceChanged = (
-          newestDataPoint.price.open !== currentLatest.price.open ||
-          newestDataPoint.price.high !== currentLatest.price.high ||
-          newestDataPoint.price.low !== currentLatest.price.low ||
-          newestDataPoint.price.close !== currentLatest.price.close
-        )
+      for (const apiDataPoint of result.data) {
+        // Check last 5 datapoints for existing timestamp
+        const lastFive = rawDataRef.current.slice(-5)
+        const existingIndex = lastFive.findIndex(point => point.timestamp === apiDataPoint.timestamp)
         
-        const volumeChanged = (
-          newestDataPoint.volume.totalSize !== currentLatest.volume.totalSize ||
-          newestDataPoint.volume.totalDollarVolume !== currentLatest.volume.totalDollarVolume
-        )
-
-        if (priceChanged || volumeChanged) {
-          // Update existing datapoint
-          const updatedPriceData = {
-            time: newestDataPoint.timestamp as any,
-            open: newestDataPoint.price.open,
-            high: newestDataPoint.price.high,
-            low: newestDataPoint.price.low,
-            close: newestDataPoint.price.close
-          }
-
-          const updatedVolumeData = {
-            time: newestDataPoint.timestamp as any,
-            value: volumeType === 'totalDollarVolume' ? newestDataPoint.volume.totalDollarVolume : newestDataPoint.volume.totalSize,
-            color: newestDataPoint.price.close >= newestDataPoint.price.open ? '#26a69a' : '#ef5350'
-          }
-
-          seriesRef.current.update(updatedPriceData)
-          volumeSeriesRef.current.update(updatedVolumeData)
-          
-          // Update refs and cache
-          latestDataPointRef.current = newestDataPoint
-          const updatedRawData = [...rawDataRef.current]
-          updatedRawData[updatedRawData.length - 1] = newestDataPoint
-          rawDataRef.current = updatedRawData
-          volumeDataRef.current = updatedRawData
-
-          console.log('📈 Real-time: Updated existing datapoint')
+        let actualIndex = -1
+        if (existingIndex !== -1) {
+          // Calculate actual index in the full array
+          actualIndex = rawDataRef.current.length - 5 + existingIndex
         }
+
+        if (actualIndex !== -1) {
+          // Timestamp exists → UPDATE
+          rawDataRef.current[actualIndex] = apiDataPoint
+          volumeDataRef.current[actualIndex] = apiDataPoint
+          updatedCount++
+          console.log(`📈 Real-time: Updated datapoint at timestamp ${apiDataPoint.timestamp}`)
+        } else {
+          // Timestamp doesn't exist → INSERT
+          rawDataRef.current.push(apiDataPoint)
+          volumeDataRef.current.push(apiDataPoint)
+          insertedCount++
+          console.log(`📈 Real-time: Inserted new datapoint at timestamp ${apiDataPoint.timestamp}`)
+        }
+
+        // Update chart series for this datapoint
+        const priceData = {
+          time: apiDataPoint.timestamp as any,
+          open: apiDataPoint.price.open,
+          high: apiDataPoint.price.high,
+          low: apiDataPoint.price.low,
+          close: apiDataPoint.price.close
+        }
+
+        const volumeData = {
+          time: apiDataPoint.timestamp as any,
+          value: volumeType === 'totalDollarVolume' ? apiDataPoint.volume.totalDollarVolume : apiDataPoint.volume.totalSize,
+          color: apiDataPoint.price.close >= apiDataPoint.price.open ? '#26a69a' : '#ef5350'
+        }
+
+        seriesRef.current.update(priceData)
+        volumeSeriesRef.current.update(volumeData)
       }
-      // Case 2: New timestamp, add new datapoint
-      else if (newestDataPoint.timestamp > currentLatest.timestamp) {
-        const newPriceData = {
-          time: newestDataPoint.timestamp as any,
-          open: newestDataPoint.price.open,
-          high: newestDataPoint.price.high,
-          low: newestDataPoint.price.low,
-          close: newestDataPoint.price.close
-        }
 
-        const newVolumeData = {
-          time: newestDataPoint.timestamp as any,
-          value: volumeType === 'totalDollarVolume' ? newestDataPoint.volume.totalDollarVolume : newestDataPoint.volume.totalSize,
-          color: newestDataPoint.price.close >= newestDataPoint.price.open ? '#26a69a' : '#ef5350'
-        }
-
-        seriesRef.current.update(newPriceData)
-        volumeSeriesRef.current.update(newVolumeData)
-        
-        // Update refs and cache
-        latestDataPointRef.current = newestDataPoint
-        rawDataRef.current.push(newestDataPoint)
-        volumeDataRef.current.push(newestDataPoint)
-
-        console.log('📈 Real-time: Added new datapoint')
-      }
+      console.log(`📈 Real-time: Processed ${result.data.length} datapoints (${updatedCount} updated, ${insertedCount} inserted)`)
 
       // Clear any previous real-time errors
       setRealtimeError(null)
