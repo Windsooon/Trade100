@@ -855,8 +855,35 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       if (updatedCount > 0 || insertedCount > 0) {
         console.log('📊 Refreshing chart with updated data...')
         
+        // Remove duplicates and sort by timestamp to ensure data integrity
+        const uniqueData = rawDataRef.current.reduce((acc, point) => {
+          const existingIndex = acc.findIndex(p => p.timestamp === point.timestamp)
+          if (existingIndex !== -1) {
+            // Replace with newer data if duplicate timestamp found
+            acc[existingIndex] = point
+          } else {
+            acc.push(point)
+          }
+          return acc
+        }, [] as typeof rawDataRef.current)
+        
+        // Sort by timestamp to ensure ascending order
+        const sortedUniqueData = uniqueData.sort((a, b) => a.timestamp - b.timestamp)
+        
+        console.log('🔍 Data validation:', {
+          originalLength: rawDataRef.current.length,
+          uniqueLength: sortedUniqueData.length,
+          duplicatesRemoved: rawDataRef.current.length - sortedUniqueData.length,
+          firstFewTimestamps: sortedUniqueData.slice(0, 3).map(p => p.timestamp),
+          lastFewTimestamps: sortedUniqueData.slice(-3).map(p => p.timestamp)
+        })
+        
+        // Update the refs with clean data
+        rawDataRef.current = sortedUniqueData
+        volumeDataRef.current = sortedUniqueData
+        
         // Refresh price chart
-        const refreshedPriceData = rawDataRef.current.map(point => ({
+        const refreshedPriceData = sortedUniqueData.map(point => ({
           time: point.timestamp as any,
           open: point.price.open,
           high: point.price.high,
@@ -865,7 +892,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         }))
         
         // Refresh volume chart  
-        const refreshedVolumeData = rawDataRef.current.map(point => ({
+        const refreshedVolumeData = sortedUniqueData.map(point => ({
           time: point.timestamp as any,
           value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
           color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
