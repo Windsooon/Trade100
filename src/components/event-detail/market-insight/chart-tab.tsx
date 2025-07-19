@@ -18,6 +18,10 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
   const [volumeType, setVolumeType] = useState<VolumeType>('totalDollarVolume')
   const [volumeError, setVolumeError] = useState<string | null>(null)
   
+  // Real-time update states
+  const [realtimeActive, setRealtimeActive] = useState(false)
+  const [realtimeError, setRealtimeError] = useState<string | null>(null)
+  
   // State for forcing chart re-initialization on tab switch
   const [chartKey, setChartKey] = useState(0)
   
@@ -26,6 +30,9 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
   
   // Enhanced duplicate prevention using a global registry
   const activeRequestsRef = useRef<Set<string>>(new Set())
+  
+  // Real-time update refs
+  const realtimeIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Chart refs
   const chartContainerRef = useRef<HTMLDivElement>(null)
@@ -470,6 +477,37 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     })
   }, [])
 
+  // Calculate timestamps for real-time updates (smaller range)
+  const calculateRealtimeTimeRange = useCallback((period: TimePeriod): { startTs: number; endTs: number; fidelity: number } => {
+    const now = Math.floor(Date.now() / 1000) // Current timestamp in seconds
+    let startTs: number
+    let fidelity: number
+    
+    switch (period) {
+      case '1m':
+        startTs = now - (3 * 60) // Last 3 minutes for 1m candles
+        fidelity = 1
+        break
+      case '1h':
+        startTs = now - (3 * 3600) // Last 3 hours for 1h candles
+        fidelity = 60
+        break
+      case '6h':
+        startTs = now - (3 * 6 * 3600) // Last 18 hours for 6h candles
+        fidelity = 360
+        break
+      case '1d':
+        startTs = now - (3 * 24 * 3600) // Last 3 days for 1d candles
+        fidelity = 1440
+        break
+      default:
+        startTs = now - (3 * 3600) // Default to 3 hours
+        fidelity = 60
+    }
+    
+    return { startTs, endTs: now, fidelity }
+  }, [])
+
   // Calculate timestamps for getting historical data based on period
   const calculateTimeRange = useCallback((period: TimePeriod): { startTs: number; endTs: number; fidelity: number } => {
     const now = Math.floor(Date.now() / 1000) // Current timestamp in seconds
@@ -518,6 +556,13 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     if (cachedData && (now - cachedData.timestamp) < MARKET_HISTORY_CACHE_DURATION) {
       // Process cached data
       const result = cachedData.data
+      
+      // Store data for real-time updates
+      if (result.data.length > 0) {
+        rawDataRef.current = result.data
+        volumeDataRef.current = result.data
+      }
+      
       const processedData = result.data.map(point => ({
         time: point.timestamp as any,
         open: point.price.open,
@@ -538,9 +583,10 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       if (volumeSeriesRef.current) {
         volumeSeriesRef.current.setData(volumeData)
       }
-      
-      setLoading(false)
-      return
+        
+        setLoading(false)
+        
+        return
     }
 
     // Check if request is already in progress globally
@@ -548,6 +594,13 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     if (existingPromise) {
       try {
         const result = await existingPromise
+        
+        // Store data for real-time updates
+        if (result.data.length > 0) {
+          rawDataRef.current = result.data
+          volumeDataRef.current = result.data
+        }
+        
         // Process data same as above
         const processedData = result.data.map(point => ({
           time: point.timestamp as any,
@@ -571,6 +624,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         }
         
         setLoading(false)
+        
       } catch (error) {
         setError('Failed to load market data')
         setLoading(false)
@@ -585,6 +639,10 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
     // Mark this request as active immediately
     activeRequestsRef.current.add(requestKey)
+    
+    // Stop real-time updates while loading new data
+    stopRealtimeUpdates()
+    
     setLoading(true)
     setError(null)
     setVolumeError(null)
@@ -599,6 +657,8 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       if (cachedData) {
         rawDataRef.current = cachedData
         volumeDataRef.current = cachedData // Same data contains both price and volume
+        
+        // Data stored for real-time updates
         
         // Update chart with cached data
         const chartData = cachedData.map(point => ({
@@ -625,6 +685,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         }
         
         setLoading(false)
+        
         // Clean up active request marker for cached responses
         activeRequestsRef.current.delete(requestKey)
         return
@@ -651,6 +712,8 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       rawDataRef.current = result.data
       volumeDataRef.current = result.data // Same data contains both price and volume
       setCachedData(cacheKey, result.data)
+      
+      // Data stored for real-time updates
       
              return result
        
@@ -704,6 +767,202 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     }
   }, [selectedMarket?.conditionId, selectedPeriod, calculateTimeRange, volumeType, getCachedData, setCachedData])
 
+  // Real-time data fetch function - Update/Insert based on timestamp
+  const fetchRealtimeUpdate = useCallback(async () => {
+    if (!selectedMarket?.conditionId || !seriesRef.current || !volumeSeriesRef.current) {
+      return
+    }
+
+    try {
+      const { startTs, endTs, fidelity } = calculateRealtimeTimeRange(selectedPeriod)
+      const marketId = selectedMarket.conditionId
+      
+      const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
+      
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch real-time data: ${response.status}`)
+      }
+      
+      const result: MarketHistoryResponse = await response.json()
+      
+      if (!result.data || result.data.length === 0) {
+        // No new data, this is normal
+        setRealtimeError(null)
+        return
+      }
+
+      // Sort datapoints by timestamp (oldest first) to avoid LightWeight Charts update order issues
+      const sortedDataPoints = [...result.data].sort((a, b) => a.timestamp - b.timestamp)
+      
+      console.log('📊 Real-time debug - API response data:', {
+        originalDataLength: result.data.length,
+        sortedDataLength: sortedDataPoints.length,
+        timestamps: sortedDataPoints.map(p => p.timestamp),
+        currentDataLength: rawDataRef.current.length,
+        lastCurrentTimestamps: rawDataRef.current.slice(-3).map(p => p.timestamp),
+        lastCurrentDataSample: rawDataRef.current.slice(-2).map(p => ({
+          timestamp: p.timestamp,
+          timestampType: typeof p.timestamp
+        }))
+      })
+      
+      // Process each datapoint in chronological order
+      let updatedCount = 0
+      let insertedCount = 0
+
+      for (const apiDataPoint of sortedDataPoints) {
+        // Check last 5 datapoints for existing timestamp
+        const lastFive = rawDataRef.current.slice(-5)
+        const existingIndex = lastFive.findIndex(point => point.timestamp === apiDataPoint.timestamp)
+        
+        // Also check the ENTIRE array to see if timestamp exists elsewhere
+        const fullArrayIndex = rawDataRef.current.findIndex(point => point.timestamp === apiDataPoint.timestamp)
+        
+        let actualIndex = -1
+        if (existingIndex !== -1) {
+          // Calculate actual index in the full array
+          actualIndex = rawDataRef.current.length - 5 + existingIndex
+        }
+        
+        console.log(`🔍 Timestamp ${apiDataPoint.timestamp} search:`, {
+          existsInLastFive: existingIndex !== -1,
+          existsInFullArray: fullArrayIndex !== -1,
+          lastFiveIndex: existingIndex,
+          fullArrayIndex: fullArrayIndex,
+          calculatedActualIndex: actualIndex,
+          arrayLength: rawDataRef.current.length
+        })
+
+        if (actualIndex !== -1) {
+          // Timestamp exists → UPDATE
+          console.log(`🔄 About to UPDATE datapoint:`, {
+            timestamp: apiDataPoint.timestamp,
+            actualIndex,
+            existingData: rawDataRef.current[actualIndex]?.timestamp
+          })
+          rawDataRef.current[actualIndex] = apiDataPoint
+          volumeDataRef.current[actualIndex] = apiDataPoint
+          updatedCount++
+          console.log(`📈 Real-time: Updated datapoint at timestamp ${apiDataPoint.timestamp}`)
+        } else {
+          // Timestamp doesn't exist → INSERT
+          if (fullArrayIndex !== -1) {
+            console.log(`⚠️ WARNING: Timestamp ${apiDataPoint.timestamp} exists at index ${fullArrayIndex} but not found in last 5! This will create a duplicate.`)
+          }
+          
+          console.log(`➕ About to INSERT datapoint:`, {
+            timestamp: apiDataPoint.timestamp,
+            currentLastTimestamp: rawDataRef.current[rawDataRef.current.length - 1]?.timestamp,
+            willCreateDuplicate: fullArrayIndex !== -1
+          })
+          rawDataRef.current.push(apiDataPoint)
+          volumeDataRef.current.push(apiDataPoint)
+          insertedCount++
+          console.log(`📈 Real-time: Inserted new datapoint at timestamp ${apiDataPoint.timestamp}`)
+        }
+
+
+      }
+
+      console.log(`📈 Real-time: Processed ${sortedDataPoints.length} datapoints (${updatedCount} updated, ${insertedCount} inserted)`)
+
+      // Update chart with all the modified data using setData (which works reliably)
+      if (updatedCount > 0 || insertedCount > 0) {
+        console.log('📊 Refreshing chart with updated data...')
+        
+        // Remove duplicates and sort by timestamp to ensure data integrity
+        const uniqueData = rawDataRef.current.reduce((acc, point) => {
+          const existingIndex = acc.findIndex(p => p.timestamp === point.timestamp)
+          if (existingIndex !== -1) {
+            // Replace with newer data if duplicate timestamp found
+            acc[existingIndex] = point
+          } else {
+            acc.push(point)
+          }
+          return acc
+        }, [] as typeof rawDataRef.current)
+        
+        // Sort by timestamp to ensure ascending order
+        const sortedUniqueData = uniqueData.sort((a, b) => a.timestamp - b.timestamp)
+        
+        console.log('🔍 Data validation:', {
+          originalLength: rawDataRef.current.length,
+          uniqueLength: sortedUniqueData.length,
+          duplicatesRemoved: rawDataRef.current.length - sortedUniqueData.length,
+          firstFewTimestamps: sortedUniqueData.slice(0, 3).map(p => p.timestamp),
+          lastFewTimestamps: sortedUniqueData.slice(-3).map(p => p.timestamp)
+        })
+        
+        // Update the refs with clean data
+        rawDataRef.current = sortedUniqueData
+        volumeDataRef.current = sortedUniqueData
+        
+        // Refresh price chart
+        const refreshedPriceData = sortedUniqueData.map(point => ({
+          time: point.timestamp as any,
+          open: point.price.open,
+          high: point.price.high,
+          low: point.price.low,
+          close: point.price.close
+        }))
+        
+        // Refresh volume chart  
+        const refreshedVolumeData = sortedUniqueData.map(point => ({
+          time: point.timestamp as any,
+          value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
+          color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
+        }))
+        
+        if (seriesRef.current && volumeSeriesRef.current) {
+          seriesRef.current.setData(refreshedPriceData)
+          volumeSeriesRef.current.setData(refreshedVolumeData)
+          console.log('✅ Chart refreshed successfully')
+        }
+      }
+
+      // Clear any previous real-time errors
+      setRealtimeError(null)
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      setRealtimeError(`Real-time update failed: ${errorMessage}`)
+      console.error('📈 Real-time fetch error:', error)
+    }
+  }, [selectedMarket?.conditionId, selectedPeriod, calculateRealtimeTimeRange, volumeType])
+
+  // Start real-time updates
+  const startRealtimeUpdates = useCallback(() => {
+    if (realtimeIntervalRef.current) {
+      clearInterval(realtimeIntervalRef.current)
+    }
+
+    if (!selectedMarket?.conditionId) {
+      return
+    }
+
+    setRealtimeActive(true)
+    setRealtimeError(null)
+    
+    // Set interval for every 10 seconds (10000ms)
+    realtimeIntervalRef.current = setInterval(() => {
+      fetchRealtimeUpdate()
+    }, 10000) // 10 seconds = 10000ms
+
+    console.log('📈 Real-time updates started')
+  }, [selectedMarket?.conditionId, fetchRealtimeUpdate])
+
+  // Stop real-time updates
+  const stopRealtimeUpdates = useCallback(() => {
+    if (realtimeIntervalRef.current) {
+      clearInterval(realtimeIntervalRef.current)
+      realtimeIntervalRef.current = null
+    }
+    setRealtimeActive(false)
+    console.log('📈 Real-time updates stopped')
+  }, [])
+
   // Fetch data when dependencies change
   useEffect(() => {
     if (selectedMarket?.conditionId) {
@@ -721,12 +980,26 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     }
   }, [selectedMarket?.conditionId, selectedPeriod, fetchMarketHistoryData])
 
+  // Start real-time updates after data loads and chart is ready
+  useEffect(() => {
+    if (!loading && rawDataRef.current.length > 0 && seriesRef.current && volumeSeriesRef.current && selectedMarket?.conditionId) {
+      const timeoutId = setTimeout(() => {
+        startRealtimeUpdates()
+      }, 1000) // Start after 1 second
+      
+      return () => {
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [loading, selectedMarket?.conditionId, startRealtimeUpdates])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       activeRequestsRef.current.clear()
+      stopRealtimeUpdates()
     }
-  }, [])
+  }, [stopRealtimeUpdates])
 
   // Update volume display when volume type changes
   useEffect(() => {
@@ -841,6 +1114,13 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+
+      {realtimeError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{realtimeError}</AlertDescription>
+        </Alert>
+      )}
       
       <div className="relative">
         {loading && (
@@ -854,20 +1134,31 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
           className="w-full"
           style={{ height: '384px' }}
         />
-        <div className="text-xs text-muted-foreground mt-2">
-          Chart: {rawDataRef.current.length} data points over {(() => {
-            const days = (() => {
-              switch (selectedPeriod) {
-                case '1m': return 1
-                case '1h': return 7
-                case '6h': return 30
-                case '1d': return 90
-                default: return 7
-              }
-            })()
-            return days === 1 ? '24 hours' : `${days} days`
-          })()} • {selectedPeriod} intervals
-          {volumeDataRef.current.length > 0 && ` • Volume data available`}
+        <div className="text-xs text-muted-foreground mt-2 space-y-1">
+          <div>
+            Chart: {rawDataRef.current.length} data points over {(() => {
+              const days = (() => {
+                switch (selectedPeriod) {
+                  case '1m': return 1
+                  case '1h': return 7
+                  case '6h': return 30
+                  case '1d': return 90
+                  default: return 7
+                }
+              })()
+              return days === 1 ? '24 hours' : `${days} days`
+            })()} • {selectedPeriod} intervals
+            {volumeDataRef.current.length > 0 && ` • Volume data available`}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <div className={`w-2 h-2 rounded-full ${realtimeActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              <span>Live updates: {realtimeActive ? 'ON' : 'OFF'}</span>
+            </div>
+            {realtimeActive && (
+              <span className="text-green-600">• Updates every 10 seconds</span>
+            )}
+          </div>
         </div>
       </div>
     </div>
