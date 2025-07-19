@@ -588,11 +588,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         
         setLoading(false)
         
-        // Start real-time updates after global cached data load
-        setTimeout(() => {
-          startRealtimeUpdates()
-        }, 1000) // Start after 1 second
-        
         return
     }
 
@@ -632,11 +627,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         }
         
         setLoading(false)
-        
-        // Start real-time updates after existing promise data load
-        setTimeout(() => {
-          startRealtimeUpdates()
-        }, 1000) // Start after 1 second
         
       } catch (error) {
         setError('Failed to load market data')
@@ -701,11 +691,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         }
         
         setLoading(false)
-        
-        // Start real-time updates after cached data load
-        setTimeout(() => {
-          startRealtimeUpdates()
-        }, 1000) // Start after 1 second
         
         // Clean up active request marker for cached responses
         activeRequestsRef.current.delete(requestKey)
@@ -781,11 +766,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       
       setLoading(false)
       
-      // Start real-time updates after initial data load
-      setTimeout(() => {
-        startRealtimeUpdates()
-      }, 1000) // Start after 1 second
-      
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
       setError(`Error loading market history: ${errorMessage}`)
@@ -794,7 +774,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       // Always clean up the active request marker
       activeRequestsRef.current.delete(requestKey)
     }
-  }, [selectedMarket?.conditionId, selectedPeriod, calculateTimeRange, volumeType, getCachedData, setCachedData, startRealtimeUpdates])
+  }, [selectedMarket?.conditionId, selectedPeriod, calculateTimeRange, volumeType, getCachedData, setCachedData])
 
   // Real-time data fetch function
   const fetchRealtimeUpdate = useCallback(async () => {
@@ -960,6 +940,19 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       activeRequestsRef.current.clear()
     }
   }, [selectedMarket?.conditionId, selectedPeriod, fetchMarketHistoryData])
+
+  // Start real-time updates after data loads and chart is ready
+  useEffect(() => {
+    if (!loading && rawDataRef.current.length > 0 && seriesRef.current && volumeSeriesRef.current && selectedMarket?.conditionId) {
+      const timeoutId = setTimeout(() => {
+        startRealtimeUpdates()
+      }, 1000) // Start after 1 second
+      
+      return () => {
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [loading, selectedMarket?.conditionId, startRealtimeUpdates])
 
   // Cleanup on unmount
   useEffect(() => {
