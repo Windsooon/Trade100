@@ -299,7 +299,7 @@ export default function PortfolioPage() {
                   )}
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-2xl font-bold ${latestPnL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  <div className="text-2xl font-bold">
                     {formatCurrency(latestPnL)}
                   </div>
                 </CardContent>
