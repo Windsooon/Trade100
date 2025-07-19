@@ -796,6 +796,18 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       // Sort datapoints by timestamp (oldest first) to avoid LightWeight Charts update order issues
       const sortedDataPoints = [...result.data].sort((a, b) => a.timestamp - b.timestamp)
       
+      console.log('📊 Real-time debug - API response data:', {
+        originalDataLength: result.data.length,
+        sortedDataLength: sortedDataPoints.length,
+        timestamps: sortedDataPoints.map(p => p.timestamp),
+        currentDataLength: rawDataRef.current.length,
+        lastCurrentTimestamps: rawDataRef.current.slice(-3).map(p => p.timestamp),
+        lastCurrentDataSample: rawDataRef.current.slice(-2).map(p => ({
+          timestamp: p.timestamp,
+          timestampType: typeof p.timestamp
+        }))
+      })
+      
       // Process each datapoint in chronological order
       let updatedCount = 0
       let insertedCount = 0
@@ -813,12 +825,21 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
         if (actualIndex !== -1) {
           // Timestamp exists → UPDATE
+          console.log(`🔄 About to UPDATE datapoint:`, {
+            timestamp: apiDataPoint.timestamp,
+            actualIndex,
+            existingData: rawDataRef.current[actualIndex]?.timestamp
+          })
           rawDataRef.current[actualIndex] = apiDataPoint
           volumeDataRef.current[actualIndex] = apiDataPoint
           updatedCount++
           console.log(`📈 Real-time: Updated datapoint at timestamp ${apiDataPoint.timestamp}`)
         } else {
           // Timestamp doesn't exist → INSERT
+          console.log(`➕ About to INSERT datapoint:`, {
+            timestamp: apiDataPoint.timestamp,
+            currentLastTimestamp: rawDataRef.current[rawDataRef.current.length - 1]?.timestamp
+          })
           rawDataRef.current.push(apiDataPoint)
           volumeDataRef.current.push(apiDataPoint)
           insertedCount++
@@ -840,8 +861,22 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
           color: apiDataPoint.price.close >= apiDataPoint.price.open ? '#26a69a' : '#ef5350'
         }
 
-        seriesRef.current.update(priceData)
-        volumeSeriesRef.current.update(volumeData)
+        console.log(`📊 About to update chart series:`, {
+          timestamp: apiDataPoint.timestamp,
+          priceDataTime: priceData.time,
+          volumeDataTime: volumeData.time,
+          priceDataTimeType: typeof priceData.time,
+          action: actualIndex !== -1 ? 'UPDATE' : 'INSERT'
+        })
+
+        try {
+          seriesRef.current.update(priceData)
+          volumeSeriesRef.current.update(volumeData)
+          console.log(`✅ Successfully updated chart for timestamp ${apiDataPoint.timestamp}`)
+        } catch (chartError) {
+          console.error(`❌ Chart update failed for timestamp ${apiDataPoint.timestamp}:`, chartError)
+          throw chartError
+        }
       }
 
       console.log(`📈 Real-time: Processed ${sortedDataPoints.length} datapoints (${updatedCount} updated, ${insertedCount} inserted)`)
