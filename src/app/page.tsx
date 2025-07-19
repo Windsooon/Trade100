@@ -662,7 +662,7 @@ export default function HomePage() {
 
   
   // Tag navigation
-  const [selectedTag, setSelectedTag] = useState('recommend')
+  const [selectedTag, setSelectedTag] = useState('volume')
   
   // Recommend nested tabs
   const [selectedRecommendTab, setSelectedRecommendTab] = useState('popular')
