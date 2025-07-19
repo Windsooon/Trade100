@@ -459,7 +459,7 @@ function PopularMarketCard({ market }: { market: any }) {
           </div>
         </div>
         
-        {/* Volume and Traders - Responsive Layout */}
+        {/* Volume and Trade Count - Responsive Layout */}
         {/* Desktop Layout (md and up) */}
         <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
           <div className="w-20 text-left">
@@ -467,8 +467,8 @@ function PopularMarketCard({ market }: { market: any }) {
             <div className="font-medium">{formatVolume(market.total_volume)}</div>
           </div>
           <div className="w-20 text-center">
-            <div className="text-xs text-muted-foreground mb-1">Traders</div>
-            <div className="font-medium">{market.unique_traders}</div>
+            <div className="text-xs text-muted-foreground mb-1">Trade Count</div>
+            <div className="font-medium">{market.total_trades}</div>
           </div>
         </div>
         
@@ -479,8 +479,8 @@ function PopularMarketCard({ market }: { market: any }) {
             <div className="font-medium">{formatVolume(market.total_volume)}</div>
           </div>
           <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">Traders</div>
-            <div className="font-medium">{market.unique_traders}</div>
+            <div className="text-xs text-muted-foreground mb-1">Trades</div>
+            <div className="font-medium">{market.total_trades}</div>
           </div>
         </div>
       </div>
@@ -522,7 +522,7 @@ function WhaleMarketCard({ market }: { market: any }) {
           </div>
         </div>
         
-        {/* Whale Volume and Trades - Responsive Layout */}
+        {/* Whale Volume and Avg/Trades - Responsive Layout */}
         {/* Desktop Layout (md and up) */}
         <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
           <div className="w-20 text-left">
@@ -530,8 +530,11 @@ function WhaleMarketCard({ market }: { market: any }) {
             <div className="font-medium">{formatVolume(market.total_whale_volume)}</div>
           </div>
           <div className="w-20 text-center">
-            <div className="text-xs text-muted-foreground mb-1">Trades</div>
-            <div className="font-medium">{market.whale_trades_count}</div>
+            <div className="text-xs text-muted-foreground mb-1">Avg/Trades</div>
+            <div className="font-medium">
+              <div className="text-xs leading-tight">{formatVolume(market.average_whale_value)} avg</div>
+              <div className="text-xs leading-tight">{market.whale_trades_count} trades</div>
+            </div>
           </div>
         </div>
         
@@ -542,8 +545,11 @@ function WhaleMarketCard({ market }: { market: any }) {
             <div className="font-medium">{formatVolume(market.total_whale_volume)}</div>
           </div>
           <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">Trades</div>
-            <div className="font-medium">{market.whale_trades_count}</div>
+            <div className="text-xs text-muted-foreground mb-1">Avg/Trades</div>
+            <div className="font-medium">
+              <div className="text-xs leading-tight">{formatVolume(market.average_whale_value)} avg</div>
+              <div className="text-xs leading-tight">{market.whale_trades_count} trades</div>
+            </div>
           </div>
         </div>
       </div>
@@ -560,11 +566,8 @@ function HighProbabilityMarketCard({ market }: { market: any }) {
   }
 
   const formatPriceRange = (priceRange: string): string => {
-    // Convert "0.001-0.002, 0.998-0.999" to a simpler format
-    if (priceRange.includes('0.99') || priceRange.includes('0.001')) {
-      return 'High Confidence'
-    }
-    return priceRange.split(',')[0] // Just show first range
+    // Return raw price range
+    return priceRange
   }
 
   return (
@@ -593,7 +596,7 @@ function HighProbabilityMarketCard({ market }: { market: any }) {
           </div>
         </div>
         
-        {/* Volume and Confidence - Responsive Layout */}
+        {/* Volume and Price Range - Responsive Layout */}
         {/* Desktop Layout (md and up) */}
         <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
           <div className="w-20 text-left">
@@ -601,7 +604,7 @@ function HighProbabilityMarketCard({ market }: { market: any }) {
             <div className="font-medium">{formatVolume(market.total_volume)}</div>
           </div>
           <div className="w-24 text-center">
-            <div className="text-xs text-muted-foreground mb-1">Confidence</div>
+            <div className="text-xs text-muted-foreground mb-1">Price Range</div>
             <div className="font-medium text-xs">{formatPriceRange(market.price_range)}</div>
           </div>
         </div>
@@ -613,7 +616,7 @@ function HighProbabilityMarketCard({ market }: { market: any }) {
             <div className="font-medium">{formatVolume(market.total_volume)}</div>
           </div>
           <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">Conf.</div>
+            <div className="text-xs text-muted-foreground mb-1">Range</div>
             <div className="font-medium text-xs">{formatPriceRange(market.price_range)}</div>
           </div>
         </div>
