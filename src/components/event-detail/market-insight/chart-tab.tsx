@@ -846,40 +846,37 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
           console.log(`📈 Real-time: Inserted new datapoint at timestamp ${apiDataPoint.timestamp}`)
         }
 
-        // Update chart series for this datapoint
-        const priceData = {
-          time: apiDataPoint.timestamp as any,
-          open: apiDataPoint.price.open,
-          high: apiDataPoint.price.high,
-          low: apiDataPoint.price.low,
-          close: apiDataPoint.price.close
-        }
 
-        const volumeData = {
-          time: apiDataPoint.timestamp as any,
-          value: volumeType === 'totalDollarVolume' ? apiDataPoint.volume.totalDollarVolume : apiDataPoint.volume.totalSize,
-          color: apiDataPoint.price.close >= apiDataPoint.price.open ? '#26a69a' : '#ef5350'
-        }
-
-        console.log(`📊 About to update chart series:`, {
-          timestamp: apiDataPoint.timestamp,
-          priceDataTime: priceData.time,
-          volumeDataTime: volumeData.time,
-          priceDataTimeType: typeof priceData.time,
-          action: actualIndex !== -1 ? 'UPDATE' : 'INSERT'
-        })
-
-        try {
-          seriesRef.current.update(priceData)
-          volumeSeriesRef.current.update(volumeData)
-          console.log(`✅ Successfully updated chart for timestamp ${apiDataPoint.timestamp}`)
-        } catch (chartError) {
-          console.error(`❌ Chart update failed for timestamp ${apiDataPoint.timestamp}:`, chartError)
-          throw chartError
-        }
       }
 
       console.log(`📈 Real-time: Processed ${sortedDataPoints.length} datapoints (${updatedCount} updated, ${insertedCount} inserted)`)
+
+      // Update chart with all the modified data using setData (which works reliably)
+      if (updatedCount > 0 || insertedCount > 0) {
+        console.log('📊 Refreshing chart with updated data...')
+        
+        // Refresh price chart
+        const refreshedPriceData = rawDataRef.current.map(point => ({
+          time: point.timestamp as any,
+          open: point.price.open,
+          high: point.price.high,
+          low: point.price.low,
+          close: point.price.close
+        }))
+        
+        // Refresh volume chart  
+        const refreshedVolumeData = rawDataRef.current.map(point => ({
+          time: point.timestamp as any,
+          value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
+          color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
+        }))
+        
+        if (seriesRef.current && volumeSeriesRef.current) {
+          seriesRef.current.setData(refreshedPriceData)
+          volumeSeriesRef.current.setData(refreshedVolumeData)
+          console.log('✅ Chart refreshed successfully')
+        }
+      }
 
       // Clear any previous real-time errors
       setRealtimeError(null)
