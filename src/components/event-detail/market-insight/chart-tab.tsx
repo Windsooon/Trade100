@@ -817,11 +817,23 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         const lastFive = rawDataRef.current.slice(-5)
         const existingIndex = lastFive.findIndex(point => point.timestamp === apiDataPoint.timestamp)
         
+        // Also check the ENTIRE array to see if timestamp exists elsewhere
+        const fullArrayIndex = rawDataRef.current.findIndex(point => point.timestamp === apiDataPoint.timestamp)
+        
         let actualIndex = -1
         if (existingIndex !== -1) {
           // Calculate actual index in the full array
           actualIndex = rawDataRef.current.length - 5 + existingIndex
         }
+        
+        console.log(`🔍 Timestamp ${apiDataPoint.timestamp} search:`, {
+          existsInLastFive: existingIndex !== -1,
+          existsInFullArray: fullArrayIndex !== -1,
+          lastFiveIndex: existingIndex,
+          fullArrayIndex: fullArrayIndex,
+          calculatedActualIndex: actualIndex,
+          arrayLength: rawDataRef.current.length
+        })
 
         if (actualIndex !== -1) {
           // Timestamp exists → UPDATE
@@ -836,9 +848,14 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
           console.log(`📈 Real-time: Updated datapoint at timestamp ${apiDataPoint.timestamp}`)
         } else {
           // Timestamp doesn't exist → INSERT
+          if (fullArrayIndex !== -1) {
+            console.log(`⚠️ WARNING: Timestamp ${apiDataPoint.timestamp} exists at index ${fullArrayIndex} but not found in last 5! This will create a duplicate.`)
+          }
+          
           console.log(`➕ About to INSERT datapoint:`, {
             timestamp: apiDataPoint.timestamp,
-            currentLastTimestamp: rawDataRef.current[rawDataRef.current.length - 1]?.timestamp
+            currentLastTimestamp: rawDataRef.current[rawDataRef.current.length - 1]?.timestamp,
+            willCreateDuplicate: fullArrayIndex !== -1
           })
           rawDataRef.current.push(apiDataPoint)
           volumeDataRef.current.push(apiDataPoint)
