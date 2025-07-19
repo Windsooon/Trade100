@@ -793,11 +793,14 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         return
       }
 
-      // Process each datapoint from API response (in order they appear)
+      // Sort datapoints by timestamp (oldest first) to avoid LightWeight Charts update order issues
+      const sortedDataPoints = [...result.data].sort((a, b) => a.timestamp - b.timestamp)
+      
+      // Process each datapoint in chronological order
       let updatedCount = 0
       let insertedCount = 0
 
-      for (const apiDataPoint of result.data) {
+      for (const apiDataPoint of sortedDataPoints) {
         // Check last 5 datapoints for existing timestamp
         const lastFive = rawDataRef.current.slice(-5)
         const existingIndex = lastFive.findIndex(point => point.timestamp === apiDataPoint.timestamp)
@@ -841,7 +844,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         volumeSeriesRef.current.update(volumeData)
       }
 
-      console.log(`📈 Real-time: Processed ${result.data.length} datapoints (${updatedCount} updated, ${insertedCount} inserted)`)
+      console.log(`📈 Real-time: Processed ${sortedDataPoints.length} datapoints (${updatedCount} updated, ${insertedCount} inserted)`)
 
       // Clear any previous real-time errors
       setRealtimeError(null)
@@ -866,10 +869,10 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     setRealtimeActive(true)
     setRealtimeError(null)
     
-    // Set interval for every minute (60000ms)
+    // Set interval for every 10 seconds (10000ms)
     realtimeIntervalRef.current = setInterval(() => {
       fetchRealtimeUpdate()
-    }, 60000) // 1 minute = 60000ms
+    }, 10000) // 10 seconds = 10000ms
 
     console.log('📈 Real-time updates started')
   }, [selectedMarket?.conditionId, fetchRealtimeUpdate])
@@ -1077,7 +1080,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
               <span>Live updates: {realtimeActive ? 'ON' : 'OFF'}</span>
             </div>
             {realtimeActive && (
-              <span className="text-green-600">• Updates every minute</span>
+              <span className="text-green-600">• Updates every 10 seconds</span>
             )}
           </div>
         </div>
