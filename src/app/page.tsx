@@ -40,6 +40,7 @@ interface RecommendApiResponse {
       average_whale_value: string
       total_whale_volume: string
       unique_whale_traders: number
+      event_slug: string
     }>
     popular_markets: Array<{
       market_id: string
@@ -48,6 +49,7 @@ interface RecommendApiResponse {
       total_trades: number
       total_volume: string
       unique_traders: number
+      event_slug: string
     }>
     high_probability_markets: Array<{
       market_id: string
@@ -56,6 +58,7 @@ interface RecommendApiResponse {
       trade_count: number
       total_volume: string
       price_range: string
+      event_slug: string
     }>
   }
   meta: {
@@ -434,7 +437,7 @@ function PopularMarketCard({ market }: { market: any }) {
   }
 
   return (
-    <Link href={`/events/market-${market.market_id}`} target="_blank" rel="noopener noreferrer">
+    <Link href={`/events/${market.event_slug}?market=${market.market_id}`} target="_blank" rel="noopener noreferrer">
       <div className="flex cursor-pointer items-center justify-between rounded-md p-3 hover:bg-muted/50 transition-colors">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Market Icon */}
@@ -497,7 +500,7 @@ function WhaleMarketCard({ market }: { market: any }) {
   }
 
   return (
-    <Link href={`/events/market-${market.market_id}`} target="_blank" rel="noopener noreferrer">
+    <Link href={`/events/${market.event_slug}?market=${market.market_id}`} target="_blank" rel="noopener noreferrer">
       <div className="flex cursor-pointer items-center justify-between rounded-md p-3 hover:bg-muted/50 transition-colors">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Market Icon */}
@@ -571,7 +574,7 @@ function HighProbabilityMarketCard({ market }: { market: any }) {
   }
 
   return (
-    <Link href={`/events/market-${market.market_id}`} target="_blank" rel="noopener noreferrer">
+    <Link href={`/events/${market.event_slug}?market=${market.market_id}`} target="_blank" rel="noopener noreferrer">
       <div className="flex cursor-pointer items-center justify-between rounded-md p-3 hover:bg-muted/50 transition-colors">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Market Icon */}
