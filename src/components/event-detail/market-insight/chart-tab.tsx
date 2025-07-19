@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, Loader2, TrendingUp, Wifi, WifiOff, Activity } from 'lucide-react'
+import { AlertCircle, Loader2, TrendingUp, WifiOff, Activity } from 'lucide-react'
 import { createChart, IChartApi, ISeriesApi, ColorType, CandlestickSeries, HistogramSeries } from 'lightweight-charts'
 import { ChartTabProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint, VolumeType } from './types'
 
@@ -667,7 +667,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     }, 10000) // 10 seconds interval
   }, [selectedMarket?.conditionId, fetchLatestDataPoint, updateChartWithLatestData])
 
-  // Stop real-time updates
+  // Stop real-time updates (internal use only - for cleanup)
   const stopRealtimeUpdates = useCallback(() => {
     if (realtimeIntervalRef.current) {
       clearInterval(realtimeIntervalRef.current)
@@ -1067,37 +1067,16 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       )}
 
       {/* Real-time status indicator */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2 text-sm">
-          <div className="flex items-center gap-1">
-            {realtimeActive ? (
-              <>
-                <Activity className={`h-3 w-3 ${newDataHighlight ? 'text-green-500 animate-pulse' : 'text-green-500'}`} />
-                <span className="text-green-600 dark:text-green-400">Live Updates</span>
-              </>
-            ) : (
-              <>
-                <Wifi className="h-3 w-3 text-gray-400" />
-                <span className="text-gray-500">Updates Paused</span>
-              </>
-            )}
-          </div>
-          {lastUpdateTime && (
-            <span className="text-xs text-muted-foreground">
-              Last: {lastUpdateTime.toLocaleTimeString()}
-            </span>
-          )}
+      <div className="flex items-center gap-2 text-sm mb-4">
+        <div className="flex items-center gap-1">
+          <Activity className={`h-3 w-3 ${newDataHighlight ? 'text-green-500 animate-pulse' : 'text-green-500'}`} />
+          <span className="text-green-600 dark:text-green-400">Live Updates</span>
         </div>
-        
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={realtimeActive ? stopRealtimeUpdates : startRealtimeUpdates}
-          disabled={loading || !selectedMarket?.conditionId}
-          className="text-xs px-2 py-1 h-6"
-        >
-          {realtimeActive ? 'Pause' : 'Resume'} Live
-        </Button>
+        {lastUpdateTime && (
+          <span className="text-xs text-muted-foreground">
+            Last: {lastUpdateTime.toLocaleTimeString()}
+          </span>
+        )}
       </div>
       
       <div className="relative">
@@ -1112,22 +1091,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
           className={`w-full transition-all duration-300 ${newDataHighlight ? 'ring-2 ring-green-500 ring-opacity-50' : ''}`}
           style={{ height: '384px' }}
         />
-        <div className="text-xs text-muted-foreground mt-2">
-          Chart: {rawDataRef.current.length} data points over {(() => {
-            const days = (() => {
-              switch (selectedPeriod) {
-                case '1m': return 1
-                case '1h': return 7
-                case '6h': return 30
-                case '1d': return 90
-                default: return 7
-              }
-            })()
-            return days === 1 ? '24 hours' : `${days} days`
-          })()} • {selectedPeriod} intervals
-          {volumeDataRef.current.length > 0 && ` • Volume data available`}
-          {realtimeActive && ` • Live updates every 10s`}
-        </div>
+
       </div>
     </div>
   )
