@@ -280,13 +280,13 @@ function MarketRow({
                   <div className="flex items-center gap-1">
                     <span className="text-muted-foreground">Yes:</span>
                     <span className="font-medium text-price-positive">
-                      {yesPrice.toFixed(2)}
+                      {yesPrice}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="text-muted-foreground">No:</span>
                     <span className="font-medium text-price-negative">
-                      {noPrice.toFixed(2)}
+                      {noPrice}
                     </span>
                   </div>
                 </div>

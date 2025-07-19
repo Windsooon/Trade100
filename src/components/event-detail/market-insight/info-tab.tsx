@@ -25,19 +25,15 @@ export function InfoTab({ selectedMarket }: InfoTabProps) {
         <div className="space-y-6">
           {/* Market Question */}
           <div className="space-y-2">
-            <h3 className="text-lg font-medium">Market Question</h3>
-            <p className="text-sm text-foreground leading-relaxed">{selectedMarket.question}</p>
-          </div>
-
-          {/* Market Description */}
-          {selectedMarket.description && (
-            <div className="space-y-2">
-              <h3 className="text-lg font-medium">Description</h3>
-              <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {selectedMarket.description}
+            <h3 className="text-lg font-medium">{selectedMarket.question}</h3>
+            {selectedMarket.description && (
+              <div className="space-y-2">
+                <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {selectedMarket.description}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
           
           {/* Date Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -784,12 +784,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
   return (
     <div className="space-y-4 mt-4 sm:mt-6">
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-base font-medium">
-            <TrendingUp className="h-4 w-4" />
-            {chartTitle}
-          </div>
-        </div>
         <div>
           <div className="text-xs text-muted-foreground mb-2 font-medium">Time Period</div>
           <div className="flex gap-1">
