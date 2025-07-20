@@ -667,10 +667,19 @@ export default function HomePage() {
   // Recommend nested tabs
   const [selectedRecommendTab, setSelectedRecommendTab] = useState('popular')
   
+  // Time filter for recommend tabs
+  const [selectedTimeFilter, setSelectedTimeFilter] = useState('1h')
+  
   const RECOMMEND_TABS = [
     { id: 'popular', label: 'Popular' },
     { id: 'whale', label: 'Whale' },
     { id: 'highProbability', label: 'High Probability' }
+  ]
+  
+  const TIME_FILTER_OPTIONS = [
+    { id: '1h', label: '1h' },
+    { id: '12h', label: '12h' },
+    { id: '24h', label: '24h' }
   ]
   
   // Tag list for navigation
@@ -986,12 +995,14 @@ export default function HomePage() {
     }
   }
 
-  const fetchRecommend = async () => {
+  const fetchRecommend = async (timeFilter: string = selectedTimeFilter) => {
     try {
       setIsLoading(prev => ({ ...prev, recommend: true }))
       setRecommendError(null)
       
-      const response = await fetch('https://trade-analyze-production.up.railway.app/api/recommend?hour=12')
+      // Extract numeric value from time filter (e.g., '1h' -> '1', '12h' -> '12')
+      const hourValue = timeFilter.replace('h', '')
+      const response = await fetch(`https://trade-analyze-production.up.railway.app/api/recommend?hour=${hourValue}`)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       
       const data: RecommendApiResponse = await response.json()
@@ -1010,6 +1021,11 @@ export default function HomePage() {
     } finally {
       setIsLoading(prev => ({ ...prev, recommend: false }))
     }
+  }
+
+  const handleTimeFilterChange = async (timeFilter: string) => {
+    setSelectedTimeFilter(timeFilter)
+    await fetchRecommend(timeFilter)
   }
 
   const transformApiEvents = (apiEvents: any[]): Event[] => {
@@ -1073,20 +1089,38 @@ export default function HomePage() {
           <div className="space-y-3 max-w-[800px] mx-auto">
             {selectedTag === 'recommend' && (
               <div className="space-y-6">
-                {/* Nested Recommend Tabs */}
+                {/* Nested Recommend Tabs with Time Filter */}
                 <div className="border-b bg-background">
-                  <div className="flex items-center gap-4 py-3 overflow-x-auto scrollbar-hide justify-center">
-                    {RECOMMEND_TABS.map((tab) => (
-                      <Button
-                        key={tab.id}
-                        variant={selectedRecommendTab === tab.id ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={() => setSelectedRecommendTab(tab.id)}
-                        className="whitespace-nowrap"
-                      >
-                        {tab.label}
-                      </Button>
-                    ))}
+                  <div className="flex items-center justify-center gap-4 sm:gap-6 py-3 overflow-x-auto scrollbar-hide">
+                    {/* Time Filter Buttons */}
+                    <div className="flex items-center gap-1 border rounded-lg p-1 flex-shrink-0">
+                      {TIME_FILTER_OPTIONS.map((option) => (
+                        <Button
+                          key={option.id}
+                          variant={selectedTimeFilter === option.id ? 'default' : 'ghost'}
+                          size="sm"
+                          onClick={() => handleTimeFilterChange(option.id)}
+                          className="h-7 px-2 sm:px-3 text-xs whitespace-nowrap"
+                        >
+                          {option.label}
+                        </Button>
+                      ))}
+                    </div>
+                    
+                    {/* Recommend Tabs */}
+                    <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                      {RECOMMEND_TABS.map((tab) => (
+                        <Button
+                          key={tab.id}
+                          variant={selectedRecommendTab === tab.id ? 'default' : 'ghost'}
+                          size="sm"
+                          onClick={() => setSelectedRecommendTab(tab.id)}
+                          className="whitespace-nowrap text-xs sm:text-sm"
+                        >
+                          {tab.label}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
