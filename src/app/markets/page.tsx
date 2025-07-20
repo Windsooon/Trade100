@@ -353,14 +353,16 @@ export default function MarketsPage() {
     return mode === 'markets' ? 'priceChange24h' : 'volume24hr'
   }
 
-  // Update sort when view mode changes (only if currently using a default)
+  // Update sort when view mode changes
   useEffect(() => {
-    const currentDefault = getDefaultSort(viewMode === 'markets' ? 'events' : 'markets')
-    const newDefault = getDefaultSort(viewMode)
+    const validSortOptions = {
+      markets: ['volume24hr', 'volume1wk', 'liquidity', 'priceChange24h', 'priceChange1h'],
+      events: ['volume24hr', 'volume1wk', 'liquidity', 'endDate']
+    }
     
-    // Only change sort if it's currently set to the other mode's default
-    if (sortBy === currentDefault) {
-      setSortBy(newDefault)
+    // If current sort option is not valid for the new mode, reset to default
+    if (!validSortOptions[viewMode].includes(sortBy)) {
+      setSortBy(getDefaultSort(viewMode))
     }
   }, [viewMode, sortBy])
 
@@ -654,11 +656,6 @@ export default function MarketsPage() {
               // For markets, we can't sort by endDate since it's not available on market level
               comparison = 0
               break
-            case 'yesPrice':
-              const aPrice = a.outcomePrices?.[0] ? parseFloat(a.outcomePrices[0]) : 0
-              const bPrice = b.outcomePrices?.[0] ? parseFloat(b.outcomePrices[0]) : 0
-              comparison = aPrice - bPrice
-              break
             case 'priceChange24h':
               comparison = (a.oneDayPriceChange || 0) - (b.oneDayPriceChange || 0)
               break
@@ -865,14 +862,14 @@ export default function MarketsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="volume24hr">Volume (24h)</SelectItem>
+                        <SelectItem value="volume24hr">24h Volume</SelectItem>
                         <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
                         <SelectItem value="liquidity">Liquidity</SelectItem>
-                        <SelectItem value="question">Title (A-Z)</SelectItem>
-                        <SelectItem value="endDate">End Date</SelectItem>
+                        {viewMode === 'events' && (
+                          <SelectItem value="endDate">End Date</SelectItem>
+                        )}
                         {viewMode === 'markets' && (
                           <>
-                            <SelectItem value="yesPrice">Yes Price</SelectItem>
                             <SelectItem value="priceChange24h">24h Price Change</SelectItem>
                             <SelectItem value="priceChange1h">1h Price Change</SelectItem>
                           </>
@@ -985,14 +982,14 @@ export default function MarketsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="volume24hr">Volume (24h)</SelectItem>
+                        <SelectItem value="volume24hr">24h Volume</SelectItem>
                         <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
                         <SelectItem value="liquidity">Liquidity</SelectItem>
-                        <SelectItem value="question">Title (A-Z)</SelectItem>
-                        <SelectItem value="endDate">End Date</SelectItem>
+                        {viewMode === 'events' && (
+                          <SelectItem value="endDate">End Date</SelectItem>
+                        )}
                         {viewMode === 'markets' && (
                           <>
-                            <SelectItem value="yesPrice">Yes Price</SelectItem>
                             <SelectItem value="priceChange24h">24h Price Change</SelectItem>
                             <SelectItem value="priceChange1h">1h Price Change</SelectItem>
                           </>
