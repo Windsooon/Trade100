@@ -470,8 +470,8 @@ function PopularMarketCard({ market }: { market: any }) {
             <div className="font-medium">{formatVolume(market.total_volume)}</div>
           </div>
           <div className="w-20 text-center">
-            <div className="text-xs text-muted-foreground mb-1">Trade Count</div>
-            <div className="font-medium">{market.total_trades}</div>
+            <div className="text-xs text-muted-foreground mb-1">Traders</div>
+            <div className="font-medium">{market.unique_traders}</div>
           </div>
         </div>
         
