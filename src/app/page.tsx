@@ -1114,7 +1114,7 @@ export default function HomePage() {
                             <p className="text-sm text-muted-foreground">No popular markets available</p>
                           </div>
                         ) : (
-                          recommendData.popular.slice(0, 10).map((market) => (
+                          recommendData.popular.slice(0, 20).map((market) => (
                             <PopularMarketCard key={market.market_id} market={market} />
                           ))
                         )}
@@ -1129,7 +1129,7 @@ export default function HomePage() {
                             <p className="text-sm text-muted-foreground">No whale markets available</p>
                           </div>
                         ) : (
-                          recommendData.whale.slice(0, 10).map((market) => (
+                          recommendData.whale.slice(0, 20).map((market) => (
                             <WhaleMarketCard key={market.market_id} market={market} />
                           ))
                         )}
@@ -1144,7 +1144,7 @@ export default function HomePage() {
                             <p className="text-sm text-muted-foreground">No high probability markets available</p>
                           </div>
                         ) : (
-                          recommendData.highProbability.slice(0, 10).map((market) => (
+                          recommendData.highProbability.slice(0, 20).map((market) => (
                             <HighProbabilityMarketCard key={market.market_id} market={market} />
                           ))
                         )}
