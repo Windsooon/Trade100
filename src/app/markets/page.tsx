@@ -53,7 +53,7 @@ interface TagsResponse {
 
 // Predefined tags list (matching the navigation style)
 const PREDEFINED_TAGS = [
-  'Trending', 'New', 'Politics', 'Middle East', 'Sports', 'Crypto', 
+  'Politics', 'Middle East', 'Sports', 'Crypto',
   'Tech', 'Culture', 'World', 'Economy', 'Trump', 'Elections', 'Mentions'
 ]
 
