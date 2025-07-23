@@ -417,7 +417,7 @@ export default function MarketsPage() {
   const [maxPrice, setMaxPrice] = useState<string>('')
   const [minBestAsk, setMinBestAsk] = useState<string>('')
   const [maxBestAsk, setMaxBestAsk] = useState<string>('')
-  const [sortBy, setSortBy] = useState<string>('priceChangePercent24h') // Markets mode default - changed to percentage
+  const [sortBy, setSortBy] = useState<string>('volume24hr') // Markets mode default - changed to volume
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<number>(1)
@@ -426,7 +426,7 @@ export default function MarketsPage() {
 
   // Get default sort option for each view mode
   const getDefaultSort = (mode: 'markets' | 'events'): string => {
-    return mode === 'markets' ? 'priceChangePercent24h' : 'volume24hr'
+    return mode === 'markets' ? 'volume24hr' : 'volume24hr'
   }
 
   // Update sort when view mode changes
