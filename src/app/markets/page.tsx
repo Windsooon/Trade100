@@ -58,7 +58,11 @@ const PREDEFINED_TAGS = [
 ]
 
 // Market Card Component (for inside event cards)
-function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string }) {
+function MarketCard({ market, eventSlug, sortBy }: { 
+  market: Market & { eventTitle?: string; eventIcon?: string }; 
+  eventSlug: string;
+  sortBy?: string;
+}) {
   const formatPrice = (price: number): string => {
     return price.toFixed(3)
   }
@@ -67,6 +71,16 @@ function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: str
     if (change === null) return '-'
     const sign = change >= 0 ? '+' : ''
     return `${sign}${(change * 100).toFixed(2)}%`
+  }
+
+  // Helper function to calculate and format percentage change
+  const calculateAndFormatPercentageChange = (currentPrice: number, priceChange: number): string => {
+    if (!currentPrice || !priceChange) return '-'
+    const oldPrice = currentPrice - priceChange
+    if (oldPrice <= 0) return '-'
+    const percentChange = (priceChange / oldPrice) * 100
+    const sign = percentChange >= 0 ? '+' : ''
+    return `${sign}${percentChange.toFixed(2)}%`
   }
   
   const getPriceChangeColor = (change: number | null): string => {
@@ -147,18 +161,37 @@ function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: str
             <div className="text-xs text-muted-foreground mb-1">Yes</div>
             <div className="font-medium">{formatPrice(yesPrice)}</div>
           </div>
-          <div className="w-24 text-center">
-            <div className="text-xs text-muted-foreground mb-1">1h</div>
-            <div className={`font-medium ${getPriceChangeColor(market.oneHourPriceChange || null)}`}>
-              {formatPriceChange(market.oneHourPriceChange || null)}
-            </div>
-          </div>
-          <div className="w-24 text-center">
-            <div className="text-xs text-muted-foreground mb-1">24h</div>
-            <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
-              {formatPriceChange(market.oneDayPriceChange || null)}
-            </div>
-          </div>
+          {(sortBy === 'priceChangePercent1h' || sortBy === 'priceChangePercent24h') ? (
+            <>
+              <div className="w-24 text-center">
+                <div className="text-xs text-muted-foreground mb-1">1h%</div>
+                <div className={`font-medium ${getPriceChangeColor(market.oneHourPriceChange || null)}`}>
+                  {calculateAndFormatPercentageChange(yesPrice, market.oneHourPriceChange || 0)}
+                </div>
+              </div>
+              <div className="w-24 text-center">
+                <div className="text-xs text-muted-foreground mb-1">24h%</div>
+                <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
+                  {calculateAndFormatPercentageChange(yesPrice, market.oneDayPriceChange || 0)}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-24 text-center">
+                <div className="text-xs text-muted-foreground mb-1">1h</div>
+                <div className={`font-medium ${getPriceChangeColor(market.oneHourPriceChange || null)}`}>
+                  {formatPriceChange(market.oneHourPriceChange || null)}
+                </div>
+              </div>
+              <div className="w-24 text-center">
+                <div className="text-xs text-muted-foreground mb-1">24h</div>
+                <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
+                  {formatPriceChange(market.oneDayPriceChange || null)}
+                </div>
+              </div>
+            </>
+          )}
           <div className="w-24 text-right">
             <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
             <div className="font-medium">{formatVolume(market.volume24hr || null)}</div>
@@ -172,9 +205,14 @@ function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: str
             <div className="font-medium">{formatPrice(yesPrice)}</div>
           </div>
           <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">24h</div>
+            <div className="text-xs text-muted-foreground mb-1">
+              {(sortBy === 'priceChangePercent1h' || sortBy === 'priceChangePercent24h') ? '24h%' : '24h'}
+            </div>
             <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
-              {formatPriceChange(market.oneDayPriceChange || null)}
+              {(sortBy === 'priceChangePercent1h' || sortBy === 'priceChangePercent24h') 
+                ? calculateAndFormatPercentageChange(yesPrice, market.oneDayPriceChange || 0)
+                : formatPriceChange(market.oneDayPriceChange || null)
+              }
             </div>
           </div>
         </div>
@@ -184,7 +222,7 @@ function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: str
 }
 
 // Event Card Component (main cards with collapsible markets)
-function EventCard({ event }: { event: Event }) {
+function EventCard({ event, sortBy }: { event: Event; sortBy?: string }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const formatVolume = (volume: number | null): string => {
@@ -324,7 +362,7 @@ function EventCard({ event }: { event: Event }) {
                 Markets ({activeMarkets.length})
               </div>
               {activeMarkets.map((market) => (
-                <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} />
+                <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} sortBy={sortBy} />
               ))}
             </div>
           </CollapsibleContent>
@@ -342,7 +380,7 @@ export default function MarketsPage() {
   const [maxPrice, setMaxPrice] = useState<string>('')
   const [minBestAsk, setMinBestAsk] = useState<string>('')
   const [maxBestAsk, setMaxBestAsk] = useState<string>('')
-  const [sortBy, setSortBy] = useState<string>('priceChange24h') // Markets mode default
+  const [sortBy, setSortBy] = useState<string>('priceChangePercent24h') // Markets mode default
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<number>(1)
@@ -350,7 +388,7 @@ export default function MarketsPage() {
 
   // Get default sort option for each view mode
   const getDefaultSort = (mode: 'markets' | 'events'): string => {
-    return mode === 'markets' ? 'priceChange24h' : 'volume24hr'
+    return mode === 'markets' ? 'priceChangePercent24h' : 'volume24hr'
   }
 
   // Update sort when view mode changes
@@ -1070,10 +1108,10 @@ export default function MarketsPage() {
           ) : (
             viewMode === 'events' 
               ? (paginatedData as Event[]).map((event) => (
-              <EventCard key={event.id} event={event} />
+              <EventCard key={event.id} event={event} sortBy={sortBy} />
                 ))
                               : (paginatedData as (Market & { eventTitle: string; eventSlug: string; eventIcon?: string })[]).map((market) => (
-                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug} />
+                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug} sortBy={sortBy} />
             ))
           )}
         </div>
