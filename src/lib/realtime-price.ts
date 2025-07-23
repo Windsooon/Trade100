@@ -20,7 +20,13 @@ export interface BookData {
  * Uses mid-price: (highest_bid + lowest_ask) / 2
  * Fallbacks: no bids = 0, no asks = 1
  */
-export function calculateYesPrice(orderBook: BookData): number {
+export function calculateYesPrice(orderBook: BookData): number | null {
+  // If order book is completely empty, return null to keep static price
+  if ((!orderBook.bids || orderBook.bids.length === 0) && 
+      (!orderBook.asks || orderBook.asks.length === 0)) {
+    return null // Signal to use static price
+  }
+
   let highestBid = 0
   let lowestAsk = 1
   

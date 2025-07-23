@@ -33,8 +33,10 @@ export function useHomePageRealtime() {
       // Calculate real-time price
       const realtimePrice = calculateYesPrice(orderBook)
       
-      // Update store with throttling
-      updateRealtimePrice(market.conditionId, realtimePrice)
+      // Only update if we have a valid real-time price
+      if (realtimePrice !== null) {
+        updateRealtimePrice(market.conditionId, realtimePrice)
+      }
     })
   }, [orderBooks, activeTab, marketsByTab, updateRealtimePrice])
 
