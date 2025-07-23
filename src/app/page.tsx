@@ -11,7 +11,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 import { TrendingUp, Clock, DollarSign, BarChart3, Activity, RefreshCw, AlertCircle } from 'lucide-react'
-import { Event } from '@/lib/stores'
+import { Event, useHomePageMarketStore, type Market } from '../../lib/stores'
+import { SharedOrderBookProvider } from '../../components/event-detail/shared-order-book-provider'
+import { useHomePageRealtime } from '../../hooks/use-home-page-realtime'
+import { convertToHomePageMarket } from '../../lib/realtime-price'
 import Link from 'next/link'
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 import {
@@ -349,10 +352,15 @@ interface MarketDisplay {
   yesPrice: number
   priceChange: number | null
   endDate: string
+  clobTokenIds?: string
 }
 
 // Market Card Component
 function MarketCard({ market }: { market: MarketDisplay }) {
+  const { getCurrentPrice } = useHomePageRealtime()
+  
+  // Get current price (real-time or static fallback)
+  const currentPrice = getCurrentPrice(market.conditionId, market.yesPrice)
   const formatPrice = (price: number): string => {
     return (price * 100).toFixed(2)
   }
@@ -378,8 +386,8 @@ function MarketCard({ market }: { market: MarketDisplay }) {
   const calculate24hPercentagePrice = (): number | null => {
     if (market.priceChange === null) return null
     
-    // old_price = outcomePrices[0] - oneDayPriceChange
-    const oldPrice = market.yesPrice - market.priceChange
+    // old_price = current_price - oneDayPriceChange
+    const oldPrice = currentPrice - market.priceChange
     if (oldPrice <= 0) return null
     
     // percentage = oneDayPriceChange / old_price
@@ -419,7 +427,7 @@ function MarketCard({ market }: { market: MarketDisplay }) {
         <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
           <div className="w-16 text-left">
             <div className="text-xs text-muted-foreground mb-1">Yes (%)</div>
-            <div className="font-medium">{formatPrice(market.yesPrice)}</div>
+            <div className="font-medium">{formatPrice(currentPrice)}</div>
           </div>
           <div className="w-20 text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
@@ -434,7 +442,7 @@ function MarketCard({ market }: { market: MarketDisplay }) {
         <div className="flex md:hidden items-center gap-3 text-sm ml-4 flex-shrink-0">
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">Yes (%)</div>
-            <div className="font-medium">{formatPrice(market.yesPrice)}</div>
+            <div className="font-medium">{formatPrice(currentPrice)}</div>
           </div>
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
@@ -675,16 +683,23 @@ const formatDate = (dateString: string): string => {
   }
 }
 
-export default function HomePage() {
+function HomePageContent() {
   // Store full event data for both cards and market processing
   const [allNewest, setAllNewest] = useState<any[]>([])
   const [allTopVolume, setAllTopVolume] = useState<any[]>([])
   const [allEndingSoon, setAllEndingSoon] = useState<any[]>([])
   const [allLiquidity, setAllLiquidity] = useState<any[]>([])
 
+  // Real-time market store
+  const { setActiveTab, setMarketsForTab } = useHomePageMarketStore()
   
   // Tag navigation
   const [selectedTag, setSelectedTag] = useState('volume')
+  
+  // Sync initial tab with store
+  useEffect(() => {
+    setActiveTab('volume')
+  }, [])
   
   // Recommend nested tabs
   const [selectedRecommendTab, setSelectedRecommendTab] = useState('popular')
@@ -875,6 +890,7 @@ export default function HomePage() {
           yesPrice: parseFloat(outcomePrices[0]),
           priceChange: type === 'newest' ? (selectedMarket.oneDayPriceChange ?? null) : selectedMarket.oneDayPriceChange,
           endDate: selectedMarket.endDate || event.endDate,
+          clobTokenIds: selectedMarket.clobTokenIds,
         }
         
         markets.push(marketDisplay)
@@ -916,6 +932,10 @@ export default function HomePage() {
         // 3. Process ALL filtered events to find 10 markets for tabs
         const markets = processMarketsFromEvents(filteredEvents, 'newest')
         setMarketData(prev => ({ ...prev, newest: markets }))
+        
+        // 4. Store markets in real-time store
+        const homePageMarkets = markets.map(convertToHomePageMarket)
+        setMarketsForTab('newest', homePageMarkets)
       } else {
         throw new Error(data.error || 'Failed to fetch newest events')
       }
@@ -942,6 +962,10 @@ export default function HomePage() {
         // 3. Process ALL events to find 10 markets for tabs
         const markets = processMarketsFromEvents(allEvents, 'volume')
         setMarketData(prev => ({ ...prev, volume: markets }))
+        
+        // 4. Store markets in real-time store
+        const homePageMarkets = markets.map(convertToHomePageMarket)
+        setMarketsForTab('volume', homePageMarkets)
       } else {
         throw new Error(data.error || 'Failed to fetch top volume events')
       }
@@ -981,6 +1005,10 @@ export default function HomePage() {
         // 3. Process ALL filtered events to find 10 markets for tabs
         const markets = processMarketsFromEvents(filteredEvents, 'endingSoon')
         setMarketData(prev => ({ ...prev, endingSoon: markets }))
+        
+        // 4. Store markets in real-time store
+        const homePageMarkets = markets.map(convertToHomePageMarket)
+        setMarketsForTab('endingSoon', homePageMarkets)
       } else {
         throw new Error(data.error || 'Failed to fetch ending soon events')
       }
@@ -1007,6 +1035,10 @@ export default function HomePage() {
         // 3. Process ALL events to find 10 markets for tabs
         const markets = processMarketsFromEvents(allEvents, 'liquidity')
         setMarketData(prev => ({ ...prev, liquidity: markets }))
+        
+        // 4. Store markets in real-time store
+        const homePageMarkets = markets.map(convertToHomePageMarket)
+        setMarketsForTab('liquidity', homePageMarkets)
       } else {
         throw new Error(data.error || 'Failed to fetch liquidity events')
       }
@@ -1097,7 +1129,10 @@ export default function HomePage() {
                   key={tag.id}
                   variant={selectedTag === tag.id ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setSelectedTag(tag.id)}
+                  onClick={() => {
+                    setSelectedTag(tag.id)
+                    setActiveTab(tag.id)
+                  }}
                   className="whitespace-nowrap"
                 >
                   {tag.label}
@@ -1290,5 +1325,23 @@ export default function HomePage() {
       <Footer />
       <BottomNavigation />
     </div>
+  )
+}
+
+export default function HomePage() {
+  const { getActiveMarkets } = useHomePageMarketStore()
+  
+  // Convert HomePageMarkets to Market format for WebSocket provider
+  const activeMarkets = getActiveMarkets().map(market => ({
+    conditionId: market.conditionId,
+    clobTokenIds: market.clobTokenIds,
+    question: '',
+    outcomePrices: []
+  })) as Market[]
+
+  return (
+    <SharedOrderBookProvider allActiveMarkets={activeMarkets} isHomePage={true}>
+      <HomePageContent />
+    </SharedOrderBookProvider>
   )
 } 

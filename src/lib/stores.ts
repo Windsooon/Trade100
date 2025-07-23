@@ -148,4 +148,80 @@ export const useSettingsStore = create<SettingsStore>()(
       name: 'trade100-settings',
     }
   )
-) 
+)
+
+// Real-time market data store for home page
+interface HomePageMarket {
+  conditionId: string
+  clobTokenIds: string
+  staticPrice: number
+  realtimePrice?: number
+  lastPriceUpdate?: number
+}
+
+interface HomePageMarketStore {
+  marketsByTab: Record<string, HomePageMarket[]>
+  activeTab: string
+  realtimePrices: Record<string, { price: number; lastUpdate: number }>
+  lastTabSwitch: number
+  setActiveTab: (tab: string) => void
+  setMarketsForTab: (tab: string, markets: HomePageMarket[]) => void
+  updateRealtimePrice: (conditionId: string, price: number) => void
+  getRealtimePrice: (conditionId: string) => number | undefined
+  getActiveMarkets: () => HomePageMarket[]
+  shouldKeepConnection: (tab: string) => boolean
+}
+
+export const useHomePageMarketStore = create<HomePageMarketStore>((set, get) => ({
+  marketsByTab: {},
+  activeTab: 'newest',
+  realtimePrices: {},
+  lastTabSwitch: Date.now(),
+  
+  setActiveTab: (tab: string) => {
+    set({ activeTab: tab, lastTabSwitch: Date.now() })
+  },
+  
+  setMarketsForTab: (tab: string, markets: HomePageMarket[]) => {
+    set((state) => ({
+      marketsByTab: {
+        ...state.marketsByTab,
+        [tab]: markets
+      }
+    }))
+  },
+  
+  updateRealtimePrice: (conditionId: string, price: number) => {
+    const now = Date.now()
+    const state = get()
+    const lastUpdate = state.realtimePrices[conditionId]?.lastUpdate || 0
+    
+    // Throttle updates to 500ms per market
+    if (now - lastUpdate < 500) {
+      return
+    }
+    
+    set((state) => ({
+      realtimePrices: {
+        ...state.realtimePrices,
+        [conditionId]: { price, lastUpdate: now }
+      }
+    }))
+  },
+  
+  getRealtimePrice: (conditionId: string) => {
+    return get().realtimePrices[conditionId]?.price
+  },
+  
+  getActiveMarkets: () => {
+    const state = get()
+    return state.marketsByTab[state.activeTab] || []
+  },
+  
+  shouldKeepConnection: (tab: string) => {
+    const state = get()
+    const timeSinceSwitch = Date.now() - state.lastTabSwitch
+    // Keep connection for 30 seconds after tab switch
+    return tab === state.activeTab || timeSinceSwitch < 30000
+  }
+})) 

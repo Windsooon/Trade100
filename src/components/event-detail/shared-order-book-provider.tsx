@@ -40,9 +40,10 @@ const SharedOrderBookContext = createContext<SharedOrderBookContextType | null>(
 interface SharedOrderBookProviderProps {
   children: React.ReactNode
   allActiveMarkets: Market[]
+  isHomePage?: boolean
 }
 
-export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOrderBookProviderProps) {
+export function SharedOrderBookProvider({ children, allActiveMarkets, isHomePage = false }: SharedOrderBookProviderProps) {
 
   const [orderBooks, setOrderBooks] = useState<Record<string, BookData>>({})
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
@@ -68,15 +69,21 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
       if (market.clobTokenIds) {
         try {
           const ids = JSON.parse(market.clobTokenIds)
-          if (ids[0]) allTokens.push(ids[0]) // YES token
-          if (ids[1]) allTokens.push(ids[1]) // NO token
+          if (isHomePage) {
+            // For home page, only subscribe to YES tokens
+            if (ids[0]) allTokens.push(ids[0])
+          } else {
+            // For event detail pages, subscribe to both YES and NO tokens
+            if (ids[0]) allTokens.push(ids[0]) // YES token
+            if (ids[1]) allTokens.push(ids[1]) // NO token
+          }
         } catch {
           // Skip invalid token IDs
         }
       }
     })
     return allTokens.sort()
-  }, [allActiveMarkets])
+  }, [allActiveMarkets, isHomePage])
 
   // Cleanup function
   const cleanup = useCallback(() => {
