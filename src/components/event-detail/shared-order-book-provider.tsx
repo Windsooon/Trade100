@@ -39,11 +39,12 @@ const SharedOrderBookContext = createContext<SharedOrderBookContextType | null>(
 
 interface SharedOrderBookProviderProps {
   children: React.ReactNode
-  allActiveMarkets: Market[]
+  allActiveMarkets?: Market[]
+  getMarkets?: () => Market[]
   isHomePage?: boolean
 }
 
-export function SharedOrderBookProvider({ children, allActiveMarkets, isHomePage = false }: SharedOrderBookProviderProps) {
+export function SharedOrderBookProvider({ children, allActiveMarkets, getMarkets, isHomePage = false }: SharedOrderBookProviderProps) {
 
   const [orderBooks, setOrderBooks] = useState<Record<string, BookData>>({})
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
@@ -62,10 +63,18 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, isHomePage
   const MAX_RETRY_ATTEMPTS = 5
   const RETRY_DELAYS = [1000, 2000, 4000, 8000, 16000] // Exponential backoff
 
+  // Get current markets from either prop or function
+  const currentMarkets = useMemo(() => {
+    if (getMarkets) {
+      return getMarkets()
+    }
+    return allActiveMarkets || []
+  }, [allActiveMarkets, getMarkets])
+
   // Get all active market token IDs for WebSocket subscription
   const allActiveTokenIds = useMemo(() => {
     const allTokens: string[] = []
-    allActiveMarkets.forEach(market => {
+    currentMarkets.forEach(market => {
       if (market.clobTokenIds) {
         try {
           const ids = JSON.parse(market.clobTokenIds)
@@ -82,8 +91,8 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, isHomePage
         }
       }
     })
-    return allTokens.sort()
-  }, [allActiveMarkets, isHomePage])
+          return allTokens.sort()
+  }, [currentMarkets, isHomePage])
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -102,7 +111,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, isHomePage
   }, [])
 
   // Fetch initial last trade prices from API
-  const fetchLastTradePrices = useCallback(async (markets: Market[] = allActiveMarkets) => {
+  const fetchLastTradePrices = useCallback(async (markets: Market[] = currentMarkets) => {
     if (!markets.length || isUnmountingRef.current || lastTradePricesLoadedRef.current || fetchingLastTradePricesRef.current) {
       return
     }
@@ -265,7 +274,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, isHomePage
               // Handle initial order book snapshots (event_type: "book")
               if (item.asset_id && item.event_type === 'book' && item.bids && item.asks) {
                 // Find which market this asset_id belongs to using conditionId = asset_id
-                const market = allActiveMarkets.find(m => {
+                const market = currentMarkets.find(m => {
                   if (!m.clobTokenIds) return false
                   try {
                     const ids = JSON.parse(m.clobTokenIds)
@@ -310,7 +319,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, isHomePage
               // Handle price change updates (event_type: "price_change")
               else if (item.asset_id && item.event_type === 'price_change' && item.changes) {
                 // Find which market this asset_id belongs to
-                const market = allActiveMarkets.find(m => {
+                const market = currentMarkets.find(m => {
                   if (!m.clobTokenIds) return false
                   try {
                     const ids = JSON.parse(m.clobTokenIds)
@@ -393,7 +402,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, isHomePage
               // Handle last trade price updates (event_type: "last_trade_price")
               else if (item.asset_id && item.event_type === 'last_trade_price' && item.price && item.side) {
                 // Find which market this asset_id belongs to
-                const market = allActiveMarkets.find(m => {
+                const market = currentMarkets.find(m => {
                   if (!m.clobTokenIds) return false
                   try {
                     const ids = JSON.parse(m.clobTokenIds)
@@ -500,7 +509,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, isHomePage
         setConnectionStatus('error')
       }
     }
-  }, [allActiveTokenIds, allActiveMarkets, cleanup])
+  }, [allActiveTokenIds, currentMarkets, cleanup])
 
   // Manual retry function
   const manualRetry = useCallback(() => {
@@ -526,10 +535,10 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, isHomePage
 
   // Fetch initial last trade prices when markets change
   useEffect(() => {
-    if (allActiveMarkets.length > 0) {
-      fetchLastTradePrices(allActiveMarkets)
+    if (currentMarkets.length > 0) {
+      fetchLastTradePrices(currentMarkets)
     }
-  }, [allActiveMarkets.length])
+  }, [currentMarkets.length, fetchLastTradePrices])
 
   // Note: Cleanup is handled by the main WebSocket useEffect above
 

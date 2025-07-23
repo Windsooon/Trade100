@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
@@ -691,7 +691,7 @@ function HomePageContent() {
   const [allLiquidity, setAllLiquidity] = useState<any[]>([])
 
   // Real-time market store
-  const { setActiveTab, setMarketsForTab } = useHomePageMarketStore()
+  const { setActiveTab, setMarketsForTab, addVisitedTab } = useHomePageMarketStore()
   
   // Tag navigation
   const [selectedTag, setSelectedTag] = useState('volume')
@@ -699,7 +699,7 @@ function HomePageContent() {
   // Sync initial tab with store
   useEffect(() => {
     setActiveTab('volume')
-  }, [])
+  }, [setActiveTab])
   
   // Recommend nested tabs
   const [selectedRecommendTab, setSelectedRecommendTab] = useState('popular')
@@ -966,6 +966,9 @@ function HomePageContent() {
         // 4. Store markets in real-time store
         const homePageMarkets = markets.map(convertToHomePageMarket)
         setMarketsForTab('volume', homePageMarkets)
+        
+        // 5. Mark volume tab as visited (for initial WebSocket connection)
+        addVisitedTab('volume')
       } else {
         throw new Error(data.error || 'Failed to fetch top volume events')
       }
@@ -1132,6 +1135,7 @@ function HomePageContent() {
                   onClick={() => {
                     setSelectedTag(tag.id)
                     setActiveTab(tag.id)
+                    addVisitedTab(tag.id)
                   }}
                   className="whitespace-nowrap"
                 >
@@ -1329,18 +1333,20 @@ function HomePageContent() {
 }
 
 export default function HomePage() {
-  const { getActiveMarkets } = useHomePageMarketStore()
+  const { getVisitedTabsMarkets } = useHomePageMarketStore()
   
   // Convert HomePageMarkets to Market format for WebSocket provider
-  const activeMarkets = getActiveMarkets().map(market => ({
-    conditionId: market.conditionId,
-    clobTokenIds: market.clobTokenIds,
-    question: '',
-    outcomePrices: []
-  })) as Market[]
+  const getMarkets = useCallback(() => {
+    return getVisitedTabsMarkets().map(market => ({
+      conditionId: market.conditionId,
+      clobTokenIds: market.clobTokenIds,
+      question: '',
+      outcomePrices: []
+    })) as Market[]
+  }, [getVisitedTabsMarkets])
 
   return (
-    <SharedOrderBookProvider allActiveMarkets={activeMarkets} isHomePage={true}>
+    <SharedOrderBookProvider getMarkets={getMarkets} isHomePage={true}>
       <HomePageContent />
     </SharedOrderBookProvider>
   )

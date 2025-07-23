@@ -162,19 +162,23 @@ interface HomePageMarket {
 interface HomePageMarketStore {
   marketsByTab: Record<string, HomePageMarket[]>
   activeTab: string
+  visitedTabs: Set<string>
   realtimePrices: Record<string, { price: number; lastUpdate: number }>
   lastTabSwitch: number
   setActiveTab: (tab: string) => void
   setMarketsForTab: (tab: string, markets: HomePageMarket[]) => void
+  addVisitedTab: (tab: string) => void
   updateRealtimePrice: (conditionId: string, price: number) => void
   getRealtimePrice: (conditionId: string) => number | undefined
   getActiveMarkets: () => HomePageMarket[]
+  getVisitedTabsMarkets: () => HomePageMarket[]
   shouldKeepConnection: (tab: string) => boolean
 }
 
 export const useHomePageMarketStore = create<HomePageMarketStore>((set, get) => ({
   marketsByTab: {},
-  activeTab: 'newest',
+  activeTab: 'volume',
+  visitedTabs: new Set(['volume']),
   realtimePrices: {},
   lastTabSwitch: Date.now(),
   
@@ -189,6 +193,16 @@ export const useHomePageMarketStore = create<HomePageMarketStore>((set, get) => 
         [tab]: markets
       }
     }))
+  },
+  
+  addVisitedTab: (tab: string) => {
+    const state = get()
+    // Only add if tab has markets available
+    if (state.marketsByTab[tab] && state.marketsByTab[tab].length > 0) {
+      set((state) => ({
+        visitedTabs: new Set([...state.visitedTabs, tab])
+      }))
+    }
   },
   
   updateRealtimePrice: (conditionId: string, price: number) => {
@@ -216,6 +230,27 @@ export const useHomePageMarketStore = create<HomePageMarketStore>((set, get) => 
   getActiveMarkets: () => {
     const state = get()
     return state.marketsByTab[state.activeTab] || []
+  },
+  
+  getVisitedTabsMarkets: () => {
+    const state = get()
+    const allMarkets: HomePageMarket[] = []
+    
+    // Collect markets from all visited tabs
+    state.visitedTabs.forEach(tabId => {
+      const tabMarkets = state.marketsByTab[tabId] || []
+      allMarkets.push(...tabMarkets)
+    })
+    
+    // Remove duplicates by conditionId
+    const uniqueMarkets = allMarkets.reduce((acc, market) => {
+      if (!acc.find(m => m.conditionId === market.conditionId)) {
+        acc.push(market)
+      }
+      return acc
+    }, [] as HomePageMarket[])
+    
+    return uniqueMarkets
   },
   
   shouldKeepConnection: (tab: string) => {
