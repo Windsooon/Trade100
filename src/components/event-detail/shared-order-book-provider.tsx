@@ -272,7 +272,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, getMarkets
           if (Array.isArray(data)) {
             data.forEach(item => {
               // Handle initial order book snapshots (event_type: "book")
-              if (item.asset_id && item.event_type === 'book' && item.bids && item.asks) {
+              if (item.asset_id && item.event_type === 'book' && (item.buys || item.sells)) {
                 // Find which market this asset_id belongs to using conditionId = asset_id
                 const market = currentMarkets.find(m => {
                   if (!m.clobTokenIds) return false
@@ -296,11 +296,13 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, getMarkets
                     // Default to yes
                   }
 
-                  // WebSocket sends:
-                  // - Bids: small→big (need to reverse for display: big→small)
-                  // - Asks: big→small (need to reverse for display: small→big)
-                  const processedBids = (item.bids || []).slice().reverse() // Reverse bids: small→big to big→small
-                  const processedAsks = (item.asks || []).slice().reverse() // Reverse asks: big→small to small→big
+                  // WebSocket sends buys/sells, we map to bids/asks
+                  // - buys = bids (buying orders): small→big (need to reverse for display: big→small)
+                  // - sells = asks (selling orders): big→small (need to reverse for display: small→big)  
+                  const processedBids = (item.buys || []).slice().reverse() // Reverse buys: small→big to big→small
+                  const processedAsks = (item.sells || []).slice().reverse() // Reverse sells: big→small to small→big
+
+
 
                   setOrderBooks(prev => ({
                     ...prev,
