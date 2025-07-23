@@ -975,16 +975,22 @@ export default function MarketsPage() {
                   
                   {/* Price Display Toggle - Only show in markets mode */}
                   {viewMode === 'markets' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Price Display:</span>
-                      <Button
-                        variant={showPercentages ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setShowPercentages(!showPercentages)}
-                        className="px-3"
-                      >
-                        {showPercentages ? "Percentage" : "Absolute"}
-                      </Button>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Price Display:</span>
+                        <Button
+                          variant={showPercentages ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowPercentages(!showPercentages)}
+                          className="px-3"
+                        >
+                          {showPercentages ? "Percentage" : "Absolute"}
+                        </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        <p>Percentage: (price change / old price) * 100%</p>
+                        <p>Absolute: price change</p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1124,6 +1130,10 @@ export default function MarketsPage() {
                         >
                           {showPercentages ? "Percentage" : "Absolute"}
                         </Button>
+                        <div className="text-xs text-muted-foreground">
+                          <p>Percentage: Shows price change as % (e.g., +5.20%)</p>
+                          <p>Absolute: Shows actual price change (e.g., +0.052)</p>
+                        </div>
                       </div>
                     )}
                   </div>
