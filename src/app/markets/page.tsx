@@ -58,7 +58,7 @@ const PREDEFINED_TAGS = [
 ]
 
 // Market Card Component (for inside event cards)
-function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string }) {
+function MarketCard({ market, eventSlug, showPercentages }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string; showPercentages: boolean }) {
   const formatPrice = (price: number): string => {
     return price.toFixed(3)
   }
@@ -67,6 +67,12 @@ function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: str
     if (change === null) return '-'
     const sign = change >= 0 ? '+' : ''
     return `${sign}${(change * 100).toFixed(2)}%`
+  }
+
+  const formatAbsoluteChange = (change: number | null): string => {
+    if (change === null) return '-'
+    const sign = change >= 0 ? '+' : ''
+    return `${sign}${change.toFixed(3)}`
   }
   
   const getPriceChangeColor = (change: number | null): string => {
@@ -96,6 +102,24 @@ function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: str
     } catch {
       return 'Invalid date'
     }
+  }
+
+  // Calculate percentage changes
+  const calculatePercentageChange = (currentPrice: number, priceChange: number): number => {
+    if (!currentPrice || !priceChange) return 0
+    const oldPrice = currentPrice - priceChange
+    if (oldPrice <= 0) return 0
+    return (priceChange / oldPrice) * 100
+  }
+
+  const get1hPercentageChange = (): number => {
+    const currentPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
+    return calculatePercentageChange(currentPrice, market.oneHourPriceChange || 0)
+  }
+
+  const get24hPercentageChange = (): number => {
+    const currentPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
+    return calculatePercentageChange(currentPrice, market.oneDayPriceChange || 0)
   }
 
   let yesPrice = 0
@@ -150,13 +174,19 @@ function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: str
           <div className="w-24 text-center">
             <div className="text-xs text-muted-foreground mb-1">1h</div>
             <div className={`font-medium ${getPriceChangeColor(market.oneHourPriceChange || null)}`}>
-              {formatPriceChange(market.oneHourPriceChange || null)}
+              {showPercentages 
+                ? formatPriceChange(get1hPercentageChange() / 100) 
+                : formatAbsoluteChange(market.oneHourPriceChange || null)
+              }
             </div>
           </div>
           <div className="w-24 text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
             <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
-              {formatPriceChange(market.oneDayPriceChange || null)}
+              {showPercentages 
+                ? formatPriceChange(get24hPercentageChange() / 100) 
+                : formatAbsoluteChange(market.oneDayPriceChange || null)
+              }
             </div>
           </div>
           <div className="w-24 text-right">
@@ -174,7 +204,10 @@ function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: str
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
             <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
-              {formatPriceChange(market.oneDayPriceChange || null)}
+              {showPercentages 
+                ? formatPriceChange(get24hPercentageChange() / 100) 
+                : formatAbsoluteChange(market.oneDayPriceChange || null)
+              }
             </div>
           </div>
         </div>
@@ -184,7 +217,7 @@ function MarketCard({ market, eventSlug }: { market: Market & { eventTitle?: str
 }
 
 // Event Card Component (main cards with collapsible markets)
-function EventCard({ event }: { event: Event }) {
+function EventCard({ event, showPercentages }: { event: Event; showPercentages: boolean }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const formatVolume = (volume: number | null): string => {
@@ -323,9 +356,9 @@ function EventCard({ event }: { event: Event }) {
               <div className="text-sm font-medium text-muted-foreground mb-3">
                 Markets ({activeMarkets.length})
               </div>
-              {activeMarkets.map((market) => (
-                <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} />
-              ))}
+                              {activeMarkets.map((market) => (
+                  <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} showPercentages={showPercentages} />
+                ))}
             </div>
           </CollapsibleContent>
         </CardContent>
@@ -346,6 +379,7 @@ export default function MarketsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<number>(1)
+  const [showPercentages, setShowPercentages] = useState<boolean>(false)
   const itemsPerPage = 20
 
   // Get default sort option for each view mode
@@ -909,6 +943,21 @@ export default function MarketsPage() {
                       {sortDirection === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
                     </Button>
                   </div>
+                  
+                  {/* Price Display Toggle - Only show in markets mode */}
+                  {viewMode === 'markets' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Price Display:</span>
+                      <Button
+                        variant={showPercentages ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setShowPercentages(!showPercentages)}
+                        className="px-3"
+                      >
+                        {showPercentages ? "Percentage" : "Absolute"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Search Bar */}
@@ -1031,6 +1080,21 @@ export default function MarketsPage() {
                       {sortDirection === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
                     </Button>
                     </div>
+                    
+                    {/* Price Display Toggle - Only show in markets mode */}
+                    {viewMode === 'markets' && (
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-muted-foreground">PRICE DISPLAY</h3>
+                        <Button
+                          variant={showPercentages ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowPercentages(!showPercentages)}
+                          className="w-full"
+                        >
+                          {showPercentages ? "Percentage" : "Absolute"}
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   {hasActiveFilters && (
@@ -1070,10 +1134,10 @@ export default function MarketsPage() {
           ) : (
             viewMode === 'events' 
               ? (paginatedData as Event[]).map((event) => (
-              <EventCard key={event.id} event={event} />
+              <EventCard key={event.id} event={event} showPercentages={showPercentages} />
                 ))
                               : (paginatedData as (Market & { eventTitle: string; eventSlug: string; eventIcon?: string })[]).map((market) => (
-                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug} />
+                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug} showPercentages={showPercentages} />
             ))
           )}
         </div>
