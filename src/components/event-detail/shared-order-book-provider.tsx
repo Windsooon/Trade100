@@ -272,7 +272,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, getMarkets
           if (Array.isArray(data)) {
             data.forEach(item => {
               // Handle initial order book snapshots (event_type: "book")
-              if (item.asset_id && item.event_type === 'book' && (item.buys || item.sells)) {
+              if (item.asset_id && item.event_type === 'book' && (item.bids || item.asks)) {
                 // Find which market this asset_id belongs to using conditionId = asset_id
                 const market = currentMarkets.find(m => {
                   if (!m.clobTokenIds) return false
@@ -296,11 +296,11 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, getMarkets
                     // Default to yes
                   }
 
-                  // WebSocket sends buys/sells, we map to bids/asks
-                  // - buys = bids (buying orders): small→big (need to reverse for display: big→small)
-                  // - sells = asks (selling orders): big→small (need to reverse for display: small→big)  
-                  const processedBids = (item.buys || []).slice().reverse() // Reverse buys: small→big to big→small
-                  const processedAsks = (item.sells || []).slice().reverse() // Reverse sells: big→small to small→big
+                  // WebSocket sends bids/asks
+                  // - bids: ascending order (need to reverse for highest first)
+                  // - asks: ascending order (already correct - lowest first)
+                  const processedBids = (item.bids || []).slice().reverse() // Reverse to get highest bid first
+                  const processedAsks = (item.asks || []).slice() // Keep ascending order for lowest ask first
 
 
 
@@ -528,12 +528,16 @@ export function SharedOrderBookProvider({ children, allActiveMarkets, getMarkets
       setRetryAttempt(0)
       connect()
     }
-
+    // Note: No cleanup function - we want to keep connections across tab switches
+  }, [connect, cleanup, allActiveTokenIds.join(',')]) // Use join to create stable dependency
+  
+  // Cleanup only on component unmount
+  useEffect(() => {
     return () => {
       isUnmountingRef.current = true
       cleanup()
     }
-  }, [connect, cleanup, allActiveTokenIds.join(',')]) // Use join to create stable dependency
+  }, [])
 
   // Fetch initial last trade prices when markets change
   useEffect(() => {
