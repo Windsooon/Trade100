@@ -1333,9 +1333,11 @@ function HomePageContent() {
 }
 
 export default function HomePage() {
-  const { getVisitedTabsMarkets } = useHomePageMarketStore()
+  const { getVisitedTabsMarkets, getMarketsChangeKey } = useHomePageMarketStore()
+  const marketsChangeKey = getMarketsChangeKey()
   
   // Convert HomePageMarkets to Market format for WebSocket provider
+  // Dependency on marketsChangeKey ensures this updates when markets or visited tabs change
   const getMarkets = useCallback(() => {
     return getVisitedTabsMarkets().map(market => ({
       conditionId: market.conditionId,
@@ -1343,7 +1345,7 @@ export default function HomePage() {
       question: '',
       outcomePrices: []
     })) as Market[]
-  }, [getVisitedTabsMarkets])
+  }, [getVisitedTabsMarkets, marketsChangeKey])
 
   return (
     <SharedOrderBookProvider getMarkets={getMarkets} isHomePage={true}>

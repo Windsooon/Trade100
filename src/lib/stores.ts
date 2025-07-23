@@ -172,6 +172,7 @@ interface HomePageMarketStore {
   getRealtimePrice: (conditionId: string) => number | undefined
   getActiveMarkets: () => HomePageMarket[]
   getVisitedTabsMarkets: () => HomePageMarket[]
+  getMarketsChangeKey: () => string
   shouldKeepConnection: (tab: string) => boolean
 }
 
@@ -251,6 +252,14 @@ export const useHomePageMarketStore = create<HomePageMarketStore>((set, get) => 
     }, [] as HomePageMarket[])
     
     return uniqueMarkets
+  },
+  
+  getMarketsChangeKey: () => {
+    const state = get()
+    // Create a key that changes when markets or visited tabs change
+    const marketsHash = JSON.stringify(state.marketsByTab)
+    const visitedTabsHash = Array.from(state.visitedTabs).sort().join(',')
+    return `${marketsHash}_${visitedTabsHash}`
   },
   
   shouldKeepConnection: (tab: string) => {
