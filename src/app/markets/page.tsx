@@ -60,7 +60,7 @@ const PREDEFINED_TAGS = [
 // Market Card Component (for inside event cards)
 function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string; sortBy: string }) {
   const formatPrice = (price: number): string => {
-    return price.toFixed(3)
+    return (price * 100).toFixed(2)
   }
   
   const formatPriceChange = (change: number | null): string => {
@@ -161,20 +161,20 @@ function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTit
       const bestBid = market.bestBid ? parseFloat(market.bestBid) : null
       return {
         price: bestBid !== null ? formatPrice(bestBid) : '-',
-        label: 'Best Bid'
+        label: 'Best Bid (%)'
       }
     } else if (sortBy === 'bestAsk') {
       const bestAsk = market.bestAsk ? parseFloat(market.bestAsk) : null
       return {
         price: bestAsk !== null ? formatPrice(bestAsk) : '-',
-        label: 'Best Ask'
+        label: 'Best Ask (%)'
       }
     } else {
       // Default: show Yes price
       const yesPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
       return {
         price: formatPrice(yesPrice),
-        label: 'Yes'
+        label: 'Yes (%)'
       }
     }
   }

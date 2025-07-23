@@ -354,7 +354,7 @@ interface MarketDisplay {
 // Market Card Component
 function MarketCard({ market }: { market: MarketDisplay }) {
   const formatPrice = (price: number): string => {
-    return price.toFixed(3)
+    return (price * 100).toFixed(2)
   }
   
   const formatPriceChange = (change: number | null): string => {
@@ -418,7 +418,7 @@ function MarketCard({ market }: { market: MarketDisplay }) {
         {/* Desktop Layout (md and up) */}
         <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
           <div className="w-16 text-left">
-            <div className="text-xs text-muted-foreground mb-1">Yes</div>
+            <div className="text-xs text-muted-foreground mb-1">Yes (%)</div>
             <div className="font-medium">{formatPrice(market.yesPrice)}</div>
           </div>
           <div className="w-20 text-center">
@@ -433,7 +433,7 @@ function MarketCard({ market }: { market: MarketDisplay }) {
         {/* Mobile Layout (below md) */}
         <div className="flex md:hidden items-center gap-3 text-sm ml-4 flex-shrink-0">
           <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">Yes</div>
+            <div className="text-xs text-muted-foreground mb-1">Yes (%)</div>
             <div className="font-medium">{formatPrice(market.yesPrice)}</div>
           </div>
           <div className="text-center">
