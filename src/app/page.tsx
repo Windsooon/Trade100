@@ -11,10 +11,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 import { TrendingUp, Clock, DollarSign, BarChart3, Activity, RefreshCw, AlertCircle } from 'lucide-react'
-import { Event, useHomePageMarketStore, type Market } from '../../lib/stores'
-import { SharedOrderBookProvider } from '../../components/event-detail/shared-order-book-provider'
-import { useHomePageRealtime } from '../../hooks/use-home-page-realtime'
-import { convertToHomePageMarket } from '../../lib/realtime-price'
+import { Event, useHomePageMarketStore, type Market } from '../lib/stores'
+import { SharedOrderBookProvider } from '../components/event-detail/shared-order-book-provider'
+import { useHomePageRealtime } from '../hooks/use-home-page-realtime'
+import { convertToHomePageMarket } from '../lib/realtime-price'
 import Link from 'next/link'
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 import {
