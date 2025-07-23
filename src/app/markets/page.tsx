@@ -356,7 +356,7 @@ export default function MarketsPage() {
   // Update sort when view mode changes
   useEffect(() => {
     const validSortOptions = {
-      markets: ['volume24hr', 'volume1wk', 'liquidity', 'priceChange24h', 'priceChange1h'],
+      markets: ['volume24hr', 'volume1wk', 'liquidity', 'priceChange24h', 'priceChange1h', 'priceChangePercent24h', 'priceChangePercent1h'],
       events: ['volume24hr', 'volume1wk', 'liquidity', 'endDate']
     }
     
@@ -462,6 +462,14 @@ export default function MarketsPage() {
     })
     
     return markets
+  }
+
+  // Helper function to calculate percentage change
+  const calculatePercentageChange = (currentPrice: number, priceChange: number): number => {
+    if (!currentPrice || !priceChange) return 0
+    const oldPrice = currentPrice - priceChange // oldPrice = currentPrice - changeFromOldToCurrent
+    if (oldPrice <= 0) return 0
+    return (priceChange / oldPrice) * 100
   }
 
   // Client-side filtering and sorting for events
@@ -661,6 +669,20 @@ export default function MarketsPage() {
               break
             case 'priceChange1h':
               comparison = (a.oneHourPriceChange || 0) - (b.oneHourPriceChange || 0)
+              break
+            case 'priceChangePercent24h':
+              const aCurrentPrice24h = a.outcomePrices?.[0] ? parseFloat(a.outcomePrices[0]) : 0
+              const bCurrentPrice24h = b.outcomePrices?.[0] ? parseFloat(b.outcomePrices[0]) : 0
+              const aPercent24h = calculatePercentageChange(aCurrentPrice24h, a.oneDayPriceChange || 0)
+              const bPercent24h = calculatePercentageChange(bCurrentPrice24h, b.oneDayPriceChange || 0)
+              comparison = aPercent24h - bPercent24h
+              break
+            case 'priceChangePercent1h':
+              const aCurrentPrice1h = a.outcomePrices?.[0] ? parseFloat(a.outcomePrices[0]) : 0
+              const bCurrentPrice1h = b.outcomePrices?.[0] ? parseFloat(b.outcomePrices[0]) : 0
+              const aPercent1h = calculatePercentageChange(aCurrentPrice1h, a.oneHourPriceChange || 0)
+              const bPercent1h = calculatePercentageChange(bCurrentPrice1h, b.oneHourPriceChange || 0)
+              comparison = aPercent1h - bPercent1h
               break
             default:
               return 0
@@ -872,6 +894,8 @@ export default function MarketsPage() {
                           <>
                             <SelectItem value="priceChange24h">24h Price Change</SelectItem>
                             <SelectItem value="priceChange1h">1h Price Change</SelectItem>
+                            <SelectItem value="priceChangePercent24h">24h Price Change %</SelectItem>
+                            <SelectItem value="priceChangePercent1h">1h Price Change %</SelectItem>
                           </>
                         )}
                       </SelectContent>
@@ -992,6 +1016,8 @@ export default function MarketsPage() {
                           <>
                             <SelectItem value="priceChange24h">24h Price Change</SelectItem>
                             <SelectItem value="priceChange1h">1h Price Change</SelectItem>
+                            <SelectItem value="priceChangePercent24h">24h Price Change %</SelectItem>
+                            <SelectItem value="priceChangePercent1h">1h Price Change %</SelectItem>
                           </>
                         )}
                       </SelectContent>
