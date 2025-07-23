@@ -58,7 +58,7 @@ const PREDEFINED_TAGS = [
 ]
 
 // Market Card Component (for inside event cards)
-function MarketCard({ market, eventSlug, showPercentages }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string; showPercentages: boolean }) {
+function MarketCard({ market, eventSlug, showPercentages, sortBy }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string; showPercentages: boolean; sortBy: string }) {
   const formatPrice = (price: number): string => {
     return price.toFixed(3)
   }
@@ -79,14 +79,14 @@ function MarketCard({ market, eventSlug, showPercentages }: { market: Market & {
     if (change === null) return ''
     return change >= 0 ? 'text-price-positive' : 'text-price-negative'
   }
-
+  
   const formatVolume = (volume: number | null): string => {
-    if (!volume || volume === 0) return 'N/A'
+    if (volume === null || volume === 0) return '-'
     if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`
     if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`
     return `$${volume.toFixed(0)}`
   }
-
+  
   const formatDate = (dateString: string): string => {
     try {
       const date = new Date(dateString)
@@ -104,34 +104,51 @@ function MarketCard({ market, eventSlug, showPercentages }: { market: Market & {
     }
   }
 
-  // Calculate percentage changes
+  // Calculate percentage change for display
   const calculatePercentageChange = (currentPrice: number, priceChange: number): number => {
-    if (!currentPrice || !priceChange) return 0
-    const oldPrice = currentPrice - priceChange
-    if (oldPrice <= 0) return 0
-    return (priceChange / oldPrice) * 100
+    if (currentPrice === 0) return 0
+    return (priceChange / currentPrice) * 100
   }
 
   const get1hPercentageChange = (): number => {
-    const currentPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
-    return calculatePercentageChange(currentPrice, market.oneHourPriceChange || 0)
+    if (!market.outcomePrices || market.outcomePrices.length === 0) return 0
+    const currentPrice = parseFloat(market.outcomePrices[0])
+    const priceChange = market.oneHourPriceChange || 0
+    return calculatePercentageChange(currentPrice, priceChange)
   }
 
   const get24hPercentageChange = (): number => {
-    const currentPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
-    return calculatePercentageChange(currentPrice, market.oneDayPriceChange || 0)
+    if (!market.outcomePrices || market.outcomePrices.length === 0) return 0
+    const currentPrice = parseFloat(market.outcomePrices[0])
+    const priceChange = market.oneDayPriceChange || 0
+    return calculatePercentageChange(currentPrice, priceChange)
   }
 
-  let yesPrice = 0
-  
-  try {
-    if (market.outcomePrices && market.outcomePrices.length >= 2) {
-      yesPrice = parseFloat(market.outcomePrices[0])
+  // Dynamic price display logic based on sort option
+  const getDisplayPrice = (): { price: string; label: string } => {
+    if (sortBy === 'bestBid') {
+      const bestBid = market.bestBid ? parseFloat(market.bestBid) : null
+      return {
+        price: bestBid !== null ? formatPrice(bestBid) : '-',
+        label: 'Best Bid'
+      }
+    } else if (sortBy === 'bestAsk') {
+      const bestAsk = market.bestAsk ? parseFloat(market.bestAsk) : null
+      return {
+        price: bestAsk !== null ? formatPrice(bestAsk) : '-',
+        label: 'Best Ask'
+      }
+    } else {
+      // Default: show Yes price
+      const yesPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
+      return {
+        price: formatPrice(yesPrice),
+        label: 'Yes'
+      }
     }
-  } catch (error) {
-    // Skip invalid markets
-    return null
   }
+
+  const displayPrice = getDisplayPrice()
   
   return (
     <Link href={`/events/${eventSlug}?market=${market.conditionId}`} target="_blank" rel="noopener noreferrer">
@@ -168,8 +185,8 @@ function MarketCard({ market, eventSlug, showPercentages }: { market: Market & {
         {/* Desktop Layout (md and up) */}
         <div className="hidden md:flex items-center gap-6 text-sm ml-4 flex-shrink-0">
           <div className="w-20 text-left">
-            <div className="text-xs text-muted-foreground mb-1">Yes</div>
-            <div className="font-medium">{formatPrice(yesPrice)}</div>
+            <div className="text-xs text-muted-foreground mb-1">{displayPrice.label}</div>
+            <div className="font-medium">{displayPrice.price}</div>
           </div>
           <div className="w-24 text-center">
             <div className="text-xs text-muted-foreground mb-1">1h</div>
@@ -198,8 +215,8 @@ function MarketCard({ market, eventSlug, showPercentages }: { market: Market & {
         {/* Mobile Layout (below md) */}
         <div className="flex md:hidden items-center gap-3 text-sm ml-4 flex-shrink-0">
           <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">Yes</div>
-            <div className="font-medium">{formatPrice(yesPrice)}</div>
+            <div className="text-xs text-muted-foreground mb-1">{displayPrice.label}</div>
+            <div className="font-medium">{displayPrice.price}</div>
           </div>
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
@@ -217,7 +234,7 @@ function MarketCard({ market, eventSlug, showPercentages }: { market: Market & {
 }
 
 // Event Card Component (main cards with collapsible markets)
-function EventCard({ event, showPercentages }: { event: Event; showPercentages: boolean }) {
+function EventCard({ event, showPercentages, sortBy }: { event: Event; showPercentages: boolean; sortBy: string }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const formatVolume = (volume: number | null): string => {
@@ -357,7 +374,7 @@ function EventCard({ event, showPercentages }: { event: Event; showPercentages: 
                 Markets ({activeMarkets.length})
               </div>
                               {activeMarkets.map((market) => (
-                  <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} showPercentages={showPercentages} />
+                  <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} showPercentages={showPercentages} sortBy={sortBy} />
                 ))}
             </div>
           </CollapsibleContent>
@@ -375,22 +392,22 @@ export default function MarketsPage() {
   const [maxPrice, setMaxPrice] = useState<string>('')
   const [minBestAsk, setMinBestAsk] = useState<string>('')
   const [maxBestAsk, setMaxBestAsk] = useState<string>('')
-  const [sortBy, setSortBy] = useState<string>('priceChange24h') // Markets mode default
+  const [sortBy, setSortBy] = useState<string>('priceChangePercent24h') // Markets mode default - changed to percentage
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<number>(1)
-  const [showPercentages, setShowPercentages] = useState<boolean>(false)
+  const [showPercentages, setShowPercentages] = useState<boolean>(true) // Changed to true (percentage by default)
   const itemsPerPage = 20
 
   // Get default sort option for each view mode
   const getDefaultSort = (mode: 'markets' | 'events'): string => {
-    return mode === 'markets' ? 'priceChange24h' : 'volume24hr'
+    return mode === 'markets' ? 'priceChangePercent24h' : 'volume24hr'
   }
 
   // Update sort when view mode changes
   useEffect(() => {
     const validSortOptions = {
-      markets: ['volume24hr', 'volume1wk', 'liquidity', 'priceChange24h', 'priceChange1h', 'priceChangePercent24h', 'priceChangePercent1h'],
+      markets: ['volume24hr', 'volume1wk', 'liquidity', 'priceChange24h', 'priceChange1h', 'priceChangePercent24h', 'priceChangePercent1h', 'bestBid', 'bestAsk'],
       events: ['volume24hr', 'volume1wk', 'liquidity', 'endDate']
     }
     
@@ -718,6 +735,16 @@ export default function MarketsPage() {
               const bPercent1h = calculatePercentageChange(bCurrentPrice1h, b.oneHourPriceChange || 0)
               comparison = aPercent1h - bPercent1h
               break
+            case 'bestBid':
+              const aBestBid = a.bestBid ? parseFloat(a.bestBid) : 0
+              const bBestBid = b.bestBid ? parseFloat(b.bestBid) : 0
+              comparison = aBestBid - bBestBid
+              break
+            case 'bestAsk':
+              const aBestAsk = a.bestAsk ? parseFloat(a.bestAsk) : 0
+              const bBestAsk = b.bestAsk ? parseFloat(b.bestAsk) : 0
+              comparison = aBestAsk - bBestAsk
+              break
             default:
               return 0
           }
@@ -930,6 +957,8 @@ export default function MarketsPage() {
                             <SelectItem value="priceChange1h">1h Price Change</SelectItem>
                             <SelectItem value="priceChangePercent24h">24h Price Change %</SelectItem>
                             <SelectItem value="priceChangePercent1h">1h Price Change %</SelectItem>
+                            <SelectItem value="bestBid">Best Bid</SelectItem>
+                            <SelectItem value="bestAsk">Best Ask</SelectItem>
                           </>
                         )}
                       </SelectContent>
@@ -1067,6 +1096,8 @@ export default function MarketsPage() {
                             <SelectItem value="priceChange1h">1h Price Change</SelectItem>
                             <SelectItem value="priceChangePercent24h">24h Price Change %</SelectItem>
                             <SelectItem value="priceChangePercent1h">1h Price Change %</SelectItem>
+                            <SelectItem value="bestBid">Best Bid</SelectItem>
+                            <SelectItem value="bestAsk">Best Ask</SelectItem>
                           </>
                         )}
                       </SelectContent>
@@ -1134,10 +1165,10 @@ export default function MarketsPage() {
           ) : (
             viewMode === 'events' 
               ? (paginatedData as Event[]).map((event) => (
-              <EventCard key={event.id} event={event} showPercentages={showPercentages} />
+              <EventCard key={event.id} event={event} showPercentages={showPercentages} sortBy={sortBy} />
                 ))
                               : (paginatedData as (Market & { eventTitle: string; eventSlug: string; eventIcon?: string })[]).map((market) => (
-                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug} showPercentages={showPercentages} />
+                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug} showPercentages={showPercentages} sortBy={sortBy} />
             ))
           )}
         </div>
