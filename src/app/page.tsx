@@ -360,6 +360,12 @@ function MarketCard({ market }: { market: MarketDisplay }) {
   const formatPriceChange = (change: number | null): string => {
     if (change === null) return '-'
     const sign = change >= 0 ? '+' : ''
+    return `${sign}${(change * 100).toFixed(2)}`
+  }
+
+  const formatPercentagePrice = (change: number | null): string => {
+    if (change === null) return '-'
+    const sign = change >= 0 ? '+' : ''
     return `${sign}${(change * 100).toFixed(2)}%`
   }
   
@@ -367,6 +373,20 @@ function MarketCard({ market }: { market: MarketDisplay }) {
     if (change === null) return ''
     return change >= 0 ? 'text-price-positive' : 'text-price-negative'
   }
+
+  // Calculate 24h percentage price using the same method as markets page
+  const calculate24hPercentagePrice = (): number | null => {
+    if (market.priceChange === null) return null
+    
+    // old_price = outcomePrices[0] - oneDayPriceChange
+    const oldPrice = market.yesPrice - market.priceChange
+    if (oldPrice <= 0) return null
+    
+    // percentage = oneDayPriceChange / old_price
+    return market.priceChange / oldPrice
+  }
+
+  const percentagePrice = calculate24hPercentagePrice()
   
   return (
     <Link href={`/events/${market.eventSlug}?market=${market.conditionId}`} target="_blank" rel="noopener noreferrer">
@@ -404,7 +424,8 @@ function MarketCard({ market }: { market: MarketDisplay }) {
           <div className="w-20 text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
             <div className={`font-medium ${getPriceChangeColor(market.priceChange)}`}>
-              {formatPriceChange(market.priceChange)}
+              <div>{formatPriceChange(market.priceChange)}</div>
+              <div className="text-xs">{formatPercentagePrice(percentagePrice)}</div>
             </div>
           </div>
         </div>
@@ -418,7 +439,8 @@ function MarketCard({ market }: { market: MarketDisplay }) {
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
             <div className={`font-medium ${getPriceChangeColor(market.priceChange)}`}>
-              {formatPriceChange(market.priceChange)}
+              <div>{formatPriceChange(market.priceChange)}</div>
+              <div className="text-xs">{formatPercentagePrice(percentagePrice)}</div>
             </div>
           </div>
         </div>

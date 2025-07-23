@@ -58,12 +58,18 @@ const PREDEFINED_TAGS = [
 ]
 
 // Market Card Component (for inside event cards)
-function MarketCard({ market, eventSlug, showPercentages, sortBy }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string; showPercentages: boolean; sortBy: string }) {
+function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string; sortBy: string }) {
   const formatPrice = (price: number): string => {
     return price.toFixed(3)
   }
   
   const formatPriceChange = (change: number | null): string => {
+    if (change === null) return '-'
+    const sign = change >= 0 ? '+' : ''
+    return `${sign}${(change * 100).toFixed(2)}`
+  }
+
+  const formatPercentagePrice = (change: number | null): string => {
     if (change === null) return '-'
     const sign = change >= 0 ? '+' : ''
     return `${sign}${(change * 100).toFixed(2)}%`
@@ -108,6 +114,31 @@ function MarketCard({ market, eventSlug, showPercentages, sortBy }: { market: Ma
   const calculatePercentageChange = (currentPrice: number, priceChange: number): number => {
     if (currentPrice === 0) return 0
     return (priceChange / currentPrice) * 100
+  }
+
+  // Calculate percentage price using the same method as home page
+  const calculate1hPercentagePrice = (): number | null => {
+    if (market.oneHourPriceChange === null || market.oneHourPriceChange === undefined) return null
+    
+    // old_price = current_price - price_change
+    const currentPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
+    const oldPrice = currentPrice - market.oneHourPriceChange
+    if (oldPrice <= 0) return null
+    
+    // percentage = price_change / old_price
+    return market.oneHourPriceChange / oldPrice
+  }
+
+  const calculate24hPercentagePrice = (): number | null => {
+    if (market.oneDayPriceChange === null || market.oneDayPriceChange === undefined) return null
+    
+    // old_price = current_price - price_change
+    const currentPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
+    const oldPrice = currentPrice - market.oneDayPriceChange
+    if (oldPrice <= 0) return null
+    
+    // percentage = price_change / old_price
+    return market.oneDayPriceChange / oldPrice
   }
 
   const get1hPercentageChange = (): number => {
@@ -191,19 +222,15 @@ function MarketCard({ market, eventSlug, showPercentages, sortBy }: { market: Ma
           <div className="w-24 text-center">
             <div className="text-xs text-muted-foreground mb-1">1h</div>
             <div className={`font-medium ${getPriceChangeColor(market.oneHourPriceChange || null)}`}>
-              {showPercentages 
-                ? formatPriceChange(get1hPercentageChange() / 100) 
-                : formatAbsoluteChange(market.oneHourPriceChange || null)
-              }
+              <div>{formatPriceChange(market.oneHourPriceChange || null)}</div>
+              <div className="text-xs">{formatPercentagePrice(calculate1hPercentagePrice())}</div>
             </div>
           </div>
           <div className="w-24 text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
             <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
-              {showPercentages 
-                ? formatPriceChange(get24hPercentageChange() / 100) 
-                : formatAbsoluteChange(market.oneDayPriceChange || null)
-              }
+              <div>{formatPriceChange(market.oneDayPriceChange || null)}</div>
+              <div className="text-xs">{formatPercentagePrice(calculate24hPercentagePrice())}</div>
             </div>
           </div>
           <div className="w-24 text-right">
@@ -221,10 +248,8 @@ function MarketCard({ market, eventSlug, showPercentages, sortBy }: { market: Ma
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">24h</div>
             <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
-              {showPercentages 
-                ? formatPriceChange(get24hPercentageChange() / 100) 
-                : formatAbsoluteChange(market.oneDayPriceChange || null)
-              }
+              <div>{formatPriceChange(market.oneDayPriceChange || null)}</div>
+              <div className="text-xs">{formatPercentagePrice(calculate24hPercentagePrice())}</div>
             </div>
           </div>
         </div>
@@ -234,7 +259,7 @@ function MarketCard({ market, eventSlug, showPercentages, sortBy }: { market: Ma
 }
 
 // Event Card Component (main cards with collapsible markets)
-function EventCard({ event, showPercentages, sortBy }: { event: Event; showPercentages: boolean; sortBy: string }) {
+function EventCard({ event, sortBy }: { event: Event; sortBy: string }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const formatVolume = (volume: number | null): string => {
@@ -374,7 +399,7 @@ function EventCard({ event, showPercentages, sortBy }: { event: Event; showPerce
                 Markets ({activeMarkets.length})
               </div>
                               {activeMarkets.map((market) => (
-                  <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} showPercentages={showPercentages} sortBy={sortBy} />
+                  <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} sortBy={sortBy} />
                 ))}
             </div>
           </CollapsibleContent>
@@ -396,7 +421,7 @@ export default function MarketsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<number>(1)
-  const [showPercentages, setShowPercentages] = useState<boolean>(true) // Changed to true (percentage by default)
+
   const itemsPerPage = 20
 
   // Get default sort option for each view mode
@@ -973,26 +998,7 @@ export default function MarketsPage() {
                     </Button>
                   </div>
                   
-                  {/* Price Display Toggle - Only show in markets mode */}
-                  {viewMode === 'markets' && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">Price Display:</span>
-                        <Button
-                          variant={showPercentages ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setShowPercentages(!showPercentages)}
-                          className="px-3"
-                        >
-                          {showPercentages ? "Percentage" : "Absolute"}
-                        </Button>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        <p>Percentage: (price change / old price) * 100%</p>
-                        <p>Absolute: price change</p>
-                      </div>
-                    </div>
-                  )}
+
                 </div>
 
                 {/* Search Bar */}
@@ -1118,24 +1124,7 @@ export default function MarketsPage() {
                     </Button>
                     </div>
                     
-                    {/* Price Display Toggle - Only show in markets mode */}
-                    {viewMode === 'markets' && (
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-muted-foreground">PRICE DISPLAY</h3>
-                        <Button
-                          variant={showPercentages ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setShowPercentages(!showPercentages)}
-                          className="w-full"
-                        >
-                          {showPercentages ? "Percentage" : "Absolute"}
-                        </Button>
-                        <div className="text-xs text-muted-foreground">
-                          <p>Percentage: Shows price change as % (e.g., +5.20%)</p>
-                          <p>Absolute: Shows actual price change (e.g., +0.052)</p>
-                        </div>
-                      </div>
-                    )}
+
                   </div>
 
                   {hasActiveFilters && (
@@ -1175,10 +1164,10 @@ export default function MarketsPage() {
           ) : (
             viewMode === 'events' 
               ? (paginatedData as Event[]).map((event) => (
-              <EventCard key={event.id} event={event} showPercentages={showPercentages} sortBy={sortBy} />
+              <EventCard key={event.id} event={event} sortBy={sortBy} />
                 ))
                               : (paginatedData as (Market & { eventTitle: string; eventSlug: string; eventIcon?: string })[]).map((market) => (
-                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug} showPercentages={showPercentages} sortBy={sortBy} />
+                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug} sortBy={sortBy} />
             ))
           )}
         </div>
