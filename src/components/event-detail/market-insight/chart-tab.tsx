@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, Loader2, TrendingUp, WifiOff, Activity } from 'lucide-react'
-import { createChart, IChartApi, ISeriesApi, ColorType, CandlestickSeries, HistogramSeries } from 'lightweight-charts'
+import { AlertCircle, Loader2, TrendingUp, WifiOff, Activity, BarChart3, TrendingUp as LineChart } from 'lucide-react'
+import { createChart, IChartApi, ISeriesApi, ColorType, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts'
 import { ChartTabProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint, VolumeType } from './types'
 
 // Global cache for market history to prevent duplicate API calls
@@ -10,9 +10,12 @@ let globalMarketHistoryCache: Map<string, { data: MarketHistoryResponse; timesta
 let globalMarketHistoryPromises: Map<string, Promise<MarketHistoryResponse>> = new Map()
 const MARKET_HISTORY_CACHE_DURATION = 30000 // 30 seconds
 
+type ChartType = 'candle' | 'line'
+
 export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
   
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1h')
+  const [chartType, setChartType] = useState<ChartType>('candle')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [volumeType, setVolumeType] = useState<VolumeType>('totalDollarVolume')
@@ -105,16 +108,25 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     try {
       chart = createChart(chartContainerRef.current, chartOptions)
       
-      const candlestickSeries = chart.addSeries(CandlestickSeries, {
-        upColor: '#26a69a',
-        downColor: '#ef5350',
-        borderVisible: false,
-        wickUpColor: '#26a69a',
-        wickDownColor: '#ef5350',
-      })
+      let priceSeries: ISeriesApi<'Candlestick'> | ISeriesApi<'Line'>
+      
+      if (chartType === 'candle') {
+        priceSeries = chart.addSeries(CandlestickSeries, {
+          upColor: '#26a69a',
+          downColor: '#ef5350',
+          borderVisible: false,
+          wickUpColor: '#26a69a',
+          wickDownColor: '#ef5350',
+        })
+      } else {
+        priceSeries = chart.addSeries(LineSeries, {
+          color: '#26a69a',
+          lineWidth: 2,
+        })
+      }
       
       // Position price series to take 70% of chart height
-      candlestickSeries.priceScale().applyOptions({
+      priceSeries.priceScale().applyOptions({
         scaleMargins: {
           top: 0.1,
           bottom: 0.4,
@@ -139,7 +151,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       })
 
       chartRef.current = chart
-      seriesRef.current = candlestickSeries
+      seriesRef.current = priceSeries
       volumeSeriesRef.current = volumeSeries
 
       // Handle resize
@@ -169,7 +181,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       seriesRef.current = null
       volumeSeriesRef.current = null
     }
-  }, [chartKey])
+  }, [chartKey, chartType])
 
   // Setup tooltip - waits for chart initialization to complete
   useEffect(() => {
@@ -585,13 +597,16 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     const newTimestamp = newDataPoint.timestamp
     const currentLatest = latestTimestampRef.current
 
-    // Prepare new chart data point
-    const newChartPoint = {
+    // Prepare new chart data point based on chart type
+    const newChartPoint = chartType === 'candle' ? {
       time: newTimestamp as any,
       open: newDataPoint.price.open,
       high: newDataPoint.price.high,
       low: newDataPoint.price.low,
       close: newDataPoint.price.close
+    } : {
+      time: newTimestamp as any,
+      value: newDataPoint.price.close
     }
 
     // Prepare new volume data point
@@ -637,7 +652,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     // If newTimestamp < currentLatest, ignore (out-of-order data)
     
     setLastUpdateTime(new Date())
-  }, [volumeType])
+  }, [volumeType, chartType])
 
   // Start real-time updates
   const startRealtimeUpdates = useCallback(() => {
@@ -694,12 +709,15 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
           if (cachedData && (now - cachedData.timestamp) < MARKET_HISTORY_CACHE_DURATION) {
         // Process cached data
         const result = cachedData.data
-        const processedData = result.data.map(point => ({
+        const processedData = result.data.map(point => chartType === 'candle' ? ({
           time: point.timestamp as any,
           open: point.price.open,
           high: point.price.high,
           low: point.price.low,
           close: point.price.close
+        }) : ({
+          time: point.timestamp as any,
+          value: point.price.close
         }))
         
         const volumeData = result.data.map(point => ({
@@ -710,6 +728,12 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         
         if (seriesRef.current) {
           seriesRef.current.setData(processedData)
+          
+          // Update line color for line chart
+          if (chartType === 'line' && 'applyOptions' in seriesRef.current) {
+            const lineColor = getLineColor(result.data)
+            seriesRef.current.applyOptions({ color: lineColor })
+          }
         }
         if (volumeSeriesRef.current) {
           volumeSeriesRef.current.setData(volumeData)
@@ -725,17 +749,20 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       }
 
     // Check if request is already in progress globally
-    const existingPromise = globalMarketHistoryPromises.get(requestKey)
+          const existingPromise = globalMarketHistoryPromises.get(requestKey)
     if (existingPromise) {
       try {
         const result = await existingPromise
         // Process data same as above
-        const processedData = result.data.map(point => ({
+        const processedData = result.data.map(point => chartType === 'candle' ? ({
           time: point.timestamp as any,
           open: point.price.open,
           high: point.price.high,
           low: point.price.low,
           close: point.price.close
+        }) : ({
+          time: point.timestamp as any,
+          value: point.price.close
         }))
         
         const volumeData = result.data.map(point => ({
@@ -746,6 +773,12 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         
         if (seriesRef.current) {
           seriesRef.current.setData(processedData)
+          
+          // Update line color for line chart
+          if (chartType === 'line' && 'applyOptions' in seriesRef.current) {
+            const lineColor = getLineColor(result.data)
+            seriesRef.current.applyOptions({ color: lineColor })
+          }
         }
         if (volumeSeriesRef.current) {
           volumeSeriesRef.current.setData(volumeData)
@@ -787,16 +820,25 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         volumeDataRef.current = cachedData // Same data contains both price and volume
         
         // Update chart with cached data
-        const chartData = cachedData.map(point => ({
+        const chartData = cachedData.map(point => chartType === 'candle' ? ({
           time: point.timestamp as any,
           open: point.price.open,
           high: point.price.high,
           low: point.price.low,
           close: point.price.close
+        }) : ({
+          time: point.timestamp as any,
+          value: point.price.close
         }))
         
         if (seriesRef.current) {
           seriesRef.current.setData(chartData)
+          
+          // Update line color for line chart
+          if (chartType === 'line' && 'applyOptions' in seriesRef.current) {
+            const lineColor = getLineColor(cachedData)
+            seriesRef.current.applyOptions({ color: lineColor })
+          }
         }
         
         // Update volume display
@@ -818,7 +860,12 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         setLoading(false)
         // Clean up active request marker for cached responses
         activeRequestsRef.current.delete(requestKey)
-        return
+        return { 
+          data: cachedData,
+          market: marketId,
+          start: startTs,
+          fidelity: fidelity
+        }
       }
 
       const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
@@ -864,17 +911,26 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
        const result = await apiPromise
        
        // Convert to chart format
-      const chartData = result.data.map(point => ({
+      const chartData = result.data.map(point => chartType === 'candle' ? ({
         time: point.timestamp as any,
         open: point.price.open,
         high: point.price.high,
         low: point.price.low,
         close: point.price.close
+      }) : ({
+        time: point.timestamp as any,
+        value: point.price.close
       }))
       
       // Update chart with new data
       if (seriesRef.current) {
         seriesRef.current.setData(chartData)
+        
+        // Update line color for line chart
+        if (chartType === 'line' && 'applyOptions' in seriesRef.current) {
+          const lineColor = getLineColor(result.data)
+          seriesRef.current.applyOptions({ color: lineColor })
+        }
       }
       
       // Update volume display
@@ -903,7 +959,12 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       // Always clean up the active request marker
       activeRequestsRef.current.delete(requestKey)
     }
-  }, [selectedMarket?.conditionId, selectedPeriod, calculateTimeRange, volumeType, getCachedData, setCachedData])
+  }, [selectedMarket?.conditionId, selectedPeriod, calculateTimeRange, volumeType, getCachedData, setCachedData, chartType])
+
+  // Trigger chart re-initialization when chart type changes
+  useEffect(() => {
+    setChartKey(prev => prev + 1)
+  }, [chartType])
 
   // Fetch data when dependencies change
   useEffect(() => {
@@ -959,19 +1020,36 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     }
   }, [volumeType, chartKey])
 
+  // Helper function to determine line color based on overall trend
+  const getLineColor = useCallback((data: MarketHistoryDataPoint[]) => {
+    if (data.length < 2) return '#26a69a'
+    const firstPrice = data[0].price.close
+    const lastPrice = data[data.length - 1].price.close
+    return lastPrice >= firstPrice ? '#26a69a' : '#ef5350'
+  }, [])
+
   // Restore chart data when chart is re-initialized (chartKey changes)
   useEffect(() => {
     if (rawDataRef.current.length > 0 && seriesRef.current && volumeSeriesRef.current) {
       // Restore price data
-      const chartData = rawDataRef.current.map(point => ({
+      const chartData = rawDataRef.current.map(point => chartType === 'candle' ? ({
         time: point.timestamp as any,
         open: point.price.open,
         high: point.price.high,
         low: point.price.low,
         close: point.price.close
+      }) : ({
+        time: point.timestamp as any,
+        value: point.price.close
       }))
       
       seriesRef.current.setData(chartData)
+      
+      // Update line color for line chart based on overall trend
+      if (chartType === 'line' && 'applyOptions' in seriesRef.current) {
+        const lineColor = getLineColor(rawDataRef.current)
+        seriesRef.current.applyOptions({ color: lineColor })
+      }
       
       // Restore volume data
       const volumeData = rawDataRef.current.map(point => ({
@@ -982,7 +1060,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       
       volumeSeriesRef.current.setData(volumeData)
     }
-  }, [chartKey, volumeType])
+  }, [chartKey, volumeType, chartType, getLineColor])
 
   const chartTitle = `${selectedMarket?.question || 'Market'} Price Chart`
 
@@ -1000,20 +1078,46 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     <div className="space-y-4 mt-4 sm:mt-6">
       <div className="space-y-3">
         <div>
-          <div className="text-xs text-muted-foreground mb-2 font-medium">Time Period</div>
-          <div className="flex gap-1">
-            {(['1m', '1h', '6h', '1d'] as TimePeriod[]).map((period) => (
+          <div className="text-xs text-muted-foreground mb-2 font-medium">Chart Type & Time Period</div>
+          <div className="flex gap-2">
+            {/* Chart Type Toggle */}
+            <div className="flex gap-1">
               <Button
-                key={period}
-                variant={selectedPeriod === period ? 'default' : 'outline'}
+                variant={chartType === 'candle' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setSelectedPeriod(period)}
+                onClick={() => setChartType('candle')}
                 disabled={loading}
-                className="text-xs px-2 py-1 h-7"
+                className="text-xs px-2 py-1 h-7 flex items-center gap-1"
               >
-                {period}
+                <BarChart3 className="h-3 w-3" />
+                Candle
               </Button>
-            ))}
+              <Button
+                variant={chartType === 'line' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setChartType('line')}
+                disabled={loading}
+                className="text-xs px-2 py-1 h-7 flex items-center gap-1"
+              >
+                <LineChart className="h-3 w-3" />
+                Line
+              </Button>
+            </div>
+            {/* Time Period Buttons */}
+            <div className="flex gap-1">
+              {(['1m', '1h', '6h', '1d'] as TimePeriod[]).map((period) => (
+                <Button
+                  key={period}
+                  variant={selectedPeriod === period ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedPeriod(period)}
+                  disabled={loading}
+                  className="text-xs px-2 py-1 h-7"
+                >
+                  {period}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
         <div>
