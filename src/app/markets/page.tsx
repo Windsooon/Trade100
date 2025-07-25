@@ -87,7 +87,7 @@ function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTit
   }
   
   const formatVolume = (volume: number | null): string => {
-    if (volume === null || volume === 0) return '-'
+    if (volume === null || volume === 0) return '$0'
     if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`
     if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`
     return `$${volume.toFixed(0)}`
@@ -263,7 +263,7 @@ function EventCard({ event, sortBy }: { event: Event; sortBy: string }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const formatVolume = (volume: number | null): string => {
-    if (!volume || volume === 0) return 'N/A'
+    if (!volume || volume === 0) return '$0'
     if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`
     if (volume >= 1000) return `$${(volume / 1000).toFixed(1)}K`
     return `$${volume.toFixed(0)}`
