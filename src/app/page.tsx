@@ -358,19 +358,19 @@ function MarketCard({ market }: { market: MarketDisplay }) {
   }
   
   const formatPriceChange = (change: number | null): string => {
-    if (change === null) return '-'
+    if (change === null) return '+0.00'
     const sign = change >= 0 ? '+' : ''
     return `${sign}${(change * 100).toFixed(2)}`
   }
 
   const formatPercentagePrice = (change: number | null): string => {
-    if (change === null) return '-'
+    if (change === null) return '+0.00%'
     const sign = change >= 0 ? '+' : ''
     return `${sign}${(change * 100).toFixed(2)}%`
   }
   
   const getPriceChangeColor = (change: number | null): string => {
-    if (change === null) return ''
+    if (change === null) return 'text-muted-foreground'
     return change >= 0 ? 'text-price-positive' : 'text-price-negative'
   }
 
