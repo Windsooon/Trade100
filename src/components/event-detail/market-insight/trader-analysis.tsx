@@ -176,6 +176,7 @@ export function TraderAnalysis({ selectedMarket }: TraderAnalysisProps) {
                   key={`yes-${holderIndex}`} 
                   holder={holder} 
                   selectedMarket={selectedMarket}
+                  selectedToken="yes"
                   formatShares={formatShares}
                   getDefaultAvatar={getDefaultAvatar}
                 />
@@ -198,6 +199,7 @@ export function TraderAnalysis({ selectedMarket }: TraderAnalysisProps) {
                   key={`no-${holderIndex}`} 
                   holder={holder} 
                   selectedMarket={selectedMarket}
+                  selectedToken="no"
                   formatShares={formatShares}
                   getDefaultAvatar={getDefaultAvatar}
                 />

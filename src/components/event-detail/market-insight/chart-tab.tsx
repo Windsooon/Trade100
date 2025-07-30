@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, Loader2, TrendingUp, WifiOff, Activity, BarChart3, TrendingUp as LineChart } from 'lucide-react'
 import { createChart, IChartApi, ISeriesApi, ColorType, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts'
-import { ChartTabProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint, VolumeType } from './types'
+import { ChartTabProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint, VolumeType, getAssetIdFromMarket } from './types'
 
 // Global cache for market history to prevent duplicate API calls
 let globalMarketHistoryCache: Map<string, { data: MarketHistoryResponse; timestamp: number }> = new Map()
@@ -557,15 +557,15 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
   // Fetch latest data point for real-time updates
   const fetchLatestDataPoint = useCallback(async (): Promise<MarketHistoryDataPoint | null> => {
-    if (!selectedMarket?.conditionId) {
+    const assetId = getAssetIdFromMarket(selectedMarket, selectedToken)
+    if (!assetId) {
       return null
     }
 
     try {
       const { startTs, endTs, fidelity } = calculateLatestDataRange(selectedPeriod)
-      const marketId = selectedMarket.conditionId
       
-      const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
+      const url = `https://trade-analyze-production.up.railway.app/api/market-history?asset_id=${encodeURIComponent(assetId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
       
       const response = await fetch(url)
       
@@ -586,7 +586,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       console.error('Error fetching latest data point:', error)
       throw error
     }
-  }, [selectedMarket?.conditionId, selectedPeriod, calculateLatestDataRange])
+  }, [selectedMarket, selectedToken, selectedPeriod, calculateLatestDataRange])
 
   // Update or insert data point based on timestamp comparison
   const updateChartWithLatestData = useCallback((newDataPoint: MarketHistoryDataPoint) => {
@@ -660,7 +660,8 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       clearInterval(realtimeIntervalRef.current)
     }
 
-    if (!selectedMarket?.conditionId) {
+    const assetId = getAssetIdFromMarket(selectedMarket, selectedToken)
+    if (!assetId) {
       return
     }
 
@@ -680,7 +681,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         console.error('Real-time update error:', error)
       }
     }, 10000) // 10 seconds interval
-  }, [selectedMarket?.conditionId, fetchLatestDataPoint, updateChartWithLatestData])
+  }, [selectedMarket, selectedToken, fetchLatestDataPoint, updateChartWithLatestData])
 
   // Stop real-time updates (internal use only - for cleanup)
   const stopRealtimeUpdates = useCallback(() => {
@@ -694,14 +695,14 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
   // New fetch function for market history API
   const fetchMarketHistoryData = useCallback(async () => {
-    if (!selectedMarket?.conditionId) {
-      setError('No market selected or market data unavailable')
+    const assetId = getAssetIdFromMarket(selectedMarket, selectedToken)
+    if (!assetId) {
+      setError('No market selected or asset data unavailable')
       return
     }
     
     const { startTs, endTs, fidelity } = calculateTimeRange(selectedPeriod)
-    const marketId = selectedMarket.conditionId
-    const requestKey = `${marketId}-${selectedPeriod}-${fidelity}`
+    const requestKey = `${assetId}-${selectedPeriod}-${fidelity}`
 
     // Check global cache first
     const now = Date.now()
@@ -862,13 +863,13 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         activeRequestsRef.current.delete(requestKey)
         return { 
           data: cachedData,
-          market: marketId,
+          asset_id: assetId,
           start: startTs,
           fidelity: fidelity
         }
       }
 
-      const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
+      const url = `https://trade-analyze-production.up.railway.app/api/market-history?asset_id=${encodeURIComponent(assetId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
       
       const response = await fetch(url)
       
@@ -959,7 +960,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       // Always clean up the active request marker
       activeRequestsRef.current.delete(requestKey)
     }
-  }, [selectedMarket?.conditionId, selectedPeriod, calculateTimeRange, volumeType, getCachedData, setCachedData, chartType])
+  }, [selectedMarket, selectedToken, selectedPeriod, calculateTimeRange, volumeType, getCachedData, setCachedData, chartType])
 
   // Trigger chart re-initialization when chart type changes
   useEffect(() => {
@@ -968,7 +969,8 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
   // Fetch data when dependencies change
   useEffect(() => {
-    if (selectedMarket?.conditionId) {
+    const assetId = getAssetIdFromMarket(selectedMarket, selectedToken)
+    if (assetId) {
       // Stop any existing real-time updates
       stopRealtimeUpdates()
       
@@ -991,7 +993,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       activeRequestsRef.current.clear()
       stopRealtimeUpdates()
     }
-  }, [selectedMarket?.conditionId, selectedPeriod, fetchMarketHistoryData, startRealtimeUpdates, stopRealtimeUpdates])
+  }, [selectedMarket, selectedToken, selectedPeriod, fetchMarketHistoryData, startRealtimeUpdates, stopRealtimeUpdates])
 
   // Cleanup on unmount
   useEffect(() => {

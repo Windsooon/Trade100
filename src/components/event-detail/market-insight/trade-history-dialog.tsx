@@ -8,7 +8,8 @@ import { TradeChart } from './trade-chart'
 // Trade History Dialog Component  
 export function TradeHistoryDialog({ 
   holder, 
-  selectedMarket 
+  selectedMarket,
+  selectedToken
 }: TradeHistoryDialogProps) {
   const [allTrades, setAllTrades] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -90,6 +91,7 @@ export function TradeHistoryDialog({
           error={error}
           holder={holder}
           selectedMarket={selectedMarket}
+          selectedToken={selectedToken}
           selectedPeriod="1h"
         />
       </div>

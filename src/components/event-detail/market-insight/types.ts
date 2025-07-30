@@ -9,7 +9,7 @@ export interface MarketInsightCardProps {
 
 // New interface for market history API response
 export interface MarketHistoryResponse {
-  market: string
+  asset_id: string
   start: number
   fidelity: number
   data: MarketHistoryDataPoint[]
@@ -96,17 +96,20 @@ export interface TradeChartProps {
   error: string | null
   holder: any
   selectedMarket: Market | null
+  selectedToken: 'yes' | 'no'
   selectedPeriod?: TimePeriod
 }
 
 export interface TradeHistoryDialogProps {
   holder: any
   selectedMarket: Market | null
+  selectedToken: 'yes' | 'no'
 }
 
 export interface HolderCardProps {
   holder: any
   selectedMarket: Market | null
+  selectedToken: 'yes' | 'no'
   formatShares: (amount: number) => string
   getDefaultAvatar: (name: string) => string
 }
@@ -119,4 +122,23 @@ export interface ChartTabProps {
 
 export interface InfoTabProps {
   selectedMarket: Market | null
+}
+
+// Helper function to extract asset_id from market based on selected token
+export const getAssetIdFromMarket = (market: Market | null, selectedToken: 'yes' | 'no'): string | null => {
+  if (!market?.clobTokenIds) {
+    return null
+  }
+  
+  try {
+    const tokenIds = JSON.parse(market.clobTokenIds)
+    if (Array.isArray(tokenIds) && tokenIds.length >= 2) {
+      // tokenIds[0] is YES token, tokenIds[1] is NO token
+      return selectedToken === 'yes' ? tokenIds[0] : tokenIds[1]
+    }
+  } catch (error) {
+    console.error('Failed to parse clobTokenIds:', error)
+  }
+  
+  return null
 } 
