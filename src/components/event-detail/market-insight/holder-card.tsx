@@ -13,7 +13,8 @@ import { TradeHistoryDialog } from './trade-history-dialog'
 // Holder Card Component
 export function HolderCard({ 
   holder, 
-  selectedMarket, 
+  selectedMarket,
+  selectedToken,
   formatShares, 
   getDefaultAvatar 
 }: HolderCardProps) {
@@ -89,6 +90,7 @@ export function HolderCard({
               <TradeHistoryDialog 
                 holder={holder} 
                 selectedMarket={selectedMarket}
+                selectedToken={selectedToken}
               />
             </DialogContent>
           </Dialog>

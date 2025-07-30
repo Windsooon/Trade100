@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Loader2, BarChart3 } from 'lucide-react'
 import { createChart, IChartApi, ISeriesApi, CandlestickSeries, HistogramSeries, ColorType } from 'lightweight-charts'
-import { TradeChartProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint } from './types'
+import { TradeChartProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint, getAssetIdFromMarket } from './types'
 
 // Trade Chart Component - Real integration with LightweightCharts
 export function TradeChart({ 
@@ -10,6 +10,7 @@ export function TradeChart({
   error, 
   holder, 
   selectedMarket,
+  selectedToken,
   selectedPeriod = '1h'
 }: TradeChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null)
@@ -23,8 +24,9 @@ export function TradeChart({
 
   // Fetch market history data for the chart
   const fetchMarketHistory = useCallback(async () => {
-    if (!selectedMarket?.conditionId) {
-      setChartError('No market selected')
+    const assetId = getAssetIdFromMarket(selectedMarket, selectedToken)
+    if (!assetId) {
+      setChartError('No market selected or asset data unavailable')
       return
     }
 
@@ -37,7 +39,7 @@ export function TradeChart({
       const startTs = now - (14 * 24 * 3600)
       const fidelity = 60 // 1 hour intervals
 
-      const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(selectedMarket.conditionId)}&startTs=${startTs}&endTs=${now}&fidelity=${fidelity}`
+      const url = `https://trade-analyze-production.up.railway.app/api/market-history?asset_id=${encodeURIComponent(assetId)}&startTs=${startTs}&endTs=${now}&fidelity=${fidelity}`
       
       const response = await fetch(url)
       
@@ -58,7 +60,7 @@ export function TradeChart({
     } finally {
       setChartLoading(false)
     }
-  }, [selectedMarket?.conditionId])
+  }, [selectedMarket, selectedToken])
 
   // Initialize chart
   useEffect(() => {
