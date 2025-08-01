@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Loader2, BarChart3 } from 'lucide-react'
 import { createChart, IChartApi, ISeriesApi, CandlestickSeries, HistogramSeries, ColorType } from 'lightweight-charts'
-import { TradeChartProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint } from './types'
+import { TradeChartProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint, getAssetIds } from './types'
 
 // Trade Chart Component - Real integration with LightweightCharts
 export function TradeChart({ 
@@ -23,8 +23,14 @@ export function TradeChart({
 
   // Fetch market history data for the chart
   const fetchMarketHistory = useCallback(async () => {
-    if (!selectedMarket?.conditionId) {
-      setChartError('No market selected')
+    if (!selectedMarket?.conditionId || !selectedMarket?.clobTokenIds) {
+      setChartError('No market selected or token IDs unavailable')
+      return
+    }
+
+    const assetIds = getAssetIds(selectedMarket.clobTokenIds)
+    if (!assetIds) {
+      setChartError('Invalid token IDs for market')
       return
     }
 
@@ -37,7 +43,14 @@ export function TradeChart({
       const startTs = now - (14 * 24 * 3600)
       const fidelity = 60 // 1 hour intervals
 
-      const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(selectedMarket.conditionId)}&startTs=${startTs}&endTs=${now}&fidelity=${fidelity}`
+      const params = new URLSearchParams({
+        yes_asset_id: assetIds.yesAssetId,
+        no_asset_id: assetIds.noAssetId,
+        startTs: startTs.toString(),
+        endTs: now.toString(),
+        fidelity: fidelity.toString()
+      })
+      const url = `https://api-test-production-3326.up.railway.app/market-history?${params.toString()}`
       
       const response = await fetch(url)
       
@@ -58,7 +71,7 @@ export function TradeChart({
     } finally {
       setChartLoading(false)
     }
-  }, [selectedMarket?.conditionId])
+  }, [selectedMarket?.conditionId, selectedMarket?.clobTokenIds])
 
   // Initialize chart
   useEffect(() => {
