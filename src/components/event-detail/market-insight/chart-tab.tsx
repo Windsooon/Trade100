@@ -468,6 +468,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
   }, [selectedPeriod, chartKey, formatVolume])
 
   // Helper function to build market history API URL
+  // Note: The new API only returns data for periods with actual trades (no zero-filling)
   const buildMarketHistoryUrl = useCallback((yesAssetId: string, noAssetId: string, startTs: number, endTs: number, fidelity: number) => {
     const params = new URLSearchParams({
       yes_asset_id: yesAssetId,
@@ -476,7 +477,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       endTs: endTs.toString(),
       fidelity: fidelity.toString()
     })
-    return `https://api-test-production-3326.up.railway.app/market-history?${params.toString()}`
+    return `https://api-test-production-3326.up.railway.app/api/market-history?${params.toString()}`
   }, [])
 
   // Calculate timestamps for getting historical data based on period
@@ -568,6 +569,8 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       if (!result.data || result.data.length === 0) {
         return null
       }
+      
+      // Note: The API only returns timestamps where trades occurred
       
       // Return the latest data point (last in array)
       return result.data[result.data.length - 1]
@@ -730,6 +733,9 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       if (!result.data || result.data.length === 0) {
         throw new Error('No market history data available for this period.')
       }
+      
+      // Note: The API only returns timestamps where trades occurred,
+      // so gaps in data represent periods with no trading activity
       
       // Store raw data
       rawDataRef.current = result.data

@@ -50,7 +50,7 @@ export function TradeChart({
         endTs: now.toString(),
         fidelity: fidelity.toString()
       })
-      const url = `https://api-test-production-3326.up.railway.app/market-history?${params.toString()}`
+      const url = `https://api-test-production-3326.up.railway.app/api/market-history?${params.toString()}`
       
       const response = await fetch(url)
       
@@ -64,6 +64,9 @@ export function TradeChart({
         setChartError('No price data available for this market')
         return
       }
+      
+      // Note: The API only returns timestamps where trades occurred,
+      // so gaps in data represent periods with no trading activity
       
       setPriceData(result.data)
     } catch (err) {
