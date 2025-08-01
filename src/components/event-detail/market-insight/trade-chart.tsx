@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Loader2, BarChart3 } from 'lucide-react'
 import { createChart, IChartApi, ISeriesApi, CandlestickSeries, HistogramSeries, ColorType } from 'lightweight-charts'
 import { TradeChartProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint } from './types'
+import { buildUrl, API_CONFIG } from '@/config/api'
 
 // Trade Chart Component - Real integration with LightweightCharts
 export function TradeChart({ 
@@ -37,7 +38,12 @@ export function TradeChart({
       const startTs = now - (14 * 24 * 3600)
       const fidelity = 60 // 1 hour intervals
 
-      const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(selectedMarket.conditionId)}&startTs=${startTs}&endTs=${now}&fidelity=${fidelity}`
+              const url = buildUrl.tradeAnalysis(API_CONFIG.TRADE_ANALYSIS.ENDPOINTS.MARKET_HISTORY, {
+          market: selectedMarket.conditionId,
+          startTs,
+          endTs: now,
+          fidelity
+        })
       
       const response = await fetch(url)
       

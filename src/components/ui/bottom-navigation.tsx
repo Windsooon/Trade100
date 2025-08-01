@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { API_CONFIG } from '@/config/api'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -130,7 +131,7 @@ export function BottomNavigation() {
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <a
-                href="https://discord.gg/ZR4QtSr3VU"
+                href={API_CONFIG.EXTERNAL.DISCORD}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2"
@@ -141,7 +142,7 @@ export function BottomNavigation() {
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <a
-                href="https://github.com/Windsooon/Trade100/"
+                href={API_CONFIG.EXTERNAL.GITHUB}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2"

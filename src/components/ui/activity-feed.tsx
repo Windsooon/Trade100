@@ -7,6 +7,7 @@ import { Button } from './button'
 import { ScrollArea } from './scroll-area'
 import { Alert, AlertDescription } from './alert'
 import { Activity, Wifi, WifiOff, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { API_CONFIG } from '@/config/api'
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
@@ -126,7 +127,7 @@ export function ActivityFeed({ onTradeReceived }: ActivityFeedProps) {
     setConnectionStatus('connecting')
 
     try {
-      const ws = new WebSocket('wss://ws-live-data.polymarket.com/')
+      const ws = new WebSocket(API_CONFIG.POLYMARKET.WS.LIVE_DATA)
       wsRef.current = ws
 
       ws.onopen = () => {

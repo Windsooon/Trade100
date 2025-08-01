@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { proxyFetch } from '@/lib/fetch'
 
-const POLYMARKET_API_URL = process.env.NEXT_PUBLIC_POLYMARKET_API_URL || 'https://gamma-api.polymarket.com'
+import { API_CONFIG } from '@/config/api'
+
+const POLYMARKET_API_URL = API_CONFIG.POLYMARKET.GAMMA_API
 
 export async function GET(request: NextRequest) {
   try {

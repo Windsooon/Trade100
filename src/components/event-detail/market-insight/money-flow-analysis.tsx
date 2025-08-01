@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Loader2, Brain } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { buildUrl, API_CONFIG } from '@/config/api'
 import { Pie, PieChart } from "recharts"
 import {
   ChartConfig,
@@ -71,7 +72,7 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
     setError(null)
 
     try {
-      const url = `https://trade-analyze-production.up.railway.app/api/trade-analyze?market=${encodeURIComponent(conditionId)}`
+      const url = buildUrl.tradeAnalysis(API_CONFIG.TRADE_ANALYSIS.ENDPOINTS.TRADE_ANALYZE, { market: conditionId })
       
       const response = await fetch(url)
       

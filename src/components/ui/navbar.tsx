@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Github } from "lucide-react"
 import { SettingsSheet } from "@/components/ui/settings-sheet"
 import { SearchDropdown } from "@/components/ui/search-dropdown"
+import { API_CONFIG } from '@/config/api'
 
 // Discord icon component since lucide-react doesn't have one
 const DiscordIcon = ({ className }: { className?: string }) => (
@@ -62,7 +63,7 @@ export function Navbar() {
               className="h-9 w-9 p-0"
             >
               <a
-                href="https://discord.gg/ZR4QtSr3VU"
+                href={API_CONFIG.EXTERNAL.DISCORD}
                 target="_blank"
                 rel="noopener noreferrer"
                 title="Join our Discord"
@@ -79,7 +80,7 @@ export function Navbar() {
               className="h-9 w-9 p-0"
             >
               <a
-                href="https://github.com/Windsooon/Trade100/"
+                href={API_CONFIG.EXTERNAL.GITHUB}
                 target="_blank"
                 rel="noopener noreferrer"
                 title="View on GitHub"

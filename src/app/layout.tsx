@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     ]
   },
   manifest: "/site.webmanifest",
-  metadataBase: new URL('https://trade100.vercel.app'),
+  metadataBase: new URL(process.env.NODE_ENV === 'production' ? 'https://trade100.vercel.app' : 'http://localhost:3000'),
   openGraph: {
     type: "website",
     siteName: "Trade100",
