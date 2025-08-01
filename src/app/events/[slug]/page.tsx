@@ -6,6 +6,7 @@ import { AlertCircleIcon } from 'lucide-react'
 import EventDetailClient from '@/components/event-detail/event-detail-client'
 import { proxyFetch } from '@/lib/fetch'
 import { Event } from '@/lib/stores'
+import { buildUrl, API_CONFIG } from '@/config/api'
 
 interface RawEventData {
   id: string
@@ -102,7 +103,7 @@ export default async function EventDetailPage({
 
   try {
     // Use slug parameter in the API call
-    const url = `https://gamma-api.polymarket.com/events?slug=${encodeURIComponent(eventSlug)}`
+    const url = buildUrl.polymarket(API_CONFIG.POLYMARKET.GAMMA_API, '/events', { slug: eventSlug })
     
     const res = await proxyFetch(url, { 
       headers: {

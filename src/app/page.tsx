@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { buildUrl, API_CONFIG } from '@/config/api'
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
 import { BottomNavigation } from '@/components/ui/bottom-navigation'
@@ -193,7 +194,7 @@ function TradeCountCard() {
   const { data: tradeData, isLoading, isError } = useQuery<TradeApiResponse[]>({
     queryKey: ['trade-stats'],
     queryFn: async () => {
-      const response = await fetch('https://api-test-production-3326.up.railway.app/api/trade?hours=24')
+      const response = await fetch(buildUrl.tradeAnalysis(API_CONFIG.TRADE_ANALYSIS.ENDPOINTS.TRADE, { hours: 24 }))
       if (!response.ok) {
         throw new Error('Failed to fetch trade data')
       }
@@ -267,7 +268,7 @@ function TradingVolumeCard() {
   const { data: tradeData, isLoading, isError } = useQuery<TradeApiResponse[]>({
     queryKey: ['trade-stats'],
     queryFn: async () => {
-      const response = await fetch('https://api-test-production-3326.up.railway.app/api/trade?hours=24')
+      const response = await fetch(buildUrl.tradeAnalysis(API_CONFIG.TRADE_ANALYSIS.ENDPOINTS.TRADE, { hours: 24 }))
       if (!response.ok) {
         throw new Error('Failed to fetch trade data')
       }
@@ -1024,7 +1025,7 @@ export default function HomePage() {
       
       // Extract numeric value from time filter (e.g., '1h' -> '1', '12h' -> '12')
       const hourValue = timeFilter.replace('h', '')
-      const response = await fetch(`https://api-test-production-3326.up.railway.app/api/recommend?hour=${hourValue}`)
+      const response = await fetch(buildUrl.tradeAnalysis(API_CONFIG.TRADE_ANALYSIS.ENDPOINTS.RECOMMEND, { hour: hourValue }))
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       
       const data: RecommendApiResponse = await response.json()

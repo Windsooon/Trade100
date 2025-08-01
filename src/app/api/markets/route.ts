@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Event } from '@/lib/stores'
 import { proxyFetch } from '@/lib/fetch'
 
-const POLYMARKET_API_URL = 'https://gamma-api.polymarket.com'
+import { API_CONFIG } from '@/config/api'
+
+const POLYMARKET_API_URL = API_CONFIG.POLYMARKET.GAMMA_API
 
 // Cache for storing filtered events data
 let eventsCache: Event[] = []

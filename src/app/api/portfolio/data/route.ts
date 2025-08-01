@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { proxyFetch } from '@/lib/fetch'
+import { API_CONFIG } from '@/config/api'
 
 interface PositionValueResponse {
   user: string
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch position value
-    const positionValueUrl = `https://data-api.polymarket.com/value?user=${userAddress}`
+          const positionValueUrl = `${API_CONFIG.POLYMARKET.DATA_API}/value?user=${userAddress}`
     
     let positionValue = 0
 
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch P/L data
-    const pnlUrl = `https://user-pnl-api.polymarket.com/user-pnl?user_address=${userAddress}&interval=1m&fidelity=1d`
+          const pnlUrl = `${API_CONFIG.POLYMARKET.USER_PNL_API}/user-pnl?user_address=${userAddress}&interval=1m&fidelity=1d`
     
     let pnlData: PnLDataPoint[] = []
 

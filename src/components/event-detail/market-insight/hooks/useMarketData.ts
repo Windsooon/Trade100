@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { MarketHistoryResponse, MarketHistoryDataPoint, TimePeriod } from '../types'
 import { calculateTimeRange, calculateLatestDataRange } from '../utils/dataProcessing'
+import { buildUrl, API_CONFIG } from '@/config/api'
 
 // Global cache for market history to prevent duplicate API calls
 const globalMarketHistoryCache = new Map<string, { data: MarketHistoryResponse; timestamp: number }>()
@@ -95,7 +96,12 @@ export function useMarketData(options: UseMarketDataOptions = {}) {
 
       // Create API promise
       const apiPromise = (async (): Promise<MarketHistoryResponse> => {
-        const url = `https://api-test-production-3326.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
+        const url = buildUrl.tradeAnalysis(API_CONFIG.TRADE_ANALYSIS.ENDPOINTS.MARKET_HISTORY, {
+          market: marketId,
+          startTs,
+          endTs,
+          fidelity
+        })
         
         const response = await fetch(url)
         
@@ -177,7 +183,12 @@ export function useMarketData(options: UseMarketDataOptions = {}) {
     console.log('✅ Starting new fetchLatestDataPoint request:', requestKey)
 
     try {
-      const url = `https://api-test-production-3326.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
+      const url = buildUrl.tradeAnalysis(API_CONFIG.TRADE_ANALYSIS.ENDPOINTS.MARKET_HISTORY, {
+        market: marketId,
+        startTs,
+        endTs,
+        fidelity
+      })
       
       console.log('🌐 Making fetchLatestDataPoint API call:', url)
       

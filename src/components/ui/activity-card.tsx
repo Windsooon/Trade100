@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ActivityItem } from "@/app/api/portfolio/activity/route"
 import { ExternalLink, ArrowUpDown, Coins, Gift, Repeat, Award } from "lucide-react"
+import { buildUrl } from '@/config/api'
 
 interface ActivityCardProps {
   activity: ActivityItem
@@ -164,7 +165,7 @@ export function ActivityCard({ activity }: ActivityCardProps) {
               {formatCompactDate(activity.timestamp)}
             </span>
             <a
-              href={`https://polygonscan.com/tx/${activity.transactionHash}`}
+                              href={buildUrl.polygonscanTx(activity.transactionHash)}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground transition-colors"
@@ -221,7 +222,7 @@ export function ActivityCard({ activity }: ActivityCardProps) {
             <div className="flex items-center gap-1">
               <span>{formatCompactDate(activity.timestamp)}</span>
               <a
-                href={`https://polygonscan.com/tx/${activity.transactionHash}`}
+                href={buildUrl.polygonscanTx(activity.transactionHash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-foreground transition-colors"

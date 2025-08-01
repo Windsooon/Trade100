@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { Calendar, DollarSign, TrendingUp, ExternalLink } from 'lucide-react'
 import { Event } from '@/lib/stores'
 import { format } from 'date-fns'
+import { buildUrl } from '@/config/api'
 
 interface EventInfoBannerProps {
   event: Event
@@ -30,7 +31,7 @@ const formatDate = (dateString: string): string => {
 }
 
 export function EventInfoBanner({ event }: EventInfoBannerProps) {
-  const polymarketUrl = `https://polymarket.com/event/${event.slug}`
+  const polymarketUrl = buildUrl.polymarketEvent(event.slug)
 
   return (
     <Card>

@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useRef, useState, useMemo, useCallback } from 'react'
+import { API_CONFIG } from '@/config/api'
 
 interface Market {
   conditionId: string
@@ -198,7 +199,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
     setConnectionStatus('connecting')
 
     try {
-      const ws = new WebSocket('wss://ws-subscriptions-clob.polymarket.com/ws/market')
+      const ws = new WebSocket(`${API_CONFIG.POLYMARKET.WS.SUBSCRIPTIONS}/ws/market`)
       wsRef.current = ws
 
       // Connection timeout
