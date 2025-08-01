@@ -3,6 +3,9 @@ import { ISeriesApi } from 'lightweight-charts'
 import { MarketHistoryDataPoint, VolumeType, TimePeriod } from '../types'
 import { useMarketData } from './useMarketData'
 
+// Global registry to prevent multiple realtime intervals for the same market
+const activeRealtimeIntervals = new Map<string, string>() // marketId -> hookId
+
 interface UseRealtimeUpdatesOptions {
   chartType: 'candle' | 'line'
   volumeType: VolumeType
@@ -114,53 +117,81 @@ export function useRealtimeUpdates({
   // Start real-time updates
   const startRealtimeUpdates = useCallback(() => {
     console.log('🚀 startRealtimeUpdates called:', {
+      hookId: hookId.current,
       marketId,
       selectedPeriod,
-      hasExistingInterval: !!realtimeIntervalRef.current
+      hasExistingInterval: !!realtimeIntervalRef.current,
+      isActive: realtimeActive,
+      globalActiveIntervals: Array.from(activeRealtimeIntervals.entries())
     })
-
-    if (realtimeIntervalRef.current) {
-      console.log('🛑 Clearing existing realtime interval')
-      clearInterval(realtimeIntervalRef.current)
-    }
 
     if (!marketId) {
       console.log('❌ No marketId provided, aborting realtime updates')
       return
     }
 
+    // Check if another hook is already handling this market
+    const existingHookId = activeRealtimeIntervals.get(marketId)
+    if (existingHookId && existingHookId !== hookId.current) {
+      console.log('⚠️ Another hook is already handling realtime updates for this market:', existingHookId)
+      return
+    }
+
+    // Prevent multiple intervals from being created in this hook
+    if (realtimeIntervalRef.current || realtimeActive) {
+      console.log('⚠️ Real-time updates already active or interval exists in this hook, skipping')
+      return
+    }
+
+    // Register this hook as the active handler for this market
+    activeRealtimeIntervals.set(marketId, hookId.current)
+    
     setRealtimeActive(true)
     setRealtimeError(null)
 
-    console.log('⏰ Setting up realtime interval (10s)')
+    console.log('⏰ Setting up realtime interval (10s) for hook:', hookId.current, 'market:', marketId)
     realtimeIntervalRef.current = setInterval(async () => {
-      console.log('⏰ Realtime interval tick - fetching latest data')
+      console.log('⏰ Realtime interval tick - fetching latest data (hook:', hookId.current, ')')
       try {
         const latestData = await fetchLatestDataPoint(marketId, selectedPeriod)
         if (latestData) {
-          console.log('✅ Got latest data, updating chart:', latestData.timestamp)
+          console.log('✅ Got latest data, updating chart:', latestData.timestamp, '(hook:', hookId.current, ')')
           updateChartWithLatestData(latestData)
           setRealtimeError(null) // Clear any previous errors
         } else {
-          console.log('⚠️ No latest data received')
+          console.log('⚠️ No latest data received (hook:', hookId.current, ')')
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to fetch real-time data'
-        console.error('❌ Real-time update error:', error)
+        console.error('❌ Real-time update error (hook:', hookId.current, '):', error)
         setRealtimeError(errorMessage)
       }
     }, 10000) // 10 seconds interval
-  }, [marketId, selectedPeriod, fetchLatestDataPoint, updateChartWithLatestData])
+  }, [marketId, selectedPeriod, fetchLatestDataPoint, updateChartWithLatestData, realtimeActive])
 
   // Stop real-time updates
   const stopRealtimeUpdates = useCallback(() => {
+    console.log('🛑 stopRealtimeUpdates called for hook:', hookId.current, {
+      marketId,
+      hasInterval: !!realtimeIntervalRef.current,
+      isActive: realtimeActive
+    })
+    
     if (realtimeIntervalRef.current) {
+      console.log('🗑️ Clearing interval for hook:', hookId.current, 'market:', marketId)
       clearInterval(realtimeIntervalRef.current)
       realtimeIntervalRef.current = null
     }
+    
+    // Remove this hook from the global registry if it was the active one
+    if (marketId && activeRealtimeIntervals.get(marketId) === hookId.current) {
+      console.log('🗑️ Removing hook from global registry:', hookId.current, 'market:', marketId)
+      activeRealtimeIntervals.delete(marketId)
+    }
+    
     setRealtimeActive(false)
     setRealtimeError(null)
-  }, [])
+  }, [realtimeActive, marketId])
 
   // Set latest timestamp (used when initial data is loaded)
   const setLatestTimestamp = useCallback((timestamp: number) => {
@@ -169,6 +200,7 @@ export function useRealtimeUpdates({
 
   // Cleanup function
   const cleanup = useCallback(() => {
+    console.log('🧹 Cleanup called for hook:', hookId.current)
     stopRealtimeUpdates()
     if (highlightTimeoutRef.current) {
       clearTimeout(highlightTimeoutRef.current)

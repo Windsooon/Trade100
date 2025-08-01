@@ -25,6 +25,10 @@ type ChartType = 'candle' | 'line'
 
 export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
   
+  // Add component instance tracking
+  const componentId = useRef(Math.random().toString(36).substr(2, 6))
+  console.log('📊 ChartTab component instance created:', componentId.current)
+  
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1h')
   const [chartType, setChartType] = useState<ChartType>('candle')
   const [loading, setLoading] = useState(false)
@@ -276,6 +280,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
   // Fetch data when dependencies change
   useEffect(() => {
     console.log('📊 Chart data loading effect triggered:', {
+      componentId: componentId.current,
       marketId: selectedMarket?.conditionId,
       selectedPeriod,
       hasMarket: !!selectedMarket?.conditionId
