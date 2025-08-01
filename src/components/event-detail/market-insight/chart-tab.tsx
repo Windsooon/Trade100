@@ -32,6 +32,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
   const [volumeType, setVolumeType] = useState<VolumeType>('totalDollarVolume')
   const [volumeError, setVolumeError] = useState<string | null>(null)
   const [chartKey, setChartKey] = useState(0)
+  const [dataLoaded, setDataLoaded] = useState(false)
   
   // Tooltip states
   const [tooltipData, setTooltipData] = useState<PriceData | null>(null)
@@ -68,6 +69,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         realtimeUpdates.setLatestTimestamp(data[data.length - 1].timestamp)
       }
       setLoading(false)
+      setDataLoaded(true)
     }
   })
 
@@ -223,6 +225,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     setLoading(true)
     setError(null)
     setVolumeError(null)
+    setDataLoaded(false)
 
     try {
       await fetchMarketHistory(selectedMarket.conditionId, selectedPeriod)
@@ -233,7 +236,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
   // Update chart display when data changes
   const updateChartDisplay = useCallback(() => {
-    if (!rawDataRef.current.length || !seriesRef.current || !volumeSeriesRef.current) {
+    if (!rawDataRef.current.length || !seriesRef.current || !volumeSeriesRef.current || !dataLoaded) {
       return
     }
 
@@ -255,12 +258,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       const lineColor = getLineColor(data)
       seriesRef.current.applyOptions({ color: lineColor })
     }
-  }, [chartType, volumeType])
-
-  // Trigger chart re-initialization when chart type changes
-  useEffect(() => {
-    setChartKey(prev => prev + 1)
-  }, [chartType])
+  }, [chartType, volumeType, dataLoaded])
 
   // Fetch data when dependencies change
   useEffect(() => {
@@ -288,7 +286,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
   // Update chart display when data or chart settings change
   useEffect(() => {
     updateChartDisplay()
-  }, [updateChartDisplay, chartKey])
+  }, [updateChartDisplay, chartKey, dataLoaded])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -297,8 +295,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       realtimeUpdates.cleanup()
     }
   }, [clearActiveRequests, realtimeUpdates])
-
-
 
   // Trigger chart re-initialization when chart type changes
   useEffect(() => {
