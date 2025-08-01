@@ -774,37 +774,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         volumeSeriesRef.current.setData(volumeData)
       }
       
-      // Convert to chart format
-      const processedData = result.data.map(point => chartType === 'candle' ? ({
-        time: point.timestamp as any,
-        open: point.price.open,
-        high: point.price.high,
-        low: point.price.low,
-        close: point.price.close
-      }) : ({
-        time: point.timestamp as any,
-        value: point.price.close
-      }))
-      
-      const volumeData = result.data.map(point => ({
-        time: point.timestamp as any,
-        value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
-        color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
-      }))
-      
-      if (seriesRef.current) {
-        seriesRef.current.setData(processedData)
-        
-        // Update line color for line chart
-        if (chartType === 'line' && 'applyOptions' in seriesRef.current) {
-          const lineColor = getLineColor(result.data)
-          seriesRef.current.applyOptions({ color: lineColor })
-        }
-      }
-      if (volumeSeriesRef.current) {
-        volumeSeriesRef.current.setData(volumeData)
-      }
-      
       setLoading(false)
       
     } catch (err) {
