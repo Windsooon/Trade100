@@ -95,7 +95,7 @@ export function useMarketData(options: UseMarketDataOptions = {}) {
 
       // Create API promise
       const apiPromise = (async (): Promise<MarketHistoryResponse> => {
-        const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
+        const url = `https://api-test-production-3326.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
         
         const response = await fetch(url)
         
@@ -177,7 +177,7 @@ export function useMarketData(options: UseMarketDataOptions = {}) {
     console.log('✅ Starting new fetchLatestDataPoint request:', requestKey)
 
     try {
-      const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
+      const url = `https://api-test-production-3326.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
       
       console.log('🌐 Making fetchLatestDataPoint API call:', url)
       

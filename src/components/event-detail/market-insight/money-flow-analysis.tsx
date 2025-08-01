@@ -71,7 +71,7 @@ export function MoneyFlowAnalysis({ selectedMarket }: MoneyFlowAnalysisProps) {
     setError(null)
 
     try {
-      const url = `https://trade-analyze-production.up.railway.app/api/trade-analyze?market=${encodeURIComponent(conditionId)}`
+      const url = `https://api-test-production-3326.up.railway.app/api/trade-analyze?market=${encodeURIComponent(conditionId)}`
       
       const response = await fetch(url)
       

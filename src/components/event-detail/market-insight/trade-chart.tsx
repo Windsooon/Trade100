@@ -37,7 +37,7 @@ export function TradeChart({
       const startTs = now - (14 * 24 * 3600)
       const fidelity = 60 // 1 hour intervals
 
-      const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(selectedMarket.conditionId)}&startTs=${startTs}&endTs=${now}&fidelity=${fidelity}`
+      const url = `https://api-test-production-3326.up.railway.app/api/market-history?market=${encodeURIComponent(selectedMarket.conditionId)}&startTs=${startTs}&endTs=${now}&fidelity=${fidelity}`
       
       const response = await fetch(url)
       
