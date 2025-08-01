@@ -44,10 +44,19 @@ export function useMarketData(options: UseMarketDataOptions = {}) {
     const { startTs, endTs, fidelity } = calculateTimeRange(period)
     const requestKey = `${marketId}-${period}-${fidelity}`
 
+    console.log('📈 fetchMarketHistory called:', {
+      marketId,
+      period,
+      requestKey,
+      activeRequests: Array.from(activeRequestsRef.current),
+      globalPromises: Array.from(globalMarketHistoryPromises.keys())
+    })
+
     // Check global cache first
     const now = Date.now()
     const cachedData = globalMarketHistoryCache.get(requestKey)
     if (cachedData && (now - cachedData.timestamp) < MARKET_HISTORY_CACHE_DURATION) {
+      console.log('💾 Using cached fetchMarketHistory data:', requestKey)
       const result = cachedData.data.data
       options.onSuccess?.(result)
       return result
@@ -133,29 +142,84 @@ export function useMarketData(options: UseMarketDataOptions = {}) {
     marketId: string,
     period: TimePeriod
   ): Promise<MarketHistoryDataPoint | null> => {
+    const { startTs, endTs, fidelity } = calculateLatestDataRange(period)
+    const requestKey = `latest-${marketId}-${period}-${fidelity}-${startTs}-${endTs}`
+    
+    console.log('🔄 fetchLatestDataPoint called:', {
+      marketId,
+      period,
+      requestKey,
+      activeRequests: Array.from(activeRequestsRef.current),
+      globalPromises: Array.from(globalMarketHistoryPromises.keys())
+    })
+
+    // Check if this exact request is already active
+    if (activeRequestsRef.current.has(requestKey)) {
+      console.log('⚠️ Duplicate fetchLatestDataPoint request blocked:', requestKey)
+      throw new Error('Latest data request already in progress')
+    }
+
+    // Check if request is already in progress globally
+    const existingPromise = globalMarketHistoryPromises.get(requestKey)
+    if (existingPromise) {
+      console.log('🔄 Using existing fetchLatestDataPoint promise:', requestKey)
+      try {
+        const result = await existingPromise
+        return result.data[result.data.length - 1] || null
+      } catch (error) {
+        console.error('❌ Existing fetchLatestDataPoint promise failed:', error)
+        throw error
+      }
+    }
+
+    // Mark this request as active
+    activeRequestsRef.current.add(requestKey)
+    console.log('✅ Starting new fetchLatestDataPoint request:', requestKey)
+
     try {
-      const { startTs, endTs, fidelity } = calculateLatestDataRange(period)
-      
       const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
       
-      const response = await fetch(url)
+      console.log('🌐 Making fetchLatestDataPoint API call:', url)
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch latest data: ${response.status}`)
-      }
+      // Create and register the promise
+      const apiPromise = (async (): Promise<MarketHistoryResponse> => {
+        const response = await fetch(url)
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch latest data: ${response.status}`)
+        }
+        
+        const result: MarketHistoryResponse = await response.json()
+        
+        if (!result.data || result.data.length === 0) {
+          throw new Error('No latest data available')
+        }
+        
+        return result
+      })()
+
+      // Register the global promise
+      globalMarketHistoryPromises.set(requestKey, apiPromise)
       
-      const result: MarketHistoryResponse = await response.json()
+      const result = await apiPromise
       
-      if (!result.data || result.data.length === 0) {
-        return null
-      }
+      console.log('✅ fetchLatestDataPoint completed:', {
+        requestKey,
+        dataPoints: result.data.length,
+        latestTimestamp: result.data[result.data.length - 1]?.timestamp
+      })
       
       // Return the latest data point (last in array)
       return result.data[result.data.length - 1]
       
     } catch (error) {
-      console.error('Error fetching latest data point:', error)
+      console.error('❌ fetchLatestDataPoint error:', error)
       throw error
+    } finally {
+      // Clean up
+      activeRequestsRef.current.delete(requestKey)
+      globalMarketHistoryPromises.delete(requestKey)
+      console.log('🧹 Cleaned up fetchLatestDataPoint request:', requestKey)
     }
   }, [])
 

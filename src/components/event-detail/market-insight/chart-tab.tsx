@@ -85,6 +85,19 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     volumeDataRef
   })
 
+  // Log when key dependencies change
+  useEffect(() => {
+    console.log('🔄 Key dependency changed - marketId:', selectedMarket?.conditionId)
+  }, [selectedMarket?.conditionId])
+
+  useEffect(() => {
+    console.log('🔄 Key dependency changed - selectedPeriod:', selectedPeriod)
+  }, [selectedPeriod])
+
+  useEffect(() => {
+    console.log('🔄 Key dependency changed - chartType:', chartType)
+  }, [chartType])
+
   // Initialize chart
   useEffect(() => {
     let chart: IChartApi | null = null
@@ -262,22 +275,33 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
   // Fetch data when dependencies change
   useEffect(() => {
+    console.log('📊 Chart data loading effect triggered:', {
+      marketId: selectedMarket?.conditionId,
+      selectedPeriod,
+      hasMarket: !!selectedMarket?.conditionId
+    })
+
     if (selectedMarket?.conditionId) {
       // Stop any existing real-time updates
+      console.log('🛑 Stopping existing realtime updates before loading new data')
       realtimeUpdates.stopRealtimeUpdates()
       
       // Load data and then start real-time updates
+      console.log('📥 Loading market data...')
       loadMarketData().then(() => {
+        console.log('✅ Market data loaded, starting realtime updates in 1s')
         setTimeout(() => {
           realtimeUpdates.startRealtimeUpdates()
         }, 1000) // Wait 1 second after initial load
       })
       
       return () => {
+        console.log('🧹 Cleanup: stopping realtime updates')
         realtimeUpdates.stopRealtimeUpdates()
       }
     } else {
       // Clear all active requests when no market selected
+      console.log('❌ No market selected, clearing requests and stopping updates')
       clearActiveRequests()
       realtimeUpdates.stopRealtimeUpdates()
     }

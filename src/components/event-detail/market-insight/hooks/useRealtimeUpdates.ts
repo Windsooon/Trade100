@@ -26,6 +26,10 @@ export function useRealtimeUpdates({
   volumeDataRef,
   onNewData
 }: UseRealtimeUpdatesOptions) {
+  // Log hook initialization
+  const hookId = useRef(Math.random().toString(36).substr(2, 6))
+  console.log('🏗️ useRealtimeUpdates hook created:', hookId.current, { marketId, selectedPeriod })
+  
   const [realtimeActive, setRealtimeActive] = useState(false)
   const [realtimeError, setRealtimeError] = useState<string | null>(null)
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
@@ -109,28 +113,41 @@ export function useRealtimeUpdates({
 
   // Start real-time updates
   const startRealtimeUpdates = useCallback(() => {
+    console.log('🚀 startRealtimeUpdates called:', {
+      marketId,
+      selectedPeriod,
+      hasExistingInterval: !!realtimeIntervalRef.current
+    })
+
     if (realtimeIntervalRef.current) {
+      console.log('🛑 Clearing existing realtime interval')
       clearInterval(realtimeIntervalRef.current)
     }
 
     if (!marketId) {
+      console.log('❌ No marketId provided, aborting realtime updates')
       return
     }
 
     setRealtimeActive(true)
     setRealtimeError(null)
 
+    console.log('⏰ Setting up realtime interval (10s)')
     realtimeIntervalRef.current = setInterval(async () => {
+      console.log('⏰ Realtime interval tick - fetching latest data')
       try {
         const latestData = await fetchLatestDataPoint(marketId, selectedPeriod)
         if (latestData) {
+          console.log('✅ Got latest data, updating chart:', latestData.timestamp)
           updateChartWithLatestData(latestData)
           setRealtimeError(null) // Clear any previous errors
+        } else {
+          console.log('⚠️ No latest data received')
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to fetch real-time data'
+        console.error('❌ Real-time update error:', error)
         setRealtimeError(errorMessage)
-        console.error('Real-time update error:', error)
       }
     }, 10000) // 10 seconds interval
   }, [marketId, selectedPeriod, fetchLatestDataPoint, updateChartWithLatestData])
