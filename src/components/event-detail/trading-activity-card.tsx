@@ -394,9 +394,21 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     }
   }, [selectedMarket?.conditionId, walletAddress, fetchUserTrades, initializePaginationState])
 
+  // Helper function to check if market is resolved
+  const isMarketResolved = useCallback((market: any): boolean => {
+    if (!market) return false
+    return market.active === false || market.archived === true || market.closed === true
+  }, [])
+
   // Global synchronized refresh timer - exactly every 10 seconds
   useEffect(() => {
     if (!selectedMarket?.conditionId) return
+
+    // Skip auto-refresh for resolved markets
+    if (isMarketResolved(selectedMarket)) {
+      console.log(`[REFRESH TIMER ${componentId.current}] Skipping auto-refresh for resolved market ${selectedMarket.conditionId}`)
+      return
+    }
 
     console.log(`[REFRESH TIMER ${componentId.current}] Adding refresh callback for market ${selectedMarket.conditionId}`)
     console.log(`[REFRESH TIMER ${componentId.current}] Current callback count before add: ${globalRefreshCallbacks.size}`)
@@ -437,7 +449,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
           globalRefreshInterval = null
         }
       }
-  }, [synchronizedRefresh])
+  }, [synchronizedRefresh, isMarketResolved])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -657,6 +669,11 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
           <Activity className="h-5 w-5" />
           <span className="hidden sm:inline">Trading Activity</span>
           <span className="sm:hidden">Activity</span>
+          {isMarketResolved(selectedMarket) && (
+            <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded-full">
+              Resolved
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0 flex-1">
