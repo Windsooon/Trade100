@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { proxyFetch } from '@/lib/fetch'
 
-// Global cache for trades data
-const globalTradesCache = new Map<string, { data: any; timestamp: number }>()
-const globalTradesPromises = new Map<string, Promise<any>>()
-const CACHE_DURATION = 30 * 1000 // 30 seconds
-
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -14,6 +9,7 @@ export async function GET(request: NextRequest) {
     const market = searchParams.get('market')
     const user = searchParams.get('user')
     const takerOnly = searchParams.get('takerOnly')
+    const offset = searchParams.get('offset') || '0'
     
     if (!market) {
       return NextResponse.json(
@@ -22,43 +18,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Create cache key based on request type
-    const isUserTrades = user && user.trim() !== ''
-    const cacheKey = isUserTrades 
-      ? `my_trades_${market}_${user}` 
-      : `market_trades_${market}`
-    
-    // Check cache first
-    const cached = globalTradesCache.get(cacheKey)
-    if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-      return NextResponse.json(cached.data)
-    }
-
-    // Check for ongoing request
-    const existingPromise = globalTradesPromises.get(cacheKey)
-    if (existingPromise) {
-      const data = await existingPromise
-      return NextResponse.json(data)
-    }
-
-    // Create new request promise
-    const requestPromise = fetchTradesData(market, user, takerOnly)
-    globalTradesPromises.set(cacheKey, requestPromise)
-
-    try {
-      const data = await requestPromise
-      
-      // Cache the result
-      globalTradesCache.set(cacheKey, {
-        data,
-        timestamp: Date.now()
-      })
-      
-      return NextResponse.json(data)
-    } finally {
-      // Clean up promise
-      globalTradesPromises.delete(cacheKey)
-    }
+    const data = await fetchTradesData(market, user, takerOnly, offset)
+    return NextResponse.json(data)
 
   } catch (error) {
     console.error('Error in trades API:', error)
@@ -69,12 +30,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function fetchTradesData(market: string, user?: string, takerOnly?: string) {
+async function fetchTradesData(market: string, user?: string, takerOnly?: string, offset: string = '0') {
   try {
     // Build query parameters for Polymarket Data API
     const params = new URLSearchParams()
-    params.append('limit', '40')
-    params.append('offset', '0')
+    params.append('limit', '20')
+    params.append('offset', offset)
     params.append('market', market)
     
     // Add takerOnly parameter if provided
