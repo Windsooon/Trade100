@@ -50,15 +50,6 @@ interface TradingActivityCardProps {
 let globalRefreshInterval: NodeJS.Timeout | null = null
 const globalRefreshCallbacks = new Map<string, () => void>()
 
-// Global data cache to prevent duplicate API calls from multiple component instances
-const globalDataCache = new Map<string, {
-  marketTrades: ProcessedTrade[]
-  userTrades: ProcessedTrade[]
-  marketPagination: any
-  userPagination: any
-  timestamp: number
-}>()
-
 // Global active API requests to prevent duplicate concurrent calls
 const globalActiveRequests = new Set<string>()
 
