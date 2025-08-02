@@ -55,6 +55,7 @@ interface ApiMarket {
   image?: string
   description?: string
   liquidity?: number
+  closedTime?: string
 }
 
 interface ApiTag {
@@ -135,7 +136,8 @@ function transformEvent(apiEvent: ApiEvent): Event {
         icon: market.icon || market.image,
         image: market.image || market.icon,
         description: market.description,
-        liquidity: market.liquidity
+        liquidity: market.liquidity,
+        closedTime: market.closedTime
       }
       
 

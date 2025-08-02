@@ -49,6 +49,7 @@ export interface Market {
   description?: string
   liquidity?: number
   liquidityNum?: number
+  closedTime?: string
 }
 
 // Helper function to check if a market is active

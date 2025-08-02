@@ -59,6 +59,22 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     selectedTokenRef.current = selectedToken
   }, [selectedToken])
 
+  // Helper function to check if a market is resolved
+  const isMarketResolved = useCallback((market: Market | null): boolean => {
+    if (!market) return false
+    return market.active === false || market.archived === true || market.closed === true
+  }, [])
+
+  // Helper function to parse closedTime to Unix timestamp
+  const parseClosedTimeToTimestamp = useCallback((closedTime: string): number => {
+    try {
+      return Math.floor(new Date(closedTime).getTime() / 1000)
+    } catch (error) {
+      console.error('Error parsing closedTime:', closedTime, error)
+      return Math.floor(Date.now() / 1000) // Fallback to current time
+    }
+  }, [])
+
   const formatVolume = useCallback((value: number, isDollar: boolean = false): string => {
     const prefix = isDollar ? '$' : ''
     if (value >= 1000000) {
@@ -495,65 +511,81 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
   // Calculate timestamps for getting historical data based on period
   const calculateTimeRange = useCallback((period: TimePeriod): { startTs: number; endTs: number; fidelity: number } => {
-    const now = Math.floor(Date.now() / 1000) // Current timestamp in seconds
-    let startTs: number
+    let endTs: number
     let fidelity: number
+    
+    // Check if market is resolved and has closedTime
+    if (isMarketResolved(selectedMarket) && selectedMarket?.closedTime) {
+      endTs = parseClosedTimeToTimestamp(selectedMarket.closedTime)
+    } else {
+      endTs = Math.floor(Date.now() / 1000) // Current timestamp in seconds
+    }
+    
+    let startTs: number
     
     switch (period) {
       case '1m':
-        startTs = now - (48 * 3600) // Last 48 hours for 1m candles
+        startTs = endTs - (48 * 3600) // Last 48 hours for 1m candles
         fidelity = 1
         break
       case '1h':
-        startTs = now - (14 * 24 * 3600) // Last 14 days for 1h candles
+        startTs = endTs - (14 * 24 * 3600) // Last 14 days for 1h candles
         fidelity = 60
         break
       case '6h':
-        startTs = now - (30 * 24 * 3600) // Last 30 days for 6h candles
+        startTs = endTs - (30 * 24 * 3600) // Last 30 days for 6h candles
         fidelity = 360
         break
       case '1d':
-        startTs = now - (90 * 24 * 3600) // Last 90 days for 1d candles
+        startTs = endTs - (90 * 24 * 3600) // Last 90 days for 1d candles
         fidelity = 1440
         break
       default:
-        startTs = now - (7 * 24 * 3600) // Default to 7 days
+        startTs = endTs - (7 * 24 * 3600) // Default to 7 days
         fidelity = 60
     }
     
-    return { startTs, endTs: now, fidelity }
-  }, [])
+    return { startTs, endTs, fidelity }
+  }, [selectedMarket, isMarketResolved, parseClosedTimeToTimestamp])
 
   // Calculate timestamps for getting latest data point based on period
   const calculateLatestDataRange = useCallback((period: TimePeriod): { startTs: number; endTs: number; fidelity: number } => {
-    const now = Math.floor(Date.now() / 1000)
+    let endTs: number
+    
+    // Check if market is resolved and has closedTime
+    if (isMarketResolved(selectedMarket) && selectedMarket?.closedTime) {
+      endTs = parseClosedTimeToTimestamp(selectedMarket.closedTime)
+    } else {
+      endTs = Math.floor(Date.now() / 1000)
+    }
+    
     let fidelity: number
     let startTs: number
     
     switch (period) {
       case '1m':
         fidelity = 1
-        startTs = now - (60 * 2) // Last 2 minutes to ensure we get latest candle
+        startTs = endTs - (60 * 2) // Last 2 minutes to ensure we get latest candle
         break
       case '1h':
         fidelity = 60
-        startTs = now - (3600 * 2) // Last 2 hours
+        startTs = endTs - (3600 * 2) // Last 2 hours
         break
       case '6h':
         fidelity = 360
-        startTs = now - (6 * 3600 * 2) // Last 12 hours
+        startTs = endTs - (6 * 3600 * 2) // Last 12 hours
         break
       case '1d':
         fidelity = 1440
-        startTs = now - (24 * 3600 * 2) // Last 2 days
+        startTs = endTs - (24 * 3600 * 2) // Last 2 days
         break
       default:
         fidelity = 60
-        startTs = now - (3600 * 2)
+        startTs = endTs - (3600 * 2)
     }
     
-    return { startTs, endTs: now, fidelity }
-  }, [])
+    return { startTs, endTs, fidelity }
+  }, [selectedMarket, isMarketResolved, parseClosedTimeToTimestamp])
 
   // Fetch latest data point for real-time updates
   const fetchLatestDataPoint = useCallback(async (): Promise<MarketHistoryDataPoint | null> => {
@@ -664,6 +696,13 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       return
     }
 
+    // Don't start real-time updates for resolved markets
+    if (isMarketResolved(selectedMarket)) {
+      setRealtimeActive(false)
+      setRealtimeError(null)
+      return
+    }
+
     setRealtimeActive(true)
     setRealtimeError(null)
 
@@ -680,7 +719,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         console.error('Real-time update error:', error)
       }
     }, 10000) // 10 seconds interval
-  }, [selectedMarket?.conditionId, fetchLatestDataPoint, updateChartWithLatestData])
+  }, [selectedMarket?.conditionId, isMarketResolved, selectedMarket, fetchLatestDataPoint, updateChartWithLatestData])
 
   // Stop real-time updates (internal use only - for cleanup)
   const stopRealtimeUpdates = useCallback(() => {
@@ -975,10 +1014,12 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       // Use a small delay to handle StrictMode double execution
       const timeoutId = setTimeout(() => {
         fetchMarketHistoryData().then(() => {
-          // Start real-time updates after initial data is loaded
-          setTimeout(() => {
-            startRealtimeUpdates()
-          }, 1000) // Wait 1 second after initial load
+          // Start real-time updates after initial data is loaded (only for active markets)
+          if (!isMarketResolved(selectedMarket)) {
+            setTimeout(() => {
+              startRealtimeUpdates()
+            }, 1000) // Wait 1 second after initial load
+          }
         })
       }, 10) // 10ms delay to let StrictMode settle
       
@@ -991,7 +1032,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       activeRequestsRef.current.clear()
       stopRealtimeUpdates()
     }
-  }, [selectedMarket?.conditionId, selectedPeriod, fetchMarketHistoryData, startRealtimeUpdates, stopRealtimeUpdates])
+  }, [selectedMarket?.conditionId, selectedPeriod, fetchMarketHistoryData, startRealtimeUpdates, stopRealtimeUpdates, isMarketResolved, selectedMarket])
 
   // Cleanup on unmount
   useEffect(() => {
