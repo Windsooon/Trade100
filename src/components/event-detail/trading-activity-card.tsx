@@ -187,7 +187,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     setMarketError(null)
 
     try {
-      const offset = (page - 1) * 20
+      const offset = (page - 1) * 10
       const response = await fetch(`/api/trades?market=${conditionId}&offset=${offset}`)
       
       if (!response.ok) {
@@ -197,8 +197,8 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
       const trades: Trade[] = await response.json()
       const processedTrades = trades.map(processTrade)
       
-      // Determine if there are more pages (if we got exactly 20 trades, assume more exist)
-      const hasMorePages = trades.length === 20
+      // Determine if there are more pages (if we got exactly 10 trades, assume more exist)
+      const hasMorePages = trades.length === 10
       
       if (isMountedRef.current) {
         setMarketTrades(processedTrades)
@@ -227,7 +227,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     setUserError(null)
 
     try {
-      const offset = (page - 1) * 20
+      const offset = (page - 1) * 10
       const response = await fetch(`/api/trades?market=${conditionId}&user=${userAddress}&takerOnly=false&offset=${offset}`)
       
       if (!response.ok) {
@@ -237,8 +237,8 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
       const trades: Trade[] = await response.json()
       const processedTrades = trades.map(processTrade)
       
-      // Determine if there are more pages (if we got exactly 20 trades, assume more exist)
-      const hasMorePages = trades.length === 20
+      // Determine if there are more pages (if we got exactly 10 trades, assume more exist)
+      const hasMorePages = trades.length === 10
       
       if (isMountedRef.current) {
         setUserTrades(processedTrades)
@@ -278,7 +278,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
           // Check if user is on page 1 for market trades
           if (marketCurrentPage === 1) {
             setMarketTrades(processedTrades)
-            const hasMorePages = trades.length === 20
+            const hasMorePages = trades.length === 10
             setMarketHasMorePages(hasMorePages)
             savePaginationState(conditionId, 'market', 1, processedTrades, hasMorePages)
           } else {
@@ -306,7 +306,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
           // Check if user is on page 1 for user trades
           if (userCurrentPage === 1) {
             setUserTrades(processedTrades)
-            const hasMorePages = trades.length === 20
+            const hasMorePages = trades.length === 10
             setUserHasMorePages(hasMorePages)
             savePaginationState(conditionId, 'user', 1, processedTrades, hasMorePages)
           } else {
@@ -542,11 +542,11 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
       <div className="flex flex-col h-full">
         {/* New data notification */}
         {hasNewData && (
-          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 mb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm text-blue-700 dark:text-blue-300">
+                <Bell className="h-4 w-4 text-blue-400" />
+                <span className="text-sm text-gray-100">
                   New trades available
                 </span>
               </div>
@@ -555,7 +555,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
                   size="sm"
                   variant="outline"
                   onClick={onGoToPage1}
-                  className="h-6 text-xs"
+                  className="h-6 text-xs border-gray-600 text-gray-100 hover:bg-gray-800"
                 >
                   View Latest
                 </Button>
@@ -563,7 +563,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
                   size="sm"
                   variant="ghost"
                   onClick={onDismissNotification}
-                  className="h-6 w-6 p-0"
+                  className="h-6 w-6 p-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800"
                 >
                   <X className="h-3 w-3" />
                 </Button>

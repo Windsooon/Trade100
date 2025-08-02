@@ -34,7 +34,7 @@ async function fetchTradesData(market: string, user?: string, takerOnly?: string
   try {
     // Build query parameters for Polymarket Data API
     const params = new URLSearchParams()
-    params.append('limit', '20')
+    params.append('limit', '10')
     params.append('offset', offset)
     params.append('market', market)
     
