@@ -195,6 +195,8 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
       }
 
       const trades: Trade[] = await response.json()
+      console.log(`[MARKET TRADES] Fetched ${trades.length} trades for page ${page}`)
+      
       const processedTrades = trades.map(processTrade)
       
       // Determine if there are more pages (if we got exactly 10 trades, assume more exist)
@@ -235,6 +237,8 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
       }
 
       const trades: Trade[] = await response.json()
+      console.log(`[USER TRADES] Fetched ${trades.length} trades for page ${page}`)
+      
       const processedTrades = trades.map(processTrade)
       
       // Determine if there are more pages (if we got exactly 10 trades, assume more exist)
@@ -267,21 +271,18 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     
     const conditionId = selectedMarket.conditionId
     
-    // Always refresh page 1 for both tabs
-    const refreshMarket = async () => {
-      try {
-        const response = await fetch(`/api/trades?market=${conditionId}&offset=0`)
-        if (response.ok) {
-          const trades: Trade[] = await response.json()
-          const processedTrades = trades.map(processTrade)
-          
-          // Check if user is on page 1 for market trades
-          if (marketCurrentPage === 1) {
-            setMarketTrades(processedTrades)
-            const hasMorePages = trades.length === 10
-            setMarketHasMorePages(hasMorePages)
-            savePaginationState(conditionId, 'market', 1, processedTrades, hasMorePages)
-          } else {
+    // If user is on page 1, just refresh normally using existing functions
+    if (marketCurrentPage === 1) {
+      fetchMarketTrades(conditionId, 1)
+    } else {
+      // Check for new data on page 1 without updating UI
+      const checkForNewMarketData = async () => {
+        try {
+          const response = await fetch(`/api/trades?market=${conditionId}&offset=0`)
+          if (response.ok) {
+            const trades: Trade[] = await response.json()
+            const processedTrades = trades.map(processTrade)
+            
             // Check if new data is different from cached page 1
             const state = globalPaginationState.get(conditionId)
             const cachedPage1 = state?.market.pageData.get(1)
@@ -289,43 +290,41 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
               setMarketHasNewData(true)
             }
           }
+        } catch (error) {
+          console.error('Error checking for new market data:', error)
         }
-      } catch (error) {
-        console.error('Error refreshing market trades:', error)
       }
+      checkForNewMarketData()
     }
     
-    const refreshUser = async () => {
-      if (!walletAddress) return
-      try {
-        const response = await fetch(`/api/trades?market=${conditionId}&user=${walletAddress}&takerOnly=false&offset=0`)
-        if (response.ok) {
-          const trades: Trade[] = await response.json()
-          const processedTrades = trades.map(processTrade)
-          
-          // Check if user is on page 1 for user trades
-          if (userCurrentPage === 1) {
-            setUserTrades(processedTrades)
-            const hasMorePages = trades.length === 10
-            setUserHasMorePages(hasMorePages)
-            savePaginationState(conditionId, 'user', 1, processedTrades, hasMorePages)
-          } else {
-            // Check if new data is different from cached page 1
-            const state = globalPaginationState.get(conditionId)
-            const cachedPage1 = state?.user.pageData.get(1)
-            if (!cachedPage1 || JSON.stringify(cachedPage1) !== JSON.stringify(processedTrades)) {
-              setUserHasNewData(true)
+    // Same logic for user trades
+    if (walletAddress) {
+      if (userCurrentPage === 1) {
+        fetchUserTrades(conditionId, walletAddress, 1)
+      } else {
+        // Check for new data on page 1 without updating UI
+        const checkForNewUserData = async () => {
+          try {
+            const response = await fetch(`/api/trades?market=${conditionId}&user=${walletAddress}&takerOnly=false&offset=0`)
+            if (response.ok) {
+              const trades: Trade[] = await response.json()
+              const processedTrades = trades.map(processTrade)
+              
+              // Check if new data is different from cached page 1
+              const state = globalPaginationState.get(conditionId)
+              const cachedPage1 = state?.user.pageData.get(1)
+              if (!cachedPage1 || JSON.stringify(cachedPage1) !== JSON.stringify(processedTrades)) {
+                setUserHasNewData(true)
+              }
             }
+          } catch (error) {
+            console.error('Error checking for new user data:', error)
           }
         }
-      } catch (error) {
-        console.error('Error refreshing user trades:', error)
+        checkForNewUserData()
       }
     }
-    
-    refreshMarket()
-    refreshUser()
-  }, [selectedMarket?.conditionId, walletAddress, marketCurrentPage, userCurrentPage, savePaginationState])
+  }, [selectedMarket?.conditionId, walletAddress, marketCurrentPage, userCurrentPage, fetchMarketTrades, fetchUserTrades])
 
   // Effect for market changes - load pagination state and fetch if needed
   useEffect(() => {
@@ -387,23 +386,29 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
   useEffect(() => {
     if (!selectedMarket?.conditionId) return
 
+    console.log(`[REFRESH TIMER] Adding refresh callback for market ${selectedMarket.conditionId}`)
+    
     // Add this component's refresh function to the global set
     globalRefreshCallbacks.add(synchronizedRefresh)
 
     // Start global timer if it doesn't exist
     if (!globalRefreshInterval) {
+      console.log('[REFRESH TIMER] Starting global 10-second timer')
       globalRefreshInterval = setInterval(() => {
+        console.log(`[REFRESH TIMER] Executing ${globalRefreshCallbacks.size} refresh callbacks`)
         // Execute all registered refresh callbacks simultaneously
         globalRefreshCallbacks.forEach(callback => callback())
       }, 10000) // 10 seconds
     }
 
     return () => {
+      console.log(`[REFRESH TIMER] Removing refresh callback for market ${selectedMarket.conditionId}`)
       // Remove this component's callback
       globalRefreshCallbacks.delete(synchronizedRefresh)
       
       // Clean up global timer if no components are using it
       if (globalRefreshCallbacks.size === 0 && globalRefreshInterval) {
+        console.log('[REFRESH TIMER] Stopping global timer - no more callbacks')
         clearInterval(globalRefreshInterval)
         globalRefreshInterval = null
       }
