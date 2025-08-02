@@ -48,7 +48,7 @@ interface TradingActivityCardProps {
 
 // Global synchronized refresh timer
 let globalRefreshInterval: NodeJS.Timeout | null = null
-const globalRefreshCallbacks = new Set<() => void>()
+const globalRefreshCallbacks = new Map<string, () => void>()
 
 const formatTime = (timestamp: number): string => {
   const date = new Date(timestamp * 1000)
@@ -104,6 +104,14 @@ const globalPaginationState = new Map<string, {
 }>()
 
 export function TradingActivityCard({ selectedMarket, event }: TradingActivityCardProps) {
+  // Component instance ID for debugging
+  const componentId = useRef(Math.random().toString(36).substr(2, 9))
+  
+  console.log(`[TRADING CARD ${componentId.current}] Component mounted/re-rendered`, {
+    selectedMarket: selectedMarket?.conditionId,
+    eventId: event.id
+  })
+
   const [marketTrades, setMarketTrades] = useState<ProcessedTrade[]>([])
   const [userTrades, setUserTrades] = useState<ProcessedTrade[]>([])
   const [marketLoading, setMarketLoading] = useState(false)
@@ -183,6 +191,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
 
   // Fetch market trades with pagination
   const fetchMarketTrades = useCallback(async (conditionId: string, page: number = 1) => {
+    console.log(`[TRADING CARD ${componentId.current}] fetchMarketTrades called - page ${page}`)
     setMarketLoading(true)
     setMarketError(null)
 
@@ -225,6 +234,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
 
   // Fetch user trades with pagination
   const fetchUserTrades = useCallback(async (conditionId: string, userAddress: string, page: number = 1) => {
+    console.log(`[TRADING CARD ${componentId.current}] fetchUserTrades called - page ${page}`)
     setUserLoading(true)
     setUserError(null)
 
@@ -267,6 +277,8 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
 
   // Synchronized refresh function - only refresh page 1 and check for new data
   const synchronizedRefresh = useCallback(() => {
+    console.log(`[TRADING CARD ${componentId.current}] synchronizedRefresh called`)
+    
     if (!selectedMarket?.conditionId) return
     
     const conditionId = selectedMarket.conditionId
@@ -386,10 +398,14 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
   useEffect(() => {
     if (!selectedMarket?.conditionId) return
 
-    console.log(`[REFRESH TIMER] Adding refresh callback for market ${selectedMarket.conditionId}`)
+    console.log(`[REFRESH TIMER ${componentId.current}] Adding refresh callback for market ${selectedMarket.conditionId}`)
+    console.log(`[REFRESH TIMER ${componentId.current}] Current callback count before add: ${globalRefreshCallbacks.size}`)
     
-    // Add this component's refresh function to the global set
-    globalRefreshCallbacks.add(synchronizedRefresh)
+    // Use market ID as key to prevent duplicates for the same market
+    const refreshKey = selectedMarket.conditionId
+    globalRefreshCallbacks.set(refreshKey, synchronizedRefresh)
+    
+    console.log(`[REFRESH TIMER ${componentId.current}] Current callback count after add: ${globalRefreshCallbacks.size}`)
 
     // Start global timer if it doesn't exist
     if (!globalRefreshInterval) {
@@ -397,27 +413,36 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
       globalRefreshInterval = setInterval(() => {
         console.log(`[REFRESH TIMER] Executing ${globalRefreshCallbacks.size} refresh callbacks`)
         // Execute all registered refresh callbacks simultaneously
-        globalRefreshCallbacks.forEach(callback => callback())
+        globalRefreshCallbacks.forEach((callback, marketId) => {
+          console.log(`[REFRESH TIMER] Executing callback for market: ${marketId}`)
+          callback()
+        })
       }, 10000) // 10 seconds
     }
 
-    return () => {
-      console.log(`[REFRESH TIMER] Removing refresh callback for market ${selectedMarket.conditionId}`)
-      // Remove this component's callback
-      globalRefreshCallbacks.delete(synchronizedRefresh)
-      
-      // Clean up global timer if no components are using it
-      if (globalRefreshCallbacks.size === 0 && globalRefreshInterval) {
-        console.log('[REFRESH TIMER] Stopping global timer - no more callbacks')
-        clearInterval(globalRefreshInterval)
-        globalRefreshInterval = null
+          return () => {
+        console.log(`[REFRESH TIMER ${componentId.current}] Removing refresh callback for market ${selectedMarket.conditionId}`)
+        console.log(`[REFRESH TIMER ${componentId.current}] Current callback count before remove: ${globalRefreshCallbacks.size}`)
+        
+        // Remove this component's callback using market ID as key
+        const refreshKey = selectedMarket.conditionId
+        globalRefreshCallbacks.delete(refreshKey)
+        
+        console.log(`[REFRESH TIMER ${componentId.current}] Current callback count after remove: ${globalRefreshCallbacks.size}`)
+        
+        // Clean up global timer if no components are using it
+        if (globalRefreshCallbacks.size === 0 && globalRefreshInterval) {
+          console.log(`[REFRESH TIMER ${componentId.current}] Stopping global timer - no more callbacks`)
+          clearInterval(globalRefreshInterval)
+          globalRefreshInterval = null
+        }
       }
-    }
   }, [synchronizedRefresh])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      console.log(`[TRADING CARD ${componentId.current}] Component unmounting`)
       isMountedRef.current = false
     }
   }, [])
