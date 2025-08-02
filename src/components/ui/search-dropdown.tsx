@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search, Loader2 } from 'lucide-react';
 import { useSearch } from '@/hooks/use-search';
 import { Input } from '@/components/ui/input';
+import { EventStatusToggle } from '@/components/ui/event-status-toggle';
 
 export function SearchDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,7 +14,7 @@ export function SearchDropdown() {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   
-  const { query, updateQuery, clearSearch, results, isLoading, error, hasResults } = useSearch();
+  const { query, eventStatus, updateQuery, updateEventStatus, clearSearch, results, isLoading, error, hasResults } = useSearch();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -75,6 +76,15 @@ export function SearchDropdown() {
 
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 max-h-80 overflow-y-auto">
+          {/* Event Status Toggle */}
+          <div className="p-3 border-b border-border">
+            <EventStatusToggle
+              status={eventStatus}
+              onStatusChange={updateEventStatus}
+              disabled={isLoading}
+            />
+          </div>
+
           {isLoading && (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

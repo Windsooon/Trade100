@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search, Loader2, X } from 'lucide-react';
 import { useSearch } from '@/hooks/use-search';
 import { Input } from '@/components/ui/input';
+import { EventStatusToggle } from '@/components/ui/event-status-toggle';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -15,7 +16,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   
-  const { query, updateQuery, clearSearch, results, isLoading, error, hasResults } = useSearch();
+  const { query, eventStatus, updateQuery, updateEventStatus, clearSearch, results, isLoading, error, hasResults } = useSearch();
 
   // Focus input when modal opens
   useEffect(() => {
@@ -74,6 +75,14 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
       {/* Search Content */}
       <div className="p-4">
+        {/* Event Status Toggle */}
+        <div className="mb-4">
+          <EventStatusToggle
+            status={eventStatus}
+            onStatusChange={updateEventStatus}
+            disabled={isLoading}
+          />
+        </div>
 
         {/* Search Results */}
         {query.length > 0 && (

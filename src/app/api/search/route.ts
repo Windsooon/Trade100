@@ -5,6 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('q');
+    const eventsStatus = searchParams.get('events_status') || 'active';
     
     if (!query || query.trim() === '') {
       return NextResponse.json({ events: [], tags: [], hasMore: false });
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     // Construct the Polymarket API URL
     const polymarketUrl = new URL('https://polymarket.com/api/events/global');
     polymarketUrl.searchParams.set('q', query.trim());
-    polymarketUrl.searchParams.set('events_status', 'active');
+    polymarketUrl.searchParams.set('events_status', eventsStatus);
 
     const response = await proxyFetch(polymarketUrl.toString());
     
