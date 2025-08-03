@@ -419,13 +419,13 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
 
   // Effect for market changes - load pagination state and fetch if needed
   useEffect(() => {
-    console.log('[TradingActivityCard] Market change effect triggered', {
+    console.log(`[TradingActivityCard:${componentId.current}] Market change effect triggered`, {
       selectedMarket: selectedMarket?.conditionId,
       selectedMarketTitle: selectedMarket?.question
     })
     
     if (!selectedMarket?.conditionId) {
-      console.log('[TradingActivityCard] No selectedMarket conditionId, returning')
+      console.log(`[TradingActivityCard:${componentId.current}] No selectedMarket conditionId, returning`)
       return
     }
 
@@ -433,11 +433,11 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     
     // Only process if market actually changed
     if (lastMarketRef.current !== conditionId) {
-      console.log('[TradingActivityCard] Market changed', {
-        from: lastMarketRef.current,
-        to: conditionId,
-        selectedMarketTitle: selectedMarket?.question
-      })
+      console.log(`[TradingActivityCard:${componentId.current}] Market changed`, {
+         from: lastMarketRef.current,
+         to: conditionId,
+         selectedMarketTitle: selectedMarket?.question
+       })
       
       lastMarketRef.current = conditionId
       
