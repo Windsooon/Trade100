@@ -89,7 +89,7 @@ export function useSearch() {
     updateQuery,
     updateEventStatus,
     clearSearch,
-    results: results.events.slice(0, 5), // Limit to 5 results
+    results: results.events.slice(0, 10), // Limit to 10 results
     isLoading,
     error,
     hasResults: results.events.length > 0
