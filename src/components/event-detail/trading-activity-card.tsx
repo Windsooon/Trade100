@@ -62,6 +62,9 @@ const globalDataCache = new Map<string, {
 // Global active API requests to prevent duplicate concurrent calls
 const globalActiveRequests = new Set<string>()
 
+// Global callbacks for components waiting for the same data
+const globalWaitingCallbacks = new Map<string, Array<(data: ProcessedTrade[]) => void>>()
+
 const formatTime = (timestamp: number): string => {
   const date = new Date(timestamp * 1000)
   return date.toLocaleTimeString('en-US', { 
@@ -233,7 +236,23 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     
     // Check if this request is already in progress
     if (globalActiveRequests.has(requestKey)) {
-      console.log('[TradingActivityCard] Request already in progress, skipping', requestKey)
+      console.log('[TradingActivityCard] Request already in progress, registering callback', requestKey)
+      
+      // Register a callback to be notified when the data arrives
+      if (!globalWaitingCallbacks.has(requestKey)) {
+        globalWaitingCallbacks.set(requestKey, [])
+      }
+      
+      globalWaitingCallbacks.get(requestKey)!.push((data: ProcessedTrade[]) => {
+        if (isMountedRef.current) {
+          console.log('[TradingActivityCard] Received data from callback', data.length, 'trades')
+          setMarketTrades(data)
+          setMarketCurrentPage(page)
+          setMarketHasMorePages(data.length === 10)
+          savePaginationState(conditionId, 'market', page, data, data.length === 10)
+        }
+      })
+      
       return
     }
     
@@ -298,6 +317,20 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
           userPagination: { currentPage: 1, hasMorePages: false },
           timestamp: Date.now()
         })
+        
+        // Notify all waiting components
+        const waitingCallbacks = globalWaitingCallbacks.get(requestKey)
+        if (waitingCallbacks && waitingCallbacks.length > 0) {
+          console.log('[TradingActivityCard] Notifying', waitingCallbacks.length, 'waiting components')
+          waitingCallbacks.forEach(callback => {
+            try {
+              callback(processedTrades)
+            } catch (error) {
+              console.error('[TradingActivityCard] Error in waiting callback:', error)
+            }
+          })
+          globalWaitingCallbacks.delete(requestKey)
+        }
       } else {
         console.log('[TradingActivityCard] Component unmounted, not updating state')
       }
@@ -306,6 +339,13 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
       if (isMountedRef.current) {
         setMarketError('Failed to load market trades')
         setMarketTrades([])
+      }
+      
+      // Also notify waiting components about the error
+      const waitingCallbacks = globalWaitingCallbacks.get(requestKey)
+      if (waitingCallbacks && waitingCallbacks.length > 0) {
+        console.log('[TradingActivityCard] Notifying', waitingCallbacks.length, 'waiting components about error')
+        globalWaitingCallbacks.delete(requestKey)
       }
     } finally {
       if (isMountedRef.current) {
