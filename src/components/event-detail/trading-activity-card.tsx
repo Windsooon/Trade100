@@ -124,7 +124,10 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
   const [userError, setUserError] = useState<string | null>(null)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   
-  console.log('[TradingActivityCard] Render', {
+  // Create a unique ID for this component instance
+  const componentId = useRef(Math.random().toString(36).substr(2, 9))
+  
+  console.log(`[TradingActivityCard:${componentId.current}] Render`, {
     selectedMarketId: selectedMarket?.conditionId,
     selectedMarketTitle: selectedMarket?.question?.substring(0, 50),
     marketTradesLength: marketTrades.length,
@@ -629,6 +632,21 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     onGoToPage1: () => void,
     onDismissNotification: () => void
   ) => {
+    console.log('[TradingActivityCard] renderTradesList called', {
+      tradesLength: trades.length,
+      loading,
+      error,
+      emptyMessage,
+      currentPage,
+      hasMorePages,
+      firstTrade: trades[0] ? {
+        side: trades[0].displaySide,
+        price: trades[0].displayPrice,
+        size: trades[0].size
+      } : null,
+      timestamp: Date.now()
+    })
+    
     if (loading) {
       return (
         <div className="flex-1 flex items-center justify-center">
@@ -793,18 +811,28 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
                   </div>
                 </div>
               ) : (
-                renderTradesList(
-                  marketTrades, 
-                  marketLoading, 
-                  marketError, 
-                  "No trades available for this market",
-                  marketCurrentPage,
-                  marketHasMorePages,
-                  handleMarketPageChange,
-                  marketHasNewData,
-                  handleGoToMarketPage1,
-                  dismissMarketNotification
-                )
+                (() => {
+                  console.log(`[TradingActivityCard:${componentId.current}] About to render trades list`, {
+                    marketTradesLength: marketTrades.length,
+                    marketTrades: marketTrades.slice(0, 2), // First 2 trades for debugging
+                    marketLoading,
+                    marketError,
+                    selectedMarketId: selectedMarket?.conditionId,
+                    timestamp: Date.now()
+                  })
+                  return renderTradesList(
+                    marketTrades, 
+                    marketLoading, 
+                    marketError, 
+                    "No trades available for this market",
+                    marketCurrentPage,
+                    marketHasMorePages,
+                    handleMarketPageChange,
+                    marketHasNewData,
+                    handleGoToMarketPage1,
+                    dismissMarketNotification
+                  )
+                })()
               )}
             </div>
           </TabsContent>
