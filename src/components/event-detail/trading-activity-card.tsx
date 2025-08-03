@@ -124,6 +124,17 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
   const [userError, setUserError] = useState<string | null>(null)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   
+  console.log('[TradingActivityCard] Render', {
+    selectedMarketId: selectedMarket?.conditionId,
+    selectedMarketTitle: selectedMarket?.question?.substring(0, 50),
+    marketTradesLength: marketTrades.length,
+    marketLoading,
+    marketError,
+    userTradesLength: userTrades.length,
+    userLoading,
+    userError
+  })
+  
   // Pagination state
   const [marketCurrentPage, setMarketCurrentPage] = useState(1)
   const [userCurrentPage, setUserCurrentPage] = useState(1)
@@ -168,6 +179,8 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
   }, [getPaginationStateKey])
 
   const loadPaginationState = useCallback((conditionId: string) => {
+    console.log('[TradingActivityCard] loadPaginationState called for', conditionId)
+    
     const state = initializePaginationState(conditionId)
     setMarketCurrentPage(state.market.currentPage)
     setUserCurrentPage(state.user.currentPage)
@@ -178,11 +191,23 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     const marketData = state.market.pageData.get(state.market.currentPage)
     const userData = state.user.pageData.get(state.user.currentPage)
     
+    console.log('[TradingActivityCard] loadPaginationState data', {
+      conditionId,
+      marketCurrentPage: state.market.currentPage,
+      userCurrentPage: state.user.currentPage,
+      marketDataLength: marketData?.length || 0,
+      userDataLength: userData?.length || 0,
+      willSetMarketTrades: marketData?.length || 0,
+      willSetUserTrades: userData?.length || 0
+    })
+    
     // Always set the market trades - either with cached data or empty array
     setMarketTrades(marketData || [])
     
     // Always set the user trades - either with cached data or empty array
     setUserTrades(userData || [])
+    
+    console.log('[TradingActivityCard] State updated after loadPaginationState')
   }, [initializePaginationState])
 
   const savePaginationState = useCallback((conditionId: string, type: 'market' | 'user', page: number, data: ProcessedTrade[], hasMore: boolean) => {
@@ -196,18 +221,36 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
   const fetchMarketTrades = useCallback(async (conditionId: string, page: number = 1) => {
     const requestKey = `market-${conditionId}-${page}`
     
+    console.log('[TradingActivityCard] fetchMarketTrades called', {
+      conditionId,
+      page,
+      requestKey,
+      isAlreadyInProgress: globalActiveRequests.has(requestKey)
+    })
+    
     // Check if this request is already in progress
     if (globalActiveRequests.has(requestKey)) {
+      console.log('[TradingActivityCard] Request already in progress, skipping', requestKey)
       return
     }
     
+    console.log('[TradingActivityCard] Starting fetch request')
     setMarketLoading(true)
     setMarketError(null)
     globalActiveRequests.add(requestKey)
 
     try {
       const offset = (page - 1) * 10
-      const response = await fetch(`/api/trades?market=${conditionId}&offset=${offset}`)
+      const apiUrl = `/api/trades?market=${conditionId}&offset=${offset}`
+      console.log('[TradingActivityCard] Fetching from', apiUrl)
+      
+      const response = await fetch(apiUrl)
+      
+      console.log('[TradingActivityCard] API response', {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText
+      })
       
       if (!response.ok) {
         throw new Error('Failed to fetch market trades')
@@ -216,25 +259,45 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
       const trades: Trade[] = await response.json()
       const processedTrades = trades.map(processTrade)
       
+      console.log('[TradingActivityCard] API data received', {
+        rawTradesCount: trades.length,
+        processedTradesCount: processedTrades.length,
+        firstTrade: trades[0] ? {
+          side: trades[0].side,
+          price: trades[0].price,
+          size: trades[0].size,
+          timestamp: trades[0].timestamp
+        } : null
+      })
+      
       // Determine if there are more pages (if we got exactly 10 trades, assume more exist)
       const hasMorePages = trades.length === 10
       
       if (isMountedRef.current) {
+        console.log('[TradingActivityCard] Updating state with trades', {
+          tradesCount: processedTrades.length,
+          page,
+          hasMorePages
+        })
+        
         setMarketTrades(processedTrades)
         setMarketCurrentPage(page)
         setMarketHasMorePages(hasMorePages)
         
         // Save to pagination state
         savePaginationState(conditionId, 'market', page, processedTrades, hasMorePages)
+      } else {
+        console.log('[TradingActivityCard] Component unmounted, not updating state')
       }
     } catch (error) {
+      console.error('[TradingActivityCard] Error fetching market trades:', error)
       if (isMountedRef.current) {
-        console.error('Error fetching market trades:', error)
         setMarketError('Failed to load market trades')
         setMarketTrades([])
       }
     } finally {
       if (isMountedRef.current) {
+        console.log('[TradingActivityCard] Setting loading to false')
         setMarketLoading(false)
       }
       globalActiveRequests.delete(requestKey)
@@ -353,7 +416,13 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
 
   // Effect for market changes - load pagination state and fetch if needed
   useEffect(() => {
+    console.log('[TradingActivityCard] Market change effect triggered', {
+      selectedMarket: selectedMarket?.conditionId,
+      selectedMarketTitle: selectedMarket?.question
+    })
+    
     if (!selectedMarket?.conditionId) {
+      console.log('[TradingActivityCard] No selectedMarket conditionId, returning')
       return
     }
 
@@ -361,23 +430,46 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     
     // Only process if market actually changed
     if (lastMarketRef.current !== conditionId) {
+      console.log('[TradingActivityCard] Market changed', {
+        from: lastMarketRef.current,
+        to: conditionId,
+        selectedMarketTitle: selectedMarket?.question
+      })
+      
       lastMarketRef.current = conditionId
       
       // Load pagination state
+      console.log('[TradingActivityCard] Loading pagination state for', conditionId)
       loadPaginationState(conditionId)
       
       // Check if we have cached data for current page
       const state = initializePaginationState(conditionId)
       const marketData = state.market.pageData.get(state.market.currentPage)
       
+      console.log('[TradingActivityCard] Checking cached data', {
+        conditionId,
+        currentPage: state.market.currentPage,
+        hasCachedData: !!marketData,
+        cachedDataLength: marketData?.length || 0,
+        currentMarketTrades: marketTrades.length
+      })
+      
       // Fetch if no cached data
       if (!marketData) {
+        console.log('[TradingActivityCard] No cached data, fetching trades for', conditionId, 'page', state.market.currentPage)
         fetchMarketTrades(conditionId, state.market.currentPage)
+      } else {
+        console.log('[TradingActivityCard] Using cached data', marketData.length, 'trades')
       }
       
       // Clear new data notifications
       setMarketHasNewData(false)
       setUserHasNewData(false)
+    } else {
+      console.log('[TradingActivityCard] Market not changed, skipping', {
+        lastMarket: lastMarketRef.current,
+        currentMarket: conditionId
+      })
     }
   }, [selectedMarket?.conditionId])
 

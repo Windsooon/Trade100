@@ -21,21 +21,45 @@ export default function EventDetailClient({
 
   // Set initial market selection
   useEffect(() => {
+    console.log('[EventDetailClient] Market selection effect', {
+      eventMarketsLength: event.markets.length,
+      selectedMarketId,
+      currentSelectedMarket: selectedMarket?.conditionId
+    })
+    
     if (event.markets.length > 0) {
       if (selectedMarketId) {
+        console.log('[EventDetailClient] Looking for specific market', selectedMarketId)
         const targetMarket = event.markets.find(m => m.conditionId === selectedMarketId)
         if (targetMarket) {
+          console.log('[EventDetailClient] Found target market', {
+            conditionId: targetMarket.conditionId,
+            question: targetMarket.question
+          })
           setSelectedMarket(targetMarket)
           return
+        } else {
+          console.log('[EventDetailClient] Target market not found')
         }
       }
       
       const activeMarkets = event.markets.filter(market => 
         market.active && !market.archived && !market.closed
         )
+      console.log('[EventDetailClient] Active markets found', {
+        total: activeMarkets.length,
+        firstMarket: activeMarkets[0] ? {
+          conditionId: activeMarkets[0].conditionId,
+          question: activeMarkets[0].question
+        } : null
+      })
+      
       if (activeMarkets.length > 0) {
+        console.log('[EventDetailClient] Setting first active market as selected')
         setSelectedMarket(activeMarkets[0])
       }
+    } else {
+      console.log('[EventDetailClient] No markets available')
     }
   }, [event.markets, selectedMarketId])
 
