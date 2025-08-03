@@ -174,16 +174,15 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     setMarketHasMorePages(state.market.hasMorePages)
     setUserHasMorePages(state.user.hasMorePages)
     
-    // Load current page data if available
+    // Load current page data if available, otherwise clear the trades
     const marketData = state.market.pageData.get(state.market.currentPage)
     const userData = state.user.pageData.get(state.user.currentPage)
     
-    if (marketData) {
-      setMarketTrades(marketData)
-    }
-    if (userData) {
-      setUserTrades(userData)
-    }
+    // Always set the market trades - either with cached data or empty array
+    setMarketTrades(marketData || [])
+    
+    // Always set the user trades - either with cached data or empty array
+    setUserTrades(userData || [])
   }, [initializePaginationState])
 
   const savePaginationState = useCallback((conditionId: string, type: 'market' | 'user', page: number, data: ProcessedTrade[], hasMore: boolean) => {
