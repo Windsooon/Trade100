@@ -289,6 +289,15 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
         
         // Save to pagination state
         savePaginationState(conditionId, 'market', page, processedTrades, hasMorePages)
+        
+        // Update global cache to share data between component instances
+        globalDataCache.set(conditionId, {
+          marketTrades: processedTrades,
+          userTrades: [],
+          marketPagination: { currentPage: page, hasMorePages },
+          userPagination: { currentPage: 1, hasMorePages: false },
+          timestamp: Date.now()
+        })
       } else {
         console.log('[TradingActivityCard] Component unmounted, not updating state')
       }
@@ -459,8 +468,19 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
       
       // Fetch if no cached data
       if (!marketData) {
-        console.log('[TradingActivityCard] No cached data, fetching trades for', conditionId, 'page', state.market.currentPage)
-        fetchMarketTrades(conditionId, state.market.currentPage)
+        // Check global cache first before making API call
+        const globalCache = globalDataCache.get(conditionId)
+        if (globalCache && globalCache.marketTrades.length > 0) {
+          console.log('[TradingActivityCard] Found data in global cache, using it', globalCache.marketTrades.length, 'trades')
+          setMarketTrades(globalCache.marketTrades)
+          setMarketCurrentPage(globalCache.marketPagination.currentPage)
+          setMarketHasMorePages(globalCache.marketPagination.hasMorePages)
+          // Also save to local pagination state
+          savePaginationState(conditionId, 'market', globalCache.marketPagination.currentPage, globalCache.marketTrades, globalCache.marketPagination.hasMorePages)
+        } else {
+          console.log('[TradingActivityCard] No cached data, fetching trades for', conditionId, 'page', state.market.currentPage)
+          fetchMarketTrades(conditionId, state.market.currentPage)
+        }
       } else {
         console.log('[TradingActivityCard] Using cached data', marketData.length, 'trades')
       }
