@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ArrowDown, ArrowUp, ExternalLink, Bell, X } from 'lucide-react'
 import { Market, Event, Trade } from '@/lib/types'
 import { formatCurrency, formatNumber } from '@/lib/utils'
-import { useWallet } from '@/lib/hooks/use-wallet'
+import { useWalletAddress } from '@/hooks/use-wallet-address'
 
 interface TradingActivityCardProps {
   selectedMarket: Market | null
@@ -94,7 +94,7 @@ export function TradingActivityCard({ selectedMarket, event }: TradingActivityCa
     }
   }, [])
 
-  const { address } = useWallet()
+  const { walletAddress: address } = useWalletAddress()
 
   useEffect(() => {
     setWalletAddress(address)
