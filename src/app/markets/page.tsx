@@ -508,7 +508,7 @@ export default function MarketsPage() {
   // Get default sort option for each view mode and status
   const getDefaultSort = (mode: 'markets' | 'events', status: 'active' | 'closed' = 'active'): string => {
     if (status === 'closed') {
-      return 'endDate' // API default for closed events/markets
+      return 'volume24hr' // Default to volume for closed events/markets
     }
     return mode === 'markets' ? 'volume24hr' : 'volume24hr'
   }
@@ -1073,9 +1073,9 @@ export default function MarketsPage() {
                 {/* View Mode and Status Tabs */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-muted-foreground">VIEW & STATUS</h3>
-                  <div className="flex flex-col gap-3">
-                    {/* View Mode Tabs */}
-                    <div className="flex items-center gap-1 border rounded-lg p-1">
+                  <div className="flex gap-2">
+                    {/* View Mode Tabs - 50% width */}
+                    <div className="flex items-center gap-1 border rounded-lg p-1 flex-1">
                       <button
                         onClick={() => setViewMode('markets')}
                         className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -1098,8 +1098,8 @@ export default function MarketsPage() {
                       </button>
                     </div>
                     
-                    {/* Status Tabs */}
-                    <div className="flex items-center gap-1 border rounded-lg p-1">
+                    {/* Status Tabs - 50% width */}
+                    <div className="flex items-center gap-1 border rounded-lg p-1 flex-1">
                       <button
                         onClick={() => setEventStatus('active')}
                         className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -1271,55 +1271,55 @@ export default function MarketsPage() {
                   {/* View Mode and Status Tabs */}
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold text-muted-foreground">VIEW & STATUS</h3>
-                    <div className="space-y-3">
-                      {/* View Mode Tabs */}
-                      <div className="flex items-center gap-1 border rounded-lg p-1">
-                        <button
-                          onClick={() => setViewMode('markets')}
-                          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                            viewMode === 'markets'
-                              ? 'bg-background text-foreground shadow-sm'
-                              : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          Markets
-                        </button>
-                        <button
-                          onClick={() => setViewMode('events')}
-                          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                            viewMode === 'events'
-                              ? 'bg-background text-foreground shadow-sm'
-                              : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          Events
-                        </button>
-                      </div>
-                      
-                      {/* Status Tabs */}
-                      <div className="flex items-center gap-1 border rounded-lg p-1">
-                        <button
-                          onClick={() => setEventStatus('active')}
-                          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                            eventStatus === 'active'
-                              ? 'bg-background text-foreground shadow-sm'
-                              : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          Active
-                        </button>
-                        <button
-                          onClick={() => setEventStatus('closed')}
-                          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                            eventStatus === 'closed'
-                              ? 'bg-background text-foreground shadow-sm'
-                              : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          Closed
-                        </button>
-                      </div>
-                    </div>
+                                         <div className="flex gap-2">
+                       {/* View Mode Tabs - 50% width */}
+                       <div className="flex items-center gap-1 border rounded-lg p-1 flex-1">
+                         <button
+                           onClick={() => setViewMode('markets')}
+                           className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                             viewMode === 'markets'
+                               ? 'bg-background text-foreground shadow-sm'
+                               : 'text-muted-foreground hover:text-foreground'
+                           }`}
+                         >
+                           Markets
+                         </button>
+                         <button
+                           onClick={() => setViewMode('events')}
+                           className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                             viewMode === 'events'
+                               ? 'bg-background text-foreground shadow-sm'
+                               : 'text-muted-foreground hover:text-foreground'
+                           }`}
+                         >
+                           Events
+                         </button>
+                       </div>
+                       
+                       {/* Status Tabs - 50% width */}
+                       <div className="flex items-center gap-1 border rounded-lg p-1 flex-1">
+                         <button
+                           onClick={() => setEventStatus('active')}
+                           className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                             eventStatus === 'active'
+                               ? 'bg-background text-foreground shadow-sm'
+                               : 'text-muted-foreground hover:text-foreground'
+                           }`}
+                         >
+                           Active
+                         </button>
+                         <button
+                           onClick={() => setEventStatus('closed')}
+                           className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                             eventStatus === 'closed'
+                               ? 'bg-background text-foreground shadow-sm'
+                               : 'text-muted-foreground hover:text-foreground'
+                           }`}
+                         >
+                           Closed
+                         </button>
+                       </div>
+                     </div>
                   </div>
 
                   {/* Search */}
