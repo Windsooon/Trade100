@@ -527,10 +527,11 @@ export default function MarketsPage() {
           }
         } else {
           // Use new endpoints for closed events (server-side processing)
+          const baseUrl = 'https://trade-analyze-production.up.railway.app'
           if (viewMode === 'events') {
-            url = new URL('/api/closed_events', window.location.origin)
+            url = new URL('/api/closed_events', baseUrl)
           } else {
-            url = new URL('/api/closed_markets', window.location.origin)
+            url = new URL('/api/closed_markets', baseUrl)
           }
           
           // Add server-side filtering parameters
