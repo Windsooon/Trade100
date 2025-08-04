@@ -453,8 +453,11 @@ export default function MarketsPage() {
 
   const itemsPerPage = 20
 
-  // Get default sort option for each view mode
-  const getDefaultSort = (mode: 'markets' | 'events'): string => {
+  // Get default sort option for each view mode and status
+  const getDefaultSort = (mode: 'markets' | 'events', status: 'active' | 'closed' = 'active'): string => {
+    if (status === 'closed') {
+      return 'endDate' // API default for closed events/markets
+    }
     return mode === 'markets' ? 'volume24hr' : 'volume24hr'
   }
 
@@ -467,7 +470,7 @@ export default function MarketsPage() {
     
     // If current sort option is not valid for the new mode, reset to default
     if (!validSortOptions[viewMode].includes(sortBy)) {
-      setSortBy(getDefaultSort(viewMode))
+      setSortBy(getDefaultSort(viewMode, eventStatus))
     }
   }, [viewMode, sortBy])
 
@@ -537,7 +540,26 @@ export default function MarketsPage() {
           // Add server-side filtering parameters
           url.searchParams.set('limit', itemsPerPage.toString())
           url.searchParams.set('offset', ((currentPage - 1) * itemsPerPage).toString())
-          url.searchParams.set('ascending', 'false') // Always sort by volume descending
+          
+          // Map frontend sort options to API sort parameters
+          const getApiSortParams = (sortBy: string, sortDirection: string) => {
+            let order = 'endDate' // Default order
+            
+            if (sortBy === 'volume24hr' || sortBy === 'volume1wk' || sortBy === 'liquidity') {
+              order = 'volume'
+            } else if (sortBy === 'endDate') {
+              order = 'endDate'
+            }
+            
+            return {
+              order,
+              ascending: sortDirection === 'asc'
+            }
+          }
+          
+          const { order, ascending } = getApiSortParams(sortBy, sortDirection)
+          url.searchParams.set('order', order)
+          url.searchParams.set('ascending', ascending.toString())
           
           if (searchTerm.trim()) {
             url.searchParams.set('search', searchTerm.trim())
@@ -866,7 +888,7 @@ export default function MarketsPage() {
     ? currentData // Already paginated by server
     : currentData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
-  const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode) || sortDirection !== 'desc' || eventStatus !== 'active'
+  const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode, eventStatus) || sortDirection !== 'desc' || eventStatus !== 'active'
 
   const clearAllFilters = () => {
     setSearchTerm('')
@@ -875,7 +897,7 @@ export default function MarketsPage() {
     setMaxPrice('')
     setMinBestAsk('')
     setMaxBestAsk('')
-    setSortBy(getDefaultSort(viewMode))
+    setSortBy(getDefaultSort(viewMode, 'active'))
     setSortDirection('desc')
     setEventStatus('active')
     setCurrentPage(1)
@@ -889,7 +911,7 @@ export default function MarketsPage() {
     setMaxPrice('')
     setMinBestAsk('')
     setMaxBestAsk('')
-    setSortBy(getDefaultSort(viewMode))
+    setSortBy(getDefaultSort(viewMode, eventStatus))
     setSortDirection('desc')
     setCurrentPage(1)
     // Note: viewMode and eventStatus are preserved
@@ -898,7 +920,7 @@ export default function MarketsPage() {
   // Reset filters when switching between active/closed status
   useEffect(() => {
     resetFiltersForStatusChange()
-  }, [eventStatus])
+  }, [eventStatus, viewMode])
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -1097,8 +1119,24 @@ export default function MarketsPage() {
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-muted-foreground">SORT OPTIONS</h3>
                   {eventStatus === 'closed' ? (
-                    <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-                      Closed events are sorted by volume only
+                    <div className="flex gap-2">
+                      <Select value={sortBy} onValueChange={setSortBy}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="volume24hr">Volume</SelectItem>
+                          <SelectItem value="endDate">End Date</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+                        className="px-3"
+                      >
+                        {sortDirection === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+                      </Button>
                     </div>
                   ) : (
                     <div className="flex gap-2">
@@ -1258,8 +1296,24 @@ export default function MarketsPage() {
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold text-muted-foreground">SORT</h3>
                     {eventStatus === 'closed' ? (
-                      <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-                        Closed events are sorted by volume only
+                      <div className="flex gap-2">
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="volume24hr">Volume</SelectItem>
+                            <SelectItem value="endDate">End Date</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+                          className="px-3"
+                        >
+                          {sortDirection === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+                        </Button>
                       </div>
                     ) : (
                       <div className="flex gap-2">
