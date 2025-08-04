@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { RefreshCw, Filter, X, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, ChevronsUpDown, Search } from 'lucide-react'
+import { RefreshCw, Filter, X, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, ChevronsUpDown, Search, Check, X as XIcon } from 'lucide-react'
 import { Event, Market } from '@/lib/stores'
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
@@ -911,6 +911,7 @@ export default function MarketsPage() {
               {hasActiveFilters && (
                 <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
                   <span className="text-sm font-medium">Active:</span>
+                  {eventStatus !== 'active' && <Badge variant="secondary">Status: {eventStatus}</Badge>}
                   {searchTerm && <Badge variant="secondary">Search: "{searchTerm}"</Badge>}
                   {(minPrice || maxPrice) && <Badge variant="secondary">Price: {minPrice || '0'}-{maxPrice || '1'}</Badge>}
                   {(minBestAsk || maxBestAsk) && <Badge variant="secondary">Ask: {minBestAsk || '0'}-{maxBestAsk || '1'}</Badge>}
@@ -922,7 +923,31 @@ export default function MarketsPage() {
               )}
 
               {/* Filter Controls */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Event Status Group */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">EVENT STATUS</h3>
+                  <Select value={eventStatus} onValueChange={(value: 'active' | 'closed') => setEventStatus(value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-600" />
+                          Active
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="closed">
+                        <div className="flex items-center gap-2">
+                          <XIcon className="h-4 w-4 text-red-600" />
+                          Closed
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Price Filters Group */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-muted-foreground">PRICE FILTERS</h3>
@@ -1022,7 +1047,7 @@ export default function MarketsPage() {
 
               {/* Results Summary */}
               <div className="text-sm text-muted-foreground pt-2 border-t">
-                Showing {startIndex + 1}-{Math.min(endIndex, filteredAndSortedEvents.length)} of {filteredAndSortedEvents.length} events
+                Showing {startIndex + 1}-{Math.min(endIndex, filteredAndSortedEvents.length)} of {filteredAndSortedEvents.length} {eventStatus} events
                 {allEventsData && ` (${allEventsData.events.length} total)`}
               </div>
             </CardContent>
@@ -1034,6 +1059,30 @@ export default function MarketsPage() {
               <CardContent className="space-y-4">
                 {/* Mobile filters - simplified */}
                 <div className="space-y-4">
+                  {/* Event Status */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground">EVENT STATUS</h3>
+                    <Select value={eventStatus} onValueChange={(value: 'active' | 'closed') => setEventStatus(value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-green-600" />
+                            Active
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="closed">
+                          <div className="flex items-center gap-2">
+                            <XIcon className="h-4 w-4 text-red-600" />
+                            Closed
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   {/* Search */}
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold text-muted-foreground">SEARCH</h3>
@@ -1148,16 +1197,25 @@ export default function MarketsPage() {
             <div className="flex items-center justify-center h-64">
               <div className="text-center space-y-2">
                 <RefreshCw className="h-8 w-8 animate-spin mx-auto" />
-                <p className="text-muted-foreground">Loading events...</p>
+                <p className="text-muted-foreground">
+                  Loading {eventStatus} events...
+                </p>
               </div>
             </div>
           ) : eventsError ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center space-y-4">
-                <p className="text-destructive">Failed to load events</p>
+                <p className="text-destructive">
+                  Failed to load {eventStatus} events
+                </p>
                 <p className="text-sm text-muted-foreground">
                   {eventsErrorDetails instanceof Error ? eventsErrorDetails.message : 'Unknown error'}
                 </p>
+                {eventStatus === 'closed' && (
+                  <p className="text-xs text-muted-foreground">
+                    This might be a database connectivity issue. Please try again or switch to active events.
+                  </p>
+                )}
               </div>
             </div>
           ) : filteredAndSortedEvents.length === 0 ? (

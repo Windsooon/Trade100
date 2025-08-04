@@ -266,6 +266,7 @@ async function fetchAllEvents() {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
+  const status = searchParams.get('status') || 'active' // Default to active for backward compatibility
   const search = searchParams.get('search')
   const category = searchParams.get('category')
   const minPrice = searchParams.get('minPrice')
@@ -274,26 +275,50 @@ export async function GET(request: NextRequest) {
   const limit = parseInt(searchParams.get('limit') || '20')
 
   try {
-    // Check if cache is valid
-    const now = Date.now()
-    if (!eventsCache.length || (now - cacheTimestamp) > CACHE_DURATION) {
-      try {
-        eventsCache = await fetchAllEvents()
-        cacheTimestamp = now
-      } catch (error) {
-        console.error('Failed to fetch fresh data:', error)
-        
-        // If we have cached data, use it even if expired
-        if (eventsCache.length > 0) {
-          console.log('Using expired cache data due to fetch error')
-        } else {
-          // No cached data and fetch failed
-          return NextResponse.json({
-            error: 'Unable to fetch market data. Please try again later.',
-            details: error instanceof Error ? error.message : 'Unknown error'
-          }, { status: 503 })
+    // Validate status parameter
+    if (status !== 'active' && status !== 'closed') {
+      return NextResponse.json({
+        error: 'Invalid status parameter. Must be "active" or "closed".',
+        details: { parameter: 'status', provided: status, expected: ['active', 'closed'] }
+      }, { status: 400 })
+    }
+
+    // Handle different data sources based on status
+    if (status === 'active') {
+      // Check if cache is valid for active events
+      const now = Date.now()
+      if (!eventsCache.length || (now - cacheTimestamp) > CACHE_DURATION) {
+        try {
+          eventsCache = await fetchAllEvents()
+          cacheTimestamp = now
+        } catch (error) {
+          console.error('Failed to fetch fresh data:', error)
+          
+          // If we have cached data, use it even if expired
+          if (eventsCache.length > 0) {
+            console.log('Using expired cache data due to fetch error')
+          } else {
+            // No cached data and fetch failed
+            return NextResponse.json({
+              error: 'Unable to fetch active market data. Please try again later.',
+              details: error instanceof Error ? error.message : 'Unknown error'
+            }, { status: 503 })
+          }
         }
       }
+    } else {
+      // Handle closed events from database
+      // For now, return empty response with proper structure
+      // This will be implemented by the AI model based on the documentation
+      return NextResponse.json({
+        error: 'Closed events functionality not yet implemented. Database integration required.',
+        details: 'Please implement database queries for closed events as specified in MARKETS_API_DESIGN.md',
+        implementation_needed: {
+          database: 'PostgreSQL',
+          tables: ['events', 'markets', 'tags', 'event_tags'],
+          queries: 'See MARKETS_API_DESIGN.md for SQL examples'
+        }
+      }, { status: 501 })
     }
 
     // Filter events based on search parameters
@@ -340,6 +365,18 @@ export async function GET(request: NextRequest) {
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+      },
+      metadata: {
+        status,
+        dataSource: status === 'active' ? 'polymarket_api' : 'database',
+        filters: {
+          search: search || undefined,
+          category: category || undefined,
+          priceRange: (minPrice || maxPrice) ? {
+            min: minPrice ? parseFloat(minPrice) : undefined,
+            max: maxPrice ? parseFloat(maxPrice) : undefined
+          } : undefined
+        }
       },
       logs: fetchLogs,
       cache: {
