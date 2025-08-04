@@ -86,7 +86,7 @@ const getTagId = (label: string): string | undefined => {
 }
 
 // Market Card Component (for inside event cards)
-function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string; sortBy: string }) {
+function MarketCard({ market, eventSlug, sortBy, isClosed = false }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string; sortBy: string; isClosed?: boolean }) {
   const formatPrice = (price: number): string => {
     return (price * 100).toFixed(2)
   }
@@ -149,7 +149,8 @@ function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTit
     if (market.oneHourPriceChange === null || market.oneHourPriceChange === undefined) return null
     
     // old_price = current_price - price_change
-    const currentPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
+    const parsedPrices = parseOutcomePrices(market.outcomePrices)
+    const currentPrice = parsedPrices[0] ? parseFloat(parsedPrices[0]) : 0
     const oldPrice = currentPrice - market.oneHourPriceChange
     if (oldPrice <= 0) return null
     
@@ -161,7 +162,8 @@ function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTit
     if (market.oneDayPriceChange === null || market.oneDayPriceChange === undefined) return null
     
     // old_price = current_price - price_change
-    const currentPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
+    const parsedPrices = parseOutcomePrices(market.outcomePrices)
+    const currentPrice = parsedPrices[0] ? parseFloat(parsedPrices[0]) : 0
     const oldPrice = currentPrice - market.oneDayPriceChange
     if (oldPrice <= 0) return null
     
@@ -170,17 +172,39 @@ function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTit
   }
 
   const get1hPercentageChange = (): number => {
-    if (!market.outcomePrices || market.outcomePrices.length === 0) return 0
-    const currentPrice = parseFloat(market.outcomePrices[0])
+    const parsedPrices = parseOutcomePrices(market.outcomePrices)
+    if (!parsedPrices || parsedPrices.length === 0) return 0
+    const currentPrice = parseFloat(parsedPrices[0])
     const priceChange = market.oneHourPriceChange || 0
     return calculatePercentageChange(currentPrice, priceChange)
   }
 
   const get24hPercentageChange = (): number => {
-    if (!market.outcomePrices || market.outcomePrices.length === 0) return 0
-    const currentPrice = parseFloat(market.outcomePrices[0])
+    const parsedPrices = parseOutcomePrices(market.outcomePrices)
+    if (!parsedPrices || parsedPrices.length === 0) return 0
+    const currentPrice = parseFloat(parsedPrices[0])
     const priceChange = market.oneDayPriceChange || 0
     return calculatePercentageChange(currentPrice, priceChange)
+  }
+
+  // Parse outcome prices (handle both array and JSON string formats)
+  const parseOutcomePrices = (outcomePrices: string | string[]): string[] => {
+    try {
+      if (Array.isArray(outcomePrices)) {
+        return outcomePrices
+      }
+      if (typeof outcomePrices === 'string') {
+        // Handle JSON string format like "[\"0\", \"1\"]"
+        const parsed = JSON.parse(outcomePrices)
+        if (Array.isArray(parsed)) {
+          return parsed
+        }
+      }
+      return []
+    } catch (error) {
+      console.warn('Failed to parse outcomePrices:', outcomePrices)
+      return []
+    }
   }
 
   // Dynamic price display logic based on sort option
@@ -199,7 +223,8 @@ function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTit
       }
     } else {
       // Default: show Yes price
-      const yesPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0
+      const parsedPrices = parseOutcomePrices(market.outcomePrices)
+      const yesPrice = parsedPrices[0] ? parseFloat(parsedPrices[0]) : 0
       return {
         price: formatPrice(yesPrice),
         label: 'Yes (%)'
@@ -247,23 +272,27 @@ function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTit
             <div className="text-xs text-muted-foreground mb-1">{displayPrice.label}</div>
             <div className="font-medium">{displayPrice.price}</div>
           </div>
-          <div className="w-24 text-center">
-            <div className="text-xs text-muted-foreground mb-1">1h</div>
-            <div className={`font-medium ${getPriceChangeColor(market.oneHourPriceChange || null)}`}>
-              <div>{formatPriceChange(market.oneHourPriceChange || null)}</div>
-              <div className="text-xs">{formatPercentagePrice(calculate1hPercentagePrice())}</div>
-            </div>
-          </div>
-          <div className="w-24 text-center">
-            <div className="text-xs text-muted-foreground mb-1">24h</div>
-            <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
-              <div>{formatPriceChange(market.oneDayPriceChange || null)}</div>
-              <div className="text-xs">{formatPercentagePrice(calculate24hPercentagePrice())}</div>
-            </div>
-          </div>
+          {!isClosed && (
+            <>
+              <div className="w-24 text-center">
+                <div className="text-xs text-muted-foreground mb-1">1h</div>
+                <div className={`font-medium ${getPriceChangeColor(market.oneHourPriceChange || null)}`}>
+                  <div>{formatPriceChange(market.oneHourPriceChange || null)}</div>
+                  <div className="text-xs">{formatPercentagePrice(calculate1hPercentagePrice())}</div>
+                </div>
+              </div>
+              <div className="w-24 text-center">
+                <div className="text-xs text-muted-foreground mb-1">24h</div>
+                <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
+                  <div>{formatPriceChange(market.oneDayPriceChange || null)}</div>
+                  <div className="text-xs">{formatPercentagePrice(calculate24hPercentagePrice())}</div>
+                </div>
+              </div>
+            </>
+          )}
           <div className="w-24 text-right">
-            <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
-            <div className="font-medium">{formatVolume(market.volume24hr || null)}</div>
+            <div className="text-xs text-muted-foreground mb-1">{isClosed ? 'Volume' : '24h Volume'}</div>
+            <div className="font-medium">{formatVolume(isClosed ? (market.volume || market.volume24hr) : market.volume24hr || null)}</div>
           </div>
         </div>
 
@@ -273,13 +302,20 @@ function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTit
             <div className="text-xs text-muted-foreground mb-1">{displayPrice.label}</div>
             <div className="font-medium">{displayPrice.price}</div>
           </div>
-          <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">24h</div>
-            <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
-              <div>{formatPriceChange(market.oneDayPriceChange || null)}</div>
-              <div className="text-xs">{formatPercentagePrice(calculate24hPercentagePrice())}</div>
+          {isClosed ? (
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground mb-1">Volume</div>
+              <div className="font-medium">{formatVolume(market.volume || market.volume24hr || null)}</div>
             </div>
-          </div>
+          ) : (
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground mb-1">24h</div>
+              <div className={`font-medium ${getPriceChangeColor(market.oneDayPriceChange || null)}`}>
+                <div>{formatPriceChange(market.oneDayPriceChange || null)}</div>
+                <div className="text-xs">{formatPercentagePrice(calculate24hPercentagePrice())}</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Link>
@@ -287,7 +323,7 @@ function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTit
 }
 
 // Event Card Component (main cards with collapsible markets)
-function EventCard({ event, sortBy }: { event: Event; sortBy: string }) {
+function EventCard({ event, sortBy, isClosed = false }: { event: Event; sortBy: string; isClosed?: boolean }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const formatVolume = (volume: number | null): string => {
@@ -427,7 +463,7 @@ function EventCard({ event, sortBy }: { event: Event; sortBy: string }) {
                 Markets ({activeMarkets.length})
               </div>
                               {activeMarkets.map((market) => (
-                  <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} sortBy={sortBy} />
+                  <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} sortBy={sortBy} isClosed={isClosed} />
                 ))}
             </div>
           </CollapsibleContent>
@@ -1043,7 +1079,7 @@ export default function MarketsPage() {
               )}
 
               {/* Filter Controls */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className={`grid grid-cols-1 gap-6 ${eventStatus === 'closed' ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
                 {/* Event Status Group */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-muted-foreground">EVENT STATUS</h3>
@@ -1052,30 +1088,16 @@ export default function MarketsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="active">
-                        <div className="flex items-center gap-2">
-                          <Check className="h-4 w-4 text-green-600" />
-                          Active
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="closed">
-                        <div className="flex items-center gap-2">
-                          <XIcon className="h-4 w-4 text-red-600" />
-                          Closed
-                        </div>
-                      </SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Price Filters Group */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-muted-foreground">PRICE FILTERS</h3>
-                  {eventStatus === 'closed' ? (
-                    <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-                      Price filters are not available for closed events
-                    </div>
-                  ) : (
+                {/* Price Filters Group - Only show for active events */}
+                {eventStatus === 'active' && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground">PRICE FILTERS</h3>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Input
@@ -1112,8 +1134,8 @@ export default function MarketsPage() {
                         />
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Sort Options Group */}
                 <div className="space-y-3">
@@ -1214,18 +1236,8 @@ export default function MarketsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">
-                          <div className="flex items-center gap-2">
-                            <Check className="h-4 w-4 text-green-600" />
-                            Active
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="closed">
-                          <div className="flex items-center gap-2">
-                            <XIcon className="h-4 w-4 text-red-600" />
-                            Closed
-                          </div>
-                        </SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="closed">Closed</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1245,14 +1257,10 @@ export default function MarketsPage() {
                     </div>
                   </div>
 
-                  {/* Price Filters */}
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-muted-foreground">PRICE FILTERS</h3>
-                    {eventStatus === 'closed' ? (
-                      <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-                        Price filters are not available for closed events
-                      </div>
-                    ) : (
+                  {/* Price Filters - Only show for active events */}
+                  {eventStatus === 'active' && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold text-muted-foreground">PRICE FILTERS</h3>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <Input
@@ -1289,8 +1297,8 @@ export default function MarketsPage() {
                           />
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Sort */}
                   <div className="space-y-2">
@@ -1399,10 +1407,10 @@ export default function MarketsPage() {
           ) : (
             viewMode === 'events' 
               ? (paginatedData as Event[]).map((event) => (
-                  <EventCard key={event.id} event={event} sortBy={sortBy} />
+                  <EventCard key={event.id} event={event} sortBy={sortBy} isClosed={eventStatus === 'closed'} />
                 ))
               : (paginatedData as (Market & { eventTitle: string; eventSlug: string; eventIcon?: string })[]).map((market) => (
-                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug || ''} sortBy={sortBy} />
+                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug || ''} sortBy={sortBy} isClosed={eventStatus === 'closed'} />
                 ))
           )}
         </div>

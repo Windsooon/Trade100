@@ -33,6 +33,7 @@ export interface Market {
   oneDayPriceChange?: number
   oneWeekPriceChange?: number
   oneMonthPriceChange?: number
+  volume?: number
   volume24hr?: number
   volume1wk?: number
   volume1mo?: number
