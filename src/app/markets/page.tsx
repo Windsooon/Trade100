@@ -1217,8 +1217,14 @@ export default function MarketsPage() {
 
               {/* Results Summary */}
               <div className="text-sm text-muted-foreground pt-2 border-t">
-                Showing {startIndex + 1}-{Math.min(endIndex, total)} of {total} {eventStatus} events
-                {eventStatus === 'active' && allEventsData && ` (${allEventsData.events.length} total)`}
+                {eventStatus === 'closed' ? (
+                  `${total} ${viewMode === 'events' ? 'events' : 'markets'}`
+                ) : (
+                  <>
+                    Showing {startIndex + 1}-{Math.min(endIndex, total)} of {total} {eventStatus} events
+                    {allEventsData && ` (${allEventsData.events.length} total)`}
+                  </>
+                )}
               </div>
             </CardContent>
           </div>
@@ -1420,7 +1426,7 @@ export default function MarketsPage() {
         {!eventsLoading && !eventsError && total > 0 && (
           <div className="flex items-center justify-between border-t pt-4">
             <div className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
+              {eventStatus === 'closed' ? `Page ${currentPage}` : `Page ${currentPage} of ${totalPages}`}
             </div>
             <div className="flex items-center gap-2">
               <Button
