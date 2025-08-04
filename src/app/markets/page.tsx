@@ -23,15 +23,22 @@ interface FetchLog {
 }
 
 interface EventsResponse {
-  events: Event[]
+  events?: Event[]
+  markets?: Array<Market & { eventTitle: string; eventSlug: string; eventIcon?: string }>
   pagination: {
     page: number
     limit: number
-    total: number
-    totalPages: number
+    hasMore?: boolean
+    total?: number
+    totalPages?: number
   }
-  logs: FetchLog[]
-  cache: {
+  metadata?: {
+    status?: string
+    dataSource?: string
+    filters?: any
+  }
+  logs?: FetchLog[]
+  cache?: {
     totalEvents: number
     lastUpdated: string
   }
@@ -56,6 +63,26 @@ const PREDEFINED_TAGS = [
   'Politics', 'Middle East', 'Sports', 'Crypto',
   'Tech', 'Culture', 'World', 'Economy', 'Trump', 'Elections', 'Mentions'
 ]
+
+// Tag mapping for closed APIs (label to ID)
+const TAG_LABEL_TO_ID_MAP: Record<string, string> = {
+  'Politics': '2',
+  'Middle East': '154',
+  'Sports': '1',
+  'Crypto': '21',
+  'Tech': '1401',
+  'Culture': '596',
+  'World': '101970',
+  'Economy': '100328',
+  'Trump': '126',
+  'Elections': '144',
+  'Mentions': '100343'
+}
+
+// Helper function to get tag ID from label
+const getTagId = (label: string): string | undefined => {
+  return TAG_LABEL_TO_ID_MAP[label]
+}
 
 // Market Card Component (for inside event cards)
 function MarketCard({ market, eventSlug, sortBy }: { market: Market & { eventTitle?: string; eventIcon?: string }; eventSlug: string; sortBy: string }) {
@@ -509,27 +536,18 @@ export default function MarketsPage() {
           // Add server-side filtering parameters
           url.searchParams.set('limit', itemsPerPage.toString())
           url.searchParams.set('offset', ((currentPage - 1) * itemsPerPage).toString())
-          url.searchParams.set('order', sortBy)
-          url.searchParams.set('ascending', sortDirection === 'asc' ? 'true' : 'false')
+          url.searchParams.set('ascending', 'false') // Always sort by volume descending
           
           if (searchTerm.trim()) {
             url.searchParams.set('search', searchTerm.trim())
           }
           if (selectedTag !== 'all') {
-            url.searchParams.set('category', selectedTag)
+            const tagId = getTagId(selectedTag)
+            if (tagId) {
+              url.searchParams.set('category', tagId)
+            }
           }
-          if (minPrice) {
-            url.searchParams.set('minPrice', (parseFloat(minPrice)).toString())
-          }
-          if (maxPrice) {
-            url.searchParams.set('maxPrice', (parseFloat(maxPrice)).toString())
-          }
-          if (minBestAsk) {
-            url.searchParams.set('minBestAsk', (parseFloat(minBestAsk)).toString())
-          }
-          if (maxBestAsk) {
-            url.searchParams.set('maxBestAsk', (parseFloat(maxBestAsk)).toString())
-          }
+          // Note: Price filters are not supported for closed events
         }
         
         const response = await fetch(url.toString(), {
@@ -587,7 +605,7 @@ export default function MarketsPage() {
   }
 
   // Client-side filtering and sorting for events (only for active events)
-  const filteredAndSortedEvents = allEventsData?.events && eventStatus === 'active' ? 
+  const filteredAndSortedEvents = eventStatus === 'active' && allEventsData?.events ? 
     allEventsData.events
       .filter(event => {
         // Only include events with active markets
@@ -702,7 +720,7 @@ export default function MarketsPage() {
     : allEventsData?.events || [] // For closed events, use server-filtered data as-is
 
   // Process and filter markets for Markets view mode (only for active events)
-  const filteredAndSortedMarkets = viewMode === 'markets' && allEventsData?.events && eventStatus === 'active' ? 
+  const filteredAndSortedMarkets = eventStatus === 'active' && viewMode === 'markets' && allEventsData?.events ? 
     (() => {
       // First filter events (same as events mode)
       const filteredEvents = allEventsData.events.filter(event => {
@@ -814,31 +832,38 @@ export default function MarketsPage() {
           return sortDirection === 'desc' ? -comparison : comparison
         })
     })()
-    : allEventsData?.events || [] // For closed markets, use server-filtered data as-is
+    : allEventsData?.markets || [] // For closed markets, use server-filtered data as-is
 
   // Determine current data and pagination
-  const currentData = viewMode === 'markets' ? filteredAndSortedMarkets : filteredAndSortedEvents
+  const currentData = eventStatus === 'closed' && viewMode === 'markets' 
+    ? allEventsData?.markets || []
+    : viewMode === 'markets' 
+      ? filteredAndSortedMarkets 
+      : filteredAndSortedEvents
   
   // Calculate pagination variables based on event status
+  const currentPagination = allEventsData?.pagination
+  const hasMore = eventStatus === 'closed' ? (currentPagination?.hasMore || false) : false
+  
   const totalPages = eventStatus === 'closed' 
-    ? allEventsData?.pagination?.totalPages || 1
+    ? currentPage + (hasMore ? 1 : 0) // Show current page + potential next page
     : Math.ceil(currentData.length / itemsPerPage)
     
   const total = eventStatus === 'closed'
-    ? allEventsData?.pagination?.total || 0
+    ? currentData.length // Show current page items count
     : currentData.length
     
   const startIndex = eventStatus === 'closed'
-    ? ((allEventsData?.pagination?.page || 1) - 1) * (allEventsData?.pagination?.limit || itemsPerPage)
-    : (currentPage - 1) * itemsPerPage
+    ? ((currentPagination?.page || 1) - 1) * (currentPagination?.limit || itemsPerPage) + 1
+    : (currentPage - 1) * itemsPerPage + 1
     
   const endIndex = eventStatus === 'closed'
-    ? Math.min(startIndex + (allEventsData?.pagination?.limit || itemsPerPage), total)
-    : startIndex + itemsPerPage
+    ? startIndex + currentData.length - 1
+    : Math.min(startIndex + itemsPerPage - 1, currentData.length)
     
   const paginatedData = eventStatus === 'closed'
     ? currentData // Already paginated by server
-    : currentData.slice(startIndex, endIndex)
+    : currentData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
   const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode) || sortDirection !== 'desc' || eventStatus !== 'active'
 
@@ -855,10 +880,29 @@ export default function MarketsPage() {
     setCurrentPage(1)
   }
 
+  // Reset filters when switching between active/closed status
+  const resetFiltersForStatusChange = () => {
+    setSearchTerm('')
+    setSelectedTag('all')
+    setMinPrice('')
+    setMaxPrice('')
+    setMinBestAsk('')
+    setMaxBestAsk('')
+    setSortBy(getDefaultSort(viewMode))
+    setSortDirection('desc')
+    setCurrentPage(1)
+    // Note: viewMode and eventStatus are preserved
+  }
+
+  // Reset filters when switching between active/closed status
+  useEffect(() => {
+    resetFiltersForStatusChange()
+  }, [eventStatus])
+
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, eventStatus])
+  }, [searchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
 
   return (
     <div className="min-h-screen bg-background">
@@ -1004,81 +1048,92 @@ export default function MarketsPage() {
                 {/* Price Filters Group */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-muted-foreground">PRICE FILTERS</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="text"
-                        value={minPrice}
-                        onChange={(e) => handlePriceChange('min', e.target.value)}
-                        className="w-full"
-                        placeholder="Min price (0.00)"
-                      />
-                      <span className="text-sm text-muted-foreground">to</span>
-                      <Input
-                        type="text"
-                        value={maxPrice}
-                        onChange={(e) => handlePriceChange('max', e.target.value)}
-                        className="w-full"
-                        placeholder="Max price (1.00)"
-                      />
+                  {eventStatus === 'closed' ? (
+                    <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                      Price filters are not available for closed events
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="text"
-                        value={minBestAsk}
-                        onChange={(e) => handleBestAskChange('min', e.target.value)}
-                        className="w-full"
-                        placeholder="Min ask (0.00)"
-                      />
-                      <span className="text-sm text-muted-foreground">to</span>
-                      <Input
-                        type="text"
-                        value={maxBestAsk}
-                        onChange={(e) => handleBestAskChange('max', e.target.value)}
-                        className="w-full"
-                        placeholder="Max ask (1.00)"
-                      />
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          value={minPrice}
+                          onChange={(e) => handlePriceChange('min', e.target.value)}
+                          className="w-full"
+                          placeholder="Min price (0.00)"
+                        />
+                        <span className="text-sm text-muted-foreground">to</span>
+                        <Input
+                          type="text"
+                          value={maxPrice}
+                          onChange={(e) => handlePriceChange('max', e.target.value)}
+                          className="w-full"
+                          placeholder="Max price (1.00)"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          value={minBestAsk}
+                          onChange={(e) => handleBestAskChange('min', e.target.value)}
+                          className="w-full"
+                          placeholder="Min ask (0.00)"
+                        />
+                        <span className="text-sm text-muted-foreground">to</span>
+                        <Input
+                          type="text"
+                          value={maxBestAsk}
+                          onChange={(e) => handleBestAskChange('max', e.target.value)}
+                          className="w-full"
+                          placeholder="Max ask (1.00)"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Sort Options Group */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-muted-foreground">SORT OPTIONS</h3>
-                  <div className="flex gap-2">
-                    <Select value={sortBy} onValueChange={setSortBy}>
-                      <SelectTrigger className="flex-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="volume24hr">24h Volume</SelectItem>
-                        <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
-                        <SelectItem value="liquidity">Liquidity</SelectItem>
-                        {viewMode === 'events' && (
-                          <SelectItem value="endDate">End Date</SelectItem>
-                        )}
-                        {viewMode === 'markets' && (
-                          <>
-                            <SelectItem value="priceChange24h">24h Price Change</SelectItem>
-                            <SelectItem value="priceChange1h">1h Price Change</SelectItem>
-                            <SelectItem value="priceChangePercent24h">24h Price Change %</SelectItem>
-                            <SelectItem value="priceChangePercent1h">1h Price Change %</SelectItem>
-                            <SelectItem value="bestBid">Best Bid</SelectItem>
-                            <SelectItem value="bestAsk">Best Ask</SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
-                      className="px-3"
-                    >
-                      {sortDirection === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  
+                  {eventStatus === 'closed' ? (
+                    <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                      Closed events are sorted by volume only
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Select value={sortBy} onValueChange={setSortBy}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="volume24hr">24h Volume</SelectItem>
+                          <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
+                          <SelectItem value="liquidity">Liquidity</SelectItem>
+                          {viewMode === 'events' && (
+                            <SelectItem value="endDate">End Date</SelectItem>
+                          )}
+                          {viewMode === 'markets' && (
+                            <>
+                              <SelectItem value="priceChange24h">24h Price Change</SelectItem>
+                              <SelectItem value="priceChange1h">1h Price Change</SelectItem>
+                              <SelectItem value="priceChangePercent24h">24h Price Change %</SelectItem>
+                              <SelectItem value="priceChangePercent1h">1h Price Change %</SelectItem>
+                              <SelectItem value="bestBid">Best Bid</SelectItem>
+                              <SelectItem value="bestAsk">Best Ask</SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+                        className="px-3"
+                      >
+                        {sortDirection === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  )}
 
                 </div>
 
@@ -1154,81 +1209,92 @@ export default function MarketsPage() {
                   {/* Price Filters */}
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold text-muted-foreground">PRICE FILTERS</h3>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="text"
-                          value={minPrice}
-                          onChange={(e) => handlePriceChange('min', e.target.value)}
-                          className="w-full"
-                          placeholder="Min price (0.00)"
-                        />
-                        <span className="text-sm text-muted-foreground">to</span>
-                        <Input
-                          type="text"
-                          value={maxPrice}
-                          onChange={(e) => handlePriceChange('max', e.target.value)}
-                          className="w-full"
-                          placeholder="Max price (1.00)"
-                        />
+                    {eventStatus === 'closed' ? (
+                      <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                        Price filters are not available for closed events
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="text"
-                          value={minBestAsk}
-                          onChange={(e) => handleBestAskChange('min', e.target.value)}
-                          className="w-full"
-                          placeholder="Min ask (0.00)"
-                        />
-                        <span className="text-sm text-muted-foreground">to</span>
-                        <Input
-                          type="text"
-                          value={maxBestAsk}
-                          onChange={(e) => handleBestAskChange('max', e.target.value)}
-                          className="w-full"
-                          placeholder="Max ask (1.00)"
-                        />
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="text"
+                            value={minPrice}
+                            onChange={(e) => handlePriceChange('min', e.target.value)}
+                            className="w-full"
+                            placeholder="Min price (0.00)"
+                          />
+                          <span className="text-sm text-muted-foreground">to</span>
+                          <Input
+                            type="text"
+                            value={maxPrice}
+                            onChange={(e) => handlePriceChange('max', e.target.value)}
+                            className="w-full"
+                            placeholder="Max price (1.00)"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="text"
+                            value={minBestAsk}
+                            onChange={(e) => handleBestAskChange('min', e.target.value)}
+                            className="w-full"
+                            placeholder="Min ask (0.00)"
+                          />
+                          <span className="text-sm text-muted-foreground">to</span>
+                          <Input
+                            type="text"
+                            value={maxBestAsk}
+                            onChange={(e) => handleBestAskChange('max', e.target.value)}
+                            className="w-full"
+                            placeholder="Max ask (1.00)"
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Sort */}
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold text-muted-foreground">SORT</h3>
-                  <div className="flex gap-2">
-                    <Select value={sortBy} onValueChange={setSortBy}>
-                      <SelectTrigger className="flex-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="volume24hr">24h Volume</SelectItem>
-                        <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
-                        <SelectItem value="liquidity">Liquidity</SelectItem>
-                        {viewMode === 'events' && (
-                          <SelectItem value="endDate">End Date</SelectItem>
-                        )}
-                        {viewMode === 'markets' && (
-                          <>
-                            <SelectItem value="priceChange24h">24h Price Change</SelectItem>
-                            <SelectItem value="priceChange1h">1h Price Change</SelectItem>
-                            <SelectItem value="priceChangePercent24h">24h Price Change %</SelectItem>
-                            <SelectItem value="priceChangePercent1h">1h Price Change %</SelectItem>
-                            <SelectItem value="bestBid">Best Bid</SelectItem>
-                            <SelectItem value="bestAsk">Best Ask</SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
-                      className="px-3"
-                    >
-                      {sortDirection === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
-                    </Button>
-                    </div>
-                    
+                    {eventStatus === 'closed' ? (
+                      <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                        Closed events are sorted by volume only
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="volume24hr">24h Volume</SelectItem>
+                            <SelectItem value="volume1wk">Volume (1 week)</SelectItem>
+                            <SelectItem value="liquidity">Liquidity</SelectItem>
+                            {viewMode === 'events' && (
+                              <SelectItem value="endDate">End Date</SelectItem>
+                            )}
+                            {viewMode === 'markets' && (
+                              <>
+                                <SelectItem value="priceChange24h">24h Price Change</SelectItem>
+                                <SelectItem value="priceChange1h">1h Price Change</SelectItem>
+                                <SelectItem value="priceChangePercent24h">24h Price Change %</SelectItem>
+                                <SelectItem value="priceChangePercent1h">1h Price Change %</SelectItem>
+                                <SelectItem value="bestBid">Best Bid</SelectItem>
+                                <SelectItem value="bestAsk">Best Ask</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+                          className="px-3"
+                        >
+                          {sortDirection === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    )}
 
                   </div>
 
@@ -1278,11 +1344,11 @@ export default function MarketsPage() {
           ) : (
             viewMode === 'events' 
               ? (paginatedData as Event[]).map((event) => (
-              <EventCard key={event.id} event={event} sortBy={sortBy} />
+                  <EventCard key={event.id} event={event} sortBy={sortBy} />
                 ))
-                              : (paginatedData as (Market & { eventTitle: string; eventSlug: string; eventIcon?: string })[]).map((market) => (
-                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug} sortBy={sortBy} />
-            ))
+              : (paginatedData as (Market & { eventTitle: string; eventSlug: string; eventIcon?: string })[]).map((market) => (
+                  <MarketCard key={market.conditionId} market={market} eventSlug={market.eventSlug || ''} sortBy={sortBy} />
+                ))
           )}
         </div>
 
@@ -1301,27 +1367,29 @@ export default function MarketsPage() {
               >
                 Previous
               </Button>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
-                  if (pageNum > totalPages) return null
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={pageNum === currentPage ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(pageNum)}
-                    >
-                      {pageNum}
-                    </Button>
-                  )
-                })}
-              </div>
+              {eventStatus === 'active' && (
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
+                    if (pageNum > totalPages) return null
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={pageNum === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                </div>
+              )}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                disabled={eventStatus === 'closed' ? !hasMore : currentPage === totalPages}
               >
                 Next
               </Button>
