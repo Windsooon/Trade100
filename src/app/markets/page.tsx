@@ -478,6 +478,7 @@ export default function MarketsPage() {
   const [viewMode, setViewMode] = useState<'markets' | 'events'>('markets')
   const [eventStatus, setEventStatus] = useState<'active' | 'closed'>('active')
   const [searchTerm, setSearchTerm] = useState<string>('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('')
   const [selectedTag, setSelectedTag] = useState<string>('all')
   const [minPrice, setMinPrice] = useState<string>('')
   const [maxPrice, setMaxPrice] = useState<string>('')
@@ -489,6 +490,15 @@ export default function MarketsPage() {
   const [currentPage, setCurrentPage] = useState<number>(1)
 
   const itemsPerPage = 20
+
+  // Debounce the search term (same pattern as navbar search)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Get default sort option for each view mode and status
   const getDefaultSort = (mode: 'markets' | 'events', status: 'active' | 'closed' = 'active'): string => {
@@ -551,7 +561,7 @@ export default function MarketsPage() {
     isError: eventsError,
     error: eventsErrorDetails,
   } = useQuery<EventsResponse>({
-    queryKey: ['all-events', searchTerm, eventStatus, viewMode, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, currentPage],
+    queryKey: ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, currentPage],
     queryFn: async () => {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUTS.DEFAULT)
@@ -563,8 +573,8 @@ export default function MarketsPage() {
           // Use existing endpoint for active events (client-side processing)
           url = new URL(API_CONFIG.ENDPOINTS.ACTIVE_MARKETS, API_CONFIG.ACTIVE_EVENTS_BASE_URL || window.location.origin)
           url.searchParams.set('limit', '9999')
-          if (searchTerm.trim()) {
-            url.searchParams.set('search', searchTerm.trim())
+          if (debouncedSearchTerm.trim()) {
+            url.searchParams.set('search', debouncedSearchTerm.trim())
           }
         } else {
           // Use new endpoints for closed events (server-side processing)
@@ -598,8 +608,8 @@ export default function MarketsPage() {
           url.searchParams.set('order', order)
           url.searchParams.set('ascending', ascending.toString())
           
-          if (searchTerm.trim()) {
-            url.searchParams.set('search', searchTerm.trim())
+          if (debouncedSearchTerm.trim()) {
+            url.searchParams.set('search', debouncedSearchTerm.trim())
           }
           if (selectedTag !== 'all') {
             const tagId = getTagId(selectedTag)
@@ -810,8 +820,8 @@ export default function MarketsPage() {
       return allMarkets
         .filter(market => {
           // Search filter (market question + event title)
-          if (searchTerm) {
-            const searchLower = searchTerm.toLowerCase()
+          if (debouncedSearchTerm) {
+            const searchLower = debouncedSearchTerm.toLowerCase()
             if (!market.question.toLowerCase().includes(searchLower) && 
                 !market.eventTitle.toLowerCase().includes(searchLower)) {
               return false
