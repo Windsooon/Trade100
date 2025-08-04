@@ -940,7 +940,7 @@ export default function MarketsPage() {
     ? currentData // Already paginated by server
     : currentData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
-  const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode, eventStatus) || sortDirection !== 'desc' || eventStatus !== 'active'
+  const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode, eventStatus) || sortDirection !== 'desc'
 
   const clearAllFilters = () => {
     setSearchTerm('')
@@ -986,33 +986,7 @@ export default function MarketsPage() {
       {/* Page Header */}
       <div className="border-b bg-background">
         <div className="container mx-auto px-4 py-4 max-w-[1200px]">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{viewMode === 'markets' ? 'Markets' : 'Events'}</h1>
-            
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 border rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('markets')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  viewMode === 'markets'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Markets
-              </button>
-              <button
-                onClick={() => setViewMode('events')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  viewMode === 'events'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Events
-              </button>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold">Prediction Markets</h1>
         </div>
       </div>
 
@@ -1083,7 +1057,7 @@ export default function MarketsPage() {
               {hasActiveFilters && (
                 <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
                   <span className="text-sm font-medium">Active:</span>
-                  {eventStatus !== 'active' && <Badge variant="secondary">Status: {eventStatus}</Badge>}
+
                   {searchTerm && <Badge variant="secondary">Search: "{searchTerm}"</Badge>}
                   {(minPrice || maxPrice) && <Badge variant="secondary">Price: {minPrice || '0'}-{maxPrice || '1'}</Badge>}
                   {(minBestAsk || maxBestAsk) && <Badge variant="secondary">Ask: {minBestAsk || '0'}-{maxBestAsk || '1'}</Badge>}
@@ -1095,20 +1069,63 @@ export default function MarketsPage() {
               )}
 
               {/* Filter Controls */}
-              <div className={`grid grid-cols-1 gap-6 ${eventStatus === 'closed' ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
-                {/* Event Status Group */}
+              <div className="space-y-6">
+                {/* View Mode and Status Tabs */}
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-muted-foreground">EVENT STATUS</h3>
-                  <Select value={eventStatus} onValueChange={(value: 'active' | 'closed') => setEventStatus(value)}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="closed">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <h3 className="text-sm font-semibold text-muted-foreground">VIEW & STATUS</h3>
+                  <div className="flex flex-col gap-3">
+                    {/* View Mode Tabs */}
+                    <div className="flex items-center gap-1 border rounded-lg p-1">
+                      <button
+                        onClick={() => setViewMode('markets')}
+                        className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                          viewMode === 'markets'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        Markets
+                      </button>
+                      <button
+                        onClick={() => setViewMode('events')}
+                        className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                          viewMode === 'events'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        Events
+                      </button>
+                    </div>
+                    
+                    {/* Status Tabs */}
+                    <div className="flex items-center gap-1 border rounded-lg p-1">
+                      <button
+                        onClick={() => setEventStatus('active')}
+                        className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                          eventStatus === 'active'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        Active
+                      </button>
+                      <button
+                        onClick={() => setEventStatus('closed')}
+                        className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                          eventStatus === 'closed'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        Closed
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Other Filter Controls */}
+                <div className={`grid grid-cols-1 gap-6 ${eventStatus === 'closed' ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
 
                 {/* Price Filters Group - Only show for active events */}
                 {eventStatus === 'active' && (
@@ -1228,6 +1245,7 @@ export default function MarketsPage() {
                     />
                   </div>
                 </div>
+                </div>
               </div>
 
               {/* Results Summary */}
@@ -1250,18 +1268,58 @@ export default function MarketsPage() {
               <CardContent className="space-y-4">
                 {/* Mobile filters - simplified */}
                 <div className="space-y-4">
-                  {/* Event Status */}
+                  {/* View Mode and Status Tabs */}
                   <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-muted-foreground">EVENT STATUS</h3>
-                    <Select value={eventStatus} onValueChange={(value: 'active' | 'closed') => setEventStatus(value)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="closed">Closed</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <h3 className="text-sm font-semibold text-muted-foreground">VIEW & STATUS</h3>
+                    <div className="space-y-3">
+                      {/* View Mode Tabs */}
+                      <div className="flex items-center gap-1 border rounded-lg p-1">
+                        <button
+                          onClick={() => setViewMode('markets')}
+                          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                            viewMode === 'markets'
+                              ? 'bg-background text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          Markets
+                        </button>
+                        <button
+                          onClick={() => setViewMode('events')}
+                          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                            viewMode === 'events'
+                              ? 'bg-background text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          Events
+                        </button>
+                      </div>
+                      
+                      {/* Status Tabs */}
+                      <div className="flex items-center gap-1 border rounded-lg p-1">
+                        <button
+                          onClick={() => setEventStatus('active')}
+                          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                            eventStatus === 'active'
+                              ? 'bg-background text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          Active
+                        </button>
+                        <button
+                          onClick={() => setEventStatus('closed')}
+                          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                            eventStatus === 'closed'
+                              ? 'bg-background text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          Closed
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Search */}
