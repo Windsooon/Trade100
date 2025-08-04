@@ -489,7 +489,10 @@ export default function MarketsPage() {
   const [maxPrice, setMaxPrice] = useState<string>('')
   const [minBestAsk, setMinBestAsk] = useState<string>('')
   const [maxBestAsk, setMaxBestAsk] = useState<string>('')
-  const [sortBy, setSortBy] = useState<string>('volume24hr') // Markets mode default - changed to volume
+  const [sortBy, setSortBy] = useState<string>(() => {
+    console.log('[SORT DEBUG] Initializing sortBy to volume24hr')
+    return 'volume24hr'
+  }) // Markets mode default - changed to volume
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<number>(1)
@@ -515,6 +518,8 @@ export default function MarketsPage() {
 
   // Update sort when view mode or event status changes
   useEffect(() => {
+    console.log('[SORT DEBUG] useEffect triggered - viewMode:', viewMode, 'eventStatus:', eventStatus, 'currentSortBy:', sortBy)
+    
     const validSortOptions = {
       // Active events/markets support all sort options
       active: {
@@ -530,12 +535,18 @@ export default function MarketsPage() {
     
     // Get valid options for current view mode and event status
     const currentValidOptions = validSortOptions[eventStatus][viewMode]
+    console.log('[SORT DEBUG] Valid options for', eventStatus, viewMode, ':', currentValidOptions)
+    console.log('[SORT DEBUG] Is current sortBy valid?', currentValidOptions.includes(sortBy))
     
     // If current sort option is not valid for the current mode/status, reset to default
     if (!currentValidOptions.includes(sortBy)) {
-      setSortBy(getDefaultSort(viewMode, eventStatus))
+      const newSort = getDefaultSort(viewMode, eventStatus)
+      console.log('[SORT DEBUG] Resetting sort from', sortBy, 'to', newSort)
+      setSortBy(newSort)
+    } else {
+      console.log('[SORT DEBUG] Current sort is valid, keeping:', sortBy)
     }
-  }, [viewMode, eventStatus, sortBy, getDefaultSort])
+  }, [viewMode, eventStatus])
 
   // Helper functions for price range
   const handlePriceChange = (type: 'min' | 'max', value: string) => {
@@ -968,13 +979,15 @@ export default function MarketsPage() {
 
   // Reset filters when switching between active/closed status
   const resetFiltersForStatusChange = () => {
+    const newSort = getDefaultSort(viewMode, eventStatus)
+    console.log('[SORT DEBUG] resetFiltersForStatusChange called. Setting sort to:', newSort)
     setSearchTerm('')
     setSelectedTag('all')
     setMinPrice('')
     setMaxPrice('')
     setMinBestAsk('')
     setMaxBestAsk('')
-    setSortBy(getDefaultSort(viewMode, eventStatus))
+    setSortBy(newSort)
     setSortDirection('desc')
     setCurrentPage(1)
     // Note: viewMode and eventStatus are preserved
@@ -982,6 +995,7 @@ export default function MarketsPage() {
 
   // Reset filters when switching between active/closed status
   useEffect(() => {
+    console.log('[SORT DEBUG] Event status changed, resetting filters. New status:', eventStatus)
     resetFiltersForStatusChange()
   }, [eventStatus])
 
@@ -1186,7 +1200,10 @@ export default function MarketsPage() {
                   <h3 className="text-sm font-semibold text-muted-foreground">SORT OPTIONS</h3>
                   {eventStatus === 'closed' ? (
                     <div className="flex gap-2">
-                      <Select value={sortBy} onValueChange={setSortBy}>
+                      <Select value={sortBy} onValueChange={(value) => {
+                        console.log('[SORT DEBUG] User changing sort (CLOSED) from', sortBy, 'to', value)
+                        setSortBy(value)
+                      }}>
                         <SelectTrigger className="flex-1">
                           <SelectValue />
                         </SelectTrigger>
@@ -1206,7 +1223,10 @@ export default function MarketsPage() {
                     </div>
                   ) : (
                     <div className="flex gap-2">
-                      <Select value={sortBy} onValueChange={setSortBy}>
+                      <Select value={sortBy} onValueChange={(value) => {
+                        console.log('[SORT DEBUG] User changing sort (ACTIVE) from', sortBy, 'to', value)
+                        setSortBy(value)
+                      }}>
                         <SelectTrigger className="flex-1">
                           <SelectValue />
                         </SelectTrigger>
@@ -1396,7 +1416,10 @@ export default function MarketsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground">SORT</h3>
                     {eventStatus === 'closed' ? (
                       <div className="flex gap-2">
-                        <Select value={sortBy} onValueChange={setSortBy}>
+                        <Select value={sortBy} onValueChange={(value) => {
+                          console.log('[SORT DEBUG] User changing sort (MOBILE CLOSED) from', sortBy, 'to', value)
+                          setSortBy(value)
+                        }}>
                           <SelectTrigger className="flex-1">
                             <SelectValue />
                           </SelectTrigger>
@@ -1416,7 +1439,10 @@ export default function MarketsPage() {
                       </div>
                     ) : (
                       <div className="flex gap-2">
-                        <Select value={sortBy} onValueChange={setSortBy}>
+                        <Select value={sortBy} onValueChange={(value) => {
+                          console.log('[SORT DEBUG] User changing sort (MOBILE ACTIVE) from', sortBy, 'to', value)
+                          setSortBy(value)
+                        }}>
                           <SelectTrigger className="flex-1">
                             <SelectValue />
                           </SelectTrigger>
