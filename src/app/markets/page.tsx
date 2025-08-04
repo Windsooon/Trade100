@@ -351,16 +351,19 @@ function EventCard({ event, sortBy, isClosed = false }: { event: Event; sortBy: 
     }
   }
 
-  // Filter active markets
-  const activeMarkets = event.markets.filter(market => 
-    market.active && !market.archived && !market.closed
-  )
+  // Filter markets based on event status
+  const displayMarkets = isClosed 
+    ? event.markets // Show all markets for closed events
+    : event.markets.filter(market => 
+        market.active && !market.archived && !market.closed
+      )
 
-  const totalVolume = activeMarkets.reduce((sum, market) => 
-    sum + (market.volume24hr || 0), 0
-  )
+  // Calculate volume based on event status
+  const displayVolume = isClosed 
+    ? (event.volume || 0) // Use event.volume for closed events
+    : displayMarkets.reduce((sum, market) => sum + (market.volume24hr || 0), 0) // Calculate from markets for active events
 
-  const totalLiquidity = activeMarkets.reduce((sum, market) => 
+  const totalLiquidity = displayMarkets.reduce((sum, market) => 
     sum + (market.liquidityNum || market.liquidity || 0), 0
   )
   
@@ -421,21 +424,23 @@ function EventCard({ event, sortBy, isClosed = false }: { event: Event; sortBy: 
                     {/* Desktop Layout (md and up) */}
                     <div className="hidden md:flex items-center gap-4 text-sm ml-4 flex-shrink-0">
                     <div className="text-center">
-                      <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
-                      <div className="font-medium">{formatVolume(totalVolume)}</div>
+                      <div className="text-xs text-muted-foreground mb-1">{isClosed ? 'Volume' : '24h Volume'}</div>
+                      <div className="font-medium">{formatVolume(displayVolume)}</div>
                     </div>
 
-                    <div className="text-center">
-                      <div className="text-xs text-muted-foreground mb-1">Ends</div>
-                      <div className="font-medium">{formatDate(event.endDate)}</div>
-                    </div>
+                    {!isClosed && (
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground mb-1">Ends</div>
+                        <div className="font-medium">{formatDate(event.endDate)}</div>
+                      </div>
+                    )}
                   </div>
 
                     {/* Mobile Layout (below md) - Only show volume */}
                     <div className="flex md:hidden items-center text-sm ml-2 flex-shrink-0">
                       <div className="text-center">
                         <div className="text-xs text-muted-foreground mb-1">Volume</div>
-                        <div className="font-medium">{formatVolume(totalVolume)}</div>
+                        <div className="font-medium">{formatVolume(displayVolume)}</div>
                       </div>
                     </div>
                 </div>
@@ -461,9 +466,9 @@ function EventCard({ event, sortBy, isClosed = false }: { event: Event; sortBy: 
           <CollapsibleContent className="mt-4">
             <div className="space-y-2 border-t pt-4">
               <div className="text-sm font-medium text-muted-foreground mb-3">
-                Markets ({activeMarkets.length})
+                Markets ({displayMarkets.length})
               </div>
-                              {activeMarkets.map((market) => (
+                              {displayMarkets.map((market) => (
                   <MarketCard key={market.conditionId} market={market} eventSlug={event.slug} sortBy={sortBy} isClosed={isClosed} />
                 ))}
             </div>
