@@ -483,17 +483,53 @@ export default function MarketsPage() {
     isError: eventsError,
     error: eventsErrorDetails,
   } = useQuery<EventsResponse>({
-    queryKey: ['all-events', searchTerm, eventStatus],
+    queryKey: ['all-events', searchTerm, eventStatus, viewMode, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, currentPage],
     queryFn: async () => {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000)
       
       try {
-        const url = new URL('/api/markets', window.location.origin)
-        url.searchParams.set('limit', '9999')
-        url.searchParams.set('status', eventStatus)
-        if (searchTerm.trim()) {
-          url.searchParams.set('search', searchTerm.trim())
+        let url: URL
+        
+        if (eventStatus === 'active') {
+          // Use existing endpoint for active events (client-side processing)
+          url = new URL('/api/markets', window.location.origin)
+          url.searchParams.set('limit', '9999')
+          if (searchTerm.trim()) {
+            url.searchParams.set('search', searchTerm.trim())
+          }
+        } else {
+          // Use new endpoints for closed events (server-side processing)
+          if (viewMode === 'events') {
+            url = new URL('/api/closed_events', window.location.origin)
+          } else {
+            url = new URL('/api/closed_markets', window.location.origin)
+          }
+          
+          // Add server-side filtering parameters
+          url.searchParams.set('limit', itemsPerPage.toString())
+          url.searchParams.set('offset', ((currentPage - 1) * itemsPerPage).toString())
+          url.searchParams.set('order', sortBy)
+          url.searchParams.set('ascending', sortDirection === 'asc' ? 'true' : 'false')
+          
+          if (searchTerm.trim()) {
+            url.searchParams.set('search', searchTerm.trim())
+          }
+          if (selectedTag !== 'all') {
+            url.searchParams.set('category', selectedTag)
+          }
+          if (minPrice) {
+            url.searchParams.set('minPrice', (parseFloat(minPrice)).toString())
+          }
+          if (maxPrice) {
+            url.searchParams.set('maxPrice', (parseFloat(maxPrice)).toString())
+          }
+          if (minBestAsk) {
+            url.searchParams.set('minBestAsk', (parseFloat(minBestAsk)).toString())
+          }
+          if (maxBestAsk) {
+            url.searchParams.set('maxBestAsk', (parseFloat(maxBestAsk)).toString())
+          }
         }
         
         const response = await fetch(url.toString(), {
@@ -504,7 +540,7 @@ export default function MarketsPage() {
         
         if (!response.ok) {
           const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to fetch events')
+          throw new Error(errorData.error || `Failed to fetch ${eventStatus} events`)
         }
 
         const data = await response.json()
@@ -550,8 +586,8 @@ export default function MarketsPage() {
     return (priceChange / oldPrice) * 100
   }
 
-  // Client-side filtering and sorting for events
-  const filteredAndSortedEvents = allEventsData?.events ? 
+  // Client-side filtering and sorting for events (only for active events)
+  const filteredAndSortedEvents = allEventsData?.events && eventStatus === 'active' ? 
     allEventsData.events
       .filter(event => {
         // Only include events with active markets
@@ -663,10 +699,10 @@ export default function MarketsPage() {
         }
         return sortDirection === 'desc' ? -comparison : comparison
       })
-    : []
+    : allEventsData?.events || [] // For closed events, use server-filtered data as-is
 
-  // Process and filter markets for Markets view mode
-  const filteredAndSortedMarkets = viewMode === 'markets' && allEventsData?.events ? 
+  // Process and filter markets for Markets view mode (only for active events)
+  const filteredAndSortedMarkets = viewMode === 'markets' && allEventsData?.events && eventStatus === 'active' ? 
     (() => {
       // First filter events (same as events mode)
       const filteredEvents = allEventsData.events.filter(event => {
@@ -778,14 +814,31 @@ export default function MarketsPage() {
           return sortDirection === 'desc' ? -comparison : comparison
         })
     })()
-    : []
+    : allEventsData?.events || [] // For closed markets, use server-filtered data as-is
 
   // Determine current data and pagination
   const currentData = viewMode === 'markets' ? filteredAndSortedMarkets : filteredAndSortedEvents
-  const totalPages = Math.ceil(currentData.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const paginatedData = currentData.slice(startIndex, endIndex)
+  
+  // Calculate pagination variables based on event status
+  const totalPages = eventStatus === 'closed' 
+    ? allEventsData?.pagination?.totalPages || 1
+    : Math.ceil(currentData.length / itemsPerPage)
+    
+  const total = eventStatus === 'closed'
+    ? allEventsData?.pagination?.total || 0
+    : currentData.length
+    
+  const startIndex = eventStatus === 'closed'
+    ? ((allEventsData?.pagination?.page || 1) - 1) * (allEventsData?.pagination?.limit || itemsPerPage)
+    : (currentPage - 1) * itemsPerPage
+    
+  const endIndex = eventStatus === 'closed'
+    ? Math.min(startIndex + (allEventsData?.pagination?.limit || itemsPerPage), total)
+    : startIndex + itemsPerPage
+    
+  const paginatedData = eventStatus === 'closed'
+    ? currentData // Already paginated by server
+    : currentData.slice(startIndex, endIndex)
 
   const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode) || sortDirection !== 'desc' || eventStatus !== 'active'
 
@@ -1047,8 +1100,8 @@ export default function MarketsPage() {
 
               {/* Results Summary */}
               <div className="text-sm text-muted-foreground pt-2 border-t">
-                Showing {startIndex + 1}-{Math.min(endIndex, filteredAndSortedEvents.length)} of {filteredAndSortedEvents.length} {eventStatus} events
-                {allEventsData && ` (${allEventsData.events.length} total)`}
+                Showing {startIndex + 1}-{Math.min(endIndex, total)} of {total} {eventStatus} events
+                {eventStatus === 'active' && allEventsData && ` (${allEventsData.events.length} total)`}
               </div>
             </CardContent>
           </div>
@@ -1218,7 +1271,7 @@ export default function MarketsPage() {
                 )}
               </div>
             </div>
-          ) : filteredAndSortedEvents.length === 0 ? (
+          ) : total === 0 ? (
             <div className="flex items-center justify-center h-64">
               <p className="text-muted-foreground">No events found</p>
             </div>
@@ -1234,7 +1287,7 @@ export default function MarketsPage() {
         </div>
 
         {/* Pagination */}
-        {!eventsLoading && !eventsError && filteredAndSortedEvents.length > 0 && (
+        {!eventsLoading && !eventsError && total > 0 && (
           <div className="flex items-center justify-between border-t pt-4">
             <div className="text-sm text-muted-foreground">
               Page {currentPage} of {totalPages}
