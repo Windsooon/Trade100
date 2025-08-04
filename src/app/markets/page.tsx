@@ -513,18 +513,29 @@ export default function MarketsPage() {
     return mode === 'markets' ? 'volume24hr' : 'volume24hr'
   }
 
-  // Update sort when view mode changes
+  // Update sort when view mode or event status changes
   useEffect(() => {
     const validSortOptions = {
-      markets: ['volume24hr', 'volume1wk', 'liquidity', 'priceChange24h', 'priceChange1h', 'priceChangePercent24h', 'priceChangePercent1h', 'bestBid', 'bestAsk'],
-      events: ['volume24hr', 'volume1wk', 'liquidity', 'endDate']
+      // Active events/markets support all sort options
+      active: {
+        markets: ['volume24hr', 'volume1wk', 'liquidity', 'priceChange24h', 'priceChange1h', 'priceChangePercent24h', 'priceChangePercent1h', 'bestBid', 'bestAsk'],
+        events: ['volume24hr', 'volume1wk', 'liquidity', 'endDate']
+      },
+      // Closed events/markets only support limited sort options
+      closed: {
+        markets: ['volume24hr', 'endDate'],
+        events: ['volume24hr', 'endDate']
+      }
     }
     
-    // If current sort option is not valid for the new mode, reset to default
-    if (!validSortOptions[viewMode].includes(sortBy)) {
+    // Get valid options for current view mode and event status
+    const currentValidOptions = validSortOptions[eventStatus][viewMode]
+    
+    // If current sort option is not valid for the current mode/status, reset to default
+    if (!currentValidOptions.includes(sortBy)) {
       setSortBy(getDefaultSort(viewMode, eventStatus))
     }
-  }, [viewMode, sortBy])
+  }, [viewMode, eventStatus, sortBy, getDefaultSort])
 
   // Helper functions for price range
   const handlePriceChange = (type: 'min' | 'max', value: string) => {
@@ -972,7 +983,7 @@ export default function MarketsPage() {
   // Reset filters when switching between active/closed status
   useEffect(() => {
     resetFiltersForStatusChange()
-  }, [eventStatus, viewMode])
+  }, [eventStatus])
 
   // Reset to page 1 when filters change
   useEffect(() => {
