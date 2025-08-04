@@ -490,7 +490,7 @@ export default function MarketsPage() {
   const [minBestAsk, setMinBestAsk] = useState<string>('')
   const [maxBestAsk, setMaxBestAsk] = useState<string>('')
   const [sortBy, setSortBy] = useState<string>(() => {
-    console.log('[SORT DEBUG] Initializing sortBy to volume24hr')
+    console.log('[SORT DEBUG] Initializing sortBy to volume24hr (for active markets)')
     return 'volume24hr'
   }) // Markets mode default - changed to volume
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
@@ -511,7 +511,7 @@ export default function MarketsPage() {
   // Get default sort option for each view mode and status
   const getDefaultSort = (mode: 'markets' | 'events', status: 'active' | 'closed' = 'active'): string => {
     if (status === 'closed') {
-      return 'volume24hr' // Default to volume for closed events/markets
+      return 'volume' // Default to volume for closed events/markets
     }
     return mode === 'markets' ? 'volume24hr' : 'volume24hr'
   }
@@ -528,8 +528,8 @@ export default function MarketsPage() {
       },
       // Closed events/markets only support limited sort options
       closed: {
-        markets: ['volume24hr', 'endDate'],
-        events: ['volume24hr', 'endDate']
+        markets: ['volume', 'endDate'],
+        events: ['volume', 'endDate']
       }
     }
     
@@ -619,7 +619,7 @@ export default function MarketsPage() {
           const getApiSortParams = (sortBy: string, sortDirection: string) => {
             let order = 'endDate' // Default order
             
-            if (sortBy === 'volume24hr' || sortBy === 'volume1wk' || sortBy === 'liquidity') {
+            if (sortBy === 'volume24hr' || sortBy === 'volume1wk' || sortBy === 'liquidity' || sortBy === 'volume') {
               order = 'volume'
             } else if (sortBy === 'endDate') {
               order = 'endDate'
@@ -1208,7 +1208,7 @@ export default function MarketsPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="volume24hr">Volume</SelectItem>
+                          <SelectItem value="volume">Volume</SelectItem>
                           <SelectItem value="endDate">End Date</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1424,7 +1424,7 @@ export default function MarketsPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="volume24hr">Volume</SelectItem>
+                            <SelectItem value="volume">Volume</SelectItem>
                             <SelectItem value="endDate">End Date</SelectItem>
                           </SelectContent>
                         </Select>
