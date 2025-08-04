@@ -149,8 +149,8 @@ function MarketCard({ market, eventSlug, sortBy, isClosed = false }: { market: M
     if (market.oneHourPriceChange === null || market.oneHourPriceChange === undefined) return null
     
     // old_price = current_price - price_change
-    const parsedPrices = parseOutcomePrices(market.outcomePrices)
-    const currentPrice = parsedPrices[0] ? parseFloat(parsedPrices[0]) : 0
+    const prices = isClosed ? parseOutcomePrices(market.outcomePrices) : market.outcomePrices
+    const currentPrice = prices?.[0] ? parseFloat(prices[0]) : 0
     const oldPrice = currentPrice - market.oneHourPriceChange
     if (oldPrice <= 0) return null
     
@@ -162,8 +162,8 @@ function MarketCard({ market, eventSlug, sortBy, isClosed = false }: { market: M
     if (market.oneDayPriceChange === null || market.oneDayPriceChange === undefined) return null
     
     // old_price = current_price - price_change
-    const parsedPrices = parseOutcomePrices(market.outcomePrices)
-    const currentPrice = parsedPrices[0] ? parseFloat(parsedPrices[0]) : 0
+    const prices = isClosed ? parseOutcomePrices(market.outcomePrices) : market.outcomePrices
+    const currentPrice = prices?.[0] ? parseFloat(prices[0]) : 0
     const oldPrice = currentPrice - market.oneDayPriceChange
     if (oldPrice <= 0) return null
     
@@ -172,29 +172,29 @@ function MarketCard({ market, eventSlug, sortBy, isClosed = false }: { market: M
   }
 
   const get1hPercentageChange = (): number => {
-    const parsedPrices = parseOutcomePrices(market.outcomePrices)
-    if (!parsedPrices || parsedPrices.length === 0) return 0
-    const currentPrice = parseFloat(parsedPrices[0])
+    const prices = isClosed ? parseOutcomePrices(market.outcomePrices) : market.outcomePrices
+    if (!prices || prices.length === 0) return 0
+    const currentPrice = parseFloat(prices[0])
     const priceChange = market.oneHourPriceChange || 0
     return calculatePercentageChange(currentPrice, priceChange)
   }
 
   const get24hPercentageChange = (): number => {
-    const parsedPrices = parseOutcomePrices(market.outcomePrices)
-    if (!parsedPrices || parsedPrices.length === 0) return 0
-    const currentPrice = parseFloat(parsedPrices[0])
+    const prices = isClosed ? parseOutcomePrices(market.outcomePrices) : market.outcomePrices
+    if (!prices || prices.length === 0) return 0
+    const currentPrice = parseFloat(prices[0])
     const priceChange = market.oneDayPriceChange || 0
     return calculatePercentageChange(currentPrice, priceChange)
   }
 
-  // Parse outcome prices (handle both array and JSON string formats)
+  // Parse outcome prices only for closed events (which return JSON strings)
   const parseOutcomePrices = (outcomePrices: string | string[]): string[] => {
     try {
       if (Array.isArray(outcomePrices)) {
         return outcomePrices
       }
       if (typeof outcomePrices === 'string') {
-        // Handle JSON string format like "[\"0\", \"1\"]"
+        // Handle JSON string format like "[\"0\", \"1\"]" for closed events
         const parsed = JSON.parse(outcomePrices)
         if (Array.isArray(parsed)) {
           return parsed
@@ -223,8 +223,9 @@ function MarketCard({ market, eventSlug, sortBy, isClosed = false }: { market: M
       }
     } else {
       // Default: show Yes price
-      const parsedPrices = parseOutcomePrices(market.outcomePrices)
-      const yesPrice = parsedPrices[0] ? parseFloat(parsedPrices[0]) : 0
+      // For closed events, parse JSON string; for active events, use array directly
+      const prices = isClosed ? parseOutcomePrices(market.outcomePrices) : market.outcomePrices
+      const yesPrice = prices?.[0] ? parseFloat(prices[0]) : 0
       return {
         price: formatPrice(yesPrice),
         label: 'Yes (%)'
