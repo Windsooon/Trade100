@@ -14,6 +14,7 @@ import { Event, Market } from '@/lib/stores'
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
 import { BottomNavigation } from '@/components/ui/bottom-navigation'
+import { API_CONFIG } from '@/lib/config'
 import Link from 'next/link'
 
 interface FetchLog {
@@ -513,25 +514,24 @@ export default function MarketsPage() {
     queryKey: ['all-events', searchTerm, eventStatus, viewMode, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, currentPage],
     queryFn: async () => {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUTS.DEFAULT)
       
       try {
         let url: URL
         
         if (eventStatus === 'active') {
           // Use existing endpoint for active events (client-side processing)
-          url = new URL('/api/markets', window.location.origin)
+          url = new URL(API_CONFIG.ENDPOINTS.ACTIVE_MARKETS, API_CONFIG.ACTIVE_EVENTS_BASE_URL || window.location.origin)
           url.searchParams.set('limit', '9999')
           if (searchTerm.trim()) {
             url.searchParams.set('search', searchTerm.trim())
           }
         } else {
           // Use new endpoints for closed events (server-side processing)
-          const baseUrl = 'https://trade-analyze-production.up.railway.app'
           if (viewMode === 'events') {
-            url = new URL('/api/closed_events', baseUrl)
+            url = new URL(API_CONFIG.ENDPOINTS.CLOSED_EVENTS, API_CONFIG.CLOSED_EVENTS_BASE_URL)
           } else {
-            url = new URL('/api/closed_markets', baseUrl)
+            url = new URL(API_CONFIG.ENDPOINTS.CLOSED_MARKETS, API_CONFIG.CLOSED_EVENTS_BASE_URL)
           }
           
           // Add server-side filtering parameters
@@ -567,7 +567,7 @@ export default function MarketsPage() {
       } catch (error) {
         clearTimeout(timeoutId)
         if (error instanceof Error && error.name === 'AbortError') {
-          throw new Error('Request timed out after 30 seconds')
+          throw new Error(`Request timed out after ${API_CONFIG.TIMEOUTS.DEFAULT / 1000} seconds`)
         }
         throw error
       }
