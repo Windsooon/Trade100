@@ -411,6 +411,7 @@ function EventCard({ event, sortBy }: { event: Event; sortBy: string }) {
 
 export default function MarketsPage() {
   const [viewMode, setViewMode] = useState<'markets' | 'events'>('markets')
+  const [eventStatus, setEventStatus] = useState<'active' | 'closed'>('active')
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [selectedTag, setSelectedTag] = useState<string>('all')
   const [minPrice, setMinPrice] = useState<string>('')
@@ -482,7 +483,7 @@ export default function MarketsPage() {
     isError: eventsError,
     error: eventsErrorDetails,
   } = useQuery<EventsResponse>({
-    queryKey: ['all-events', searchTerm],
+    queryKey: ['all-events', searchTerm, eventStatus],
     queryFn: async () => {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000)
@@ -490,6 +491,7 @@ export default function MarketsPage() {
       try {
         const url = new URL('/api/markets', window.location.origin)
         url.searchParams.set('limit', '9999')
+        url.searchParams.set('status', eventStatus)
         if (searchTerm.trim()) {
           url.searchParams.set('search', searchTerm.trim())
         }
@@ -785,7 +787,7 @@ export default function MarketsPage() {
   const endIndex = startIndex + itemsPerPage
   const paginatedData = currentData.slice(startIndex, endIndex)
 
-  const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode) || sortDirection !== 'desc'
+  const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode) || sortDirection !== 'desc' || eventStatus !== 'active'
 
   const clearAllFilters = () => {
     setSearchTerm('')
@@ -796,13 +798,14 @@ export default function MarketsPage() {
     setMaxBestAsk('')
     setSortBy(getDefaultSort(viewMode))
     setSortDirection('desc')
+    setEventStatus('active')
     setCurrentPage(1)
   }
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
+  }, [searchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, eventStatus])
 
   return (
     <div className="min-h-screen bg-background">
