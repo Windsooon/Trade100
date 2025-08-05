@@ -577,7 +577,9 @@ export default function MarketsPage() {
     isError: eventsError,
     error: eventsErrorDetails,
   } = useQuery<EventsResponse>({
-    queryKey: ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, currentPage],
+    queryKey: eventStatus === 'active' 
+      ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag] // Active mode: only essential params that require new data
+      : ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, currentPage], // Closed mode: all params for server-side processing
     queryFn: async () => {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUTS.DEFAULT)
