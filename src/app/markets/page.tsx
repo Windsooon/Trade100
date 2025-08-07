@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, startTransition, flushSync } from 'react'
+import { useState, useEffect, startTransition } from 'react'
+import { flushSync } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
