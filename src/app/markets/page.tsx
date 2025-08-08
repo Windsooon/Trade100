@@ -613,22 +613,21 @@ export default function MarketsPage() {
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUTS.DEFAULT)
       
       try {
-        let url: URL
+        let finalUrl: string
         
         if (eventStatus === 'active') {
           // Use existing endpoint for active events (client-side processing)
-          url = new URL(API_CONFIG.ENDPOINTS.ACTIVE_MARKETS, API_CONFIG.ACTIVE_EVENTS_BASE_URL || window.location.origin)
+          const url = new URL(API_CONFIG.ENDPOINTS.ACTIVE_MARKETS, API_CONFIG.ACTIVE_EVENTS_BASE_URL || window.location.origin)
           url.searchParams.set('limit', '9999')
           if (debouncedSearchTerm.trim()) {
             url.searchParams.set('search', debouncedSearchTerm.trim())
           }
+          finalUrl = url.toString()
         } else {
           // Use new endpoints for closed events (server-side processing)
-          if (viewMode === 'events') {
-            url = new URL(API_CONFIG.ENDPOINTS.CLOSED_EVENTS, API_CONFIG.CLOSED_EVENTS_BASE_URL)
-          } else {
-            url = new URL(API_CONFIG.ENDPOINTS.CLOSED_MARKETS, API_CONFIG.CLOSED_EVENTS_BASE_URL)
-          }
+          const url = viewMode === 'events' 
+            ? new URL(API_CONFIG.ENDPOINTS.CLOSED_EVENTS, API_CONFIG.CLOSED_EVENTS_BASE_URL)
+            : new URL(API_CONFIG.ENDPOINTS.CLOSED_MARKETS, API_CONFIG.CLOSED_EVENTS_BASE_URL)
           
           // Add server-side filtering parameters
           url.searchParams.set('limit', itemsPerPage.toString())
@@ -657,16 +656,20 @@ export default function MarketsPage() {
           if (debouncedSearchTerm.trim()) {
             url.searchParams.set('search', debouncedSearchTerm.trim())
           }
+          
+          // Build final URL string to avoid comma encoding in category parameter
+          finalUrl = url.toString()
           if (selectedTags.length > 0) {
             const tagIds = selectedTags.map(tag => getTagId(tag)).filter(Boolean)
             if (tagIds.length > 0) {
-              url.searchParams.set('category', tagIds.join(','))
+              const separator = finalUrl.includes('?') ? '&' : '?'
+              finalUrl += separator + `category=${tagIds.join(',')}`
             }
           }
           // Note: Price filters are not supported for closed events
         }
         
-        const response = await fetch(url.toString(), {
+        const response = await fetch(finalUrl, {
           signal: controller.signal,
         })
         
