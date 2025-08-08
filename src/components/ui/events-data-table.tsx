@@ -266,7 +266,9 @@ export function EventsDataTable({ data }: EventsDataTableProps) {
       accessorKey: "endDate",
       header: "End Date",
       cell: ({ row }) => {
-        const date = row.getValue("endDate") as string
+        const event = row.original
+        // Use closedTime if available, fallback to closed_time, then endDate
+        const date = event.closedTime || event.closed_time || event.endDate
         return <div>{formatDate(date)}</div>
       },
       enableSorting: false,
