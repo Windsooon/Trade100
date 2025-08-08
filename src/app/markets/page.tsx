@@ -489,7 +489,8 @@ export default function MarketsPage() {
   const [eventStatus, setEventStatus] = useState<'active' | 'closed'>('active')
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('')
-  const [selectedTag, setSelectedTag] = useState<string>('all')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [minVolume, setMinVolume] = useState<string>('100') // Default to >$100
   const [minPrice, setMinPrice] = useState<string>('')
   const [maxPrice, setMaxPrice] = useState<string>('')
   const [minBestAsk, setMinBestAsk] = useState<string>('')
@@ -594,8 +595,8 @@ export default function MarketsPage() {
 
   // Fetch events data
   const queryKey = eventStatus === 'active' 
-    ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag] // Active mode: only essential params that require new data
-    : ['all-events', eventStatus, viewMode, debouncedSearchTerm, selectedTag, sortBy, sortDirection, currentPage] // Closed mode: stable order, excluding price filters since they're not supported
+    ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTags] // Active mode: only essential params that require new data
+    : ['all-events', eventStatus, viewMode, debouncedSearchTerm, selectedTags, sortBy, sortDirection, currentPage] // Closed mode: stable order, excluding price filters since they're not supported
   
   console.log('🔑 Query key:', JSON.stringify(queryKey), 'enabled:', !isResettingForStatusChange && !isResettingRef.current, 'isResettingForStatusChange:', isResettingForStatusChange, 'isResettingRef:', isResettingRef.current)
   
@@ -612,22 +613,21 @@ export default function MarketsPage() {
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUTS.DEFAULT)
       
       try {
-        let url: URL
+        let finalUrl: string
         
         if (eventStatus === 'active') {
           // Use existing endpoint for active events (client-side processing)
-          url = new URL(API_CONFIG.ENDPOINTS.ACTIVE_MARKETS, API_CONFIG.ACTIVE_EVENTS_BASE_URL || window.location.origin)
+          const url = new URL(API_CONFIG.ENDPOINTS.ACTIVE_MARKETS, API_CONFIG.ACTIVE_EVENTS_BASE_URL || window.location.origin)
           url.searchParams.set('limit', '9999')
           if (debouncedSearchTerm.trim()) {
             url.searchParams.set('search', debouncedSearchTerm.trim())
           }
+          finalUrl = url.toString()
         } else {
           // Use new endpoints for closed events (server-side processing)
-          if (viewMode === 'events') {
-            url = new URL(API_CONFIG.ENDPOINTS.CLOSED_EVENTS, API_CONFIG.CLOSED_EVENTS_BASE_URL)
-          } else {
-            url = new URL(API_CONFIG.ENDPOINTS.CLOSED_MARKETS, API_CONFIG.CLOSED_EVENTS_BASE_URL)
-          }
+          const url = viewMode === 'events' 
+            ? new URL(API_CONFIG.ENDPOINTS.CLOSED_EVENTS, API_CONFIG.CLOSED_EVENTS_BASE_URL)
+            : new URL(API_CONFIG.ENDPOINTS.CLOSED_MARKETS, API_CONFIG.CLOSED_EVENTS_BASE_URL)
           
           // Add server-side filtering parameters
           url.searchParams.set('limit', itemsPerPage.toString())
@@ -656,16 +656,20 @@ export default function MarketsPage() {
           if (debouncedSearchTerm.trim()) {
             url.searchParams.set('search', debouncedSearchTerm.trim())
           }
-          if (selectedTag !== 'all') {
-            const tagId = getTagId(selectedTag)
-            if (tagId) {
-              url.searchParams.set('category', tagId)
+          
+          // Build final URL string to avoid comma encoding in category parameter
+          finalUrl = url.toString()
+          if (selectedTags.length > 0) {
+            const tagIds = selectedTags.map(tag => getTagId(tag)).filter(Boolean)
+            if (tagIds.length > 0) {
+              const separator = finalUrl.includes('?') ? '&' : '?'
+              finalUrl += separator + `category=${tagIds.join(',')}`
             }
           }
           // Note: Price filters are not supported for closed events
         }
         
-        const response = await fetch(url.toString(), {
+        const response = await fetch(finalUrl, {
           signal: controller.signal,
         })
         
@@ -730,11 +734,13 @@ export default function MarketsPage() {
         )
         if (activeMarkets.length === 0) return false
 
-        // Tag filter
-        if (selectedTag !== 'all') {
+        // Tag filter - show events that have ANY of the selected tags
+        if (selectedTags.length > 0) {
           const eventTagLabels = event.tags.map(tag => tag.label)
-          const hasMatchingTag = eventTagLabels.some(eventTag => 
-            eventTag.toLowerCase().includes(selectedTag.toLowerCase())
+          const hasMatchingTag = selectedTags.some(selectedTag =>
+            eventTagLabels.some(eventTag => 
+              eventTag.toLowerCase().includes(selectedTag.toLowerCase())
+            )
           )
           if (!hasMatchingTag) return false
         }
@@ -781,6 +787,13 @@ export default function MarketsPage() {
             return yesPrice >= minBestAskNum && yesPrice <= maxBestAskNum
           })
           if (!hasMatchingMarket) return false
+        }
+
+        // Volume filter - check if event meets minimum volume requirement
+        if (minVolume && minVolume !== '0') {
+          const minVolumeNum = parseFloat(minVolume)
+          const eventVolume = activeMarkets.reduce((sum, market) => sum + (market.volume24hr || 0), 0)
+          if (eventVolume < minVolumeNum) return false
         }
 
         return true
@@ -846,14 +859,15 @@ export default function MarketsPage() {
         )
         if (activeMarkets.length === 0) return false
 
-        // Tag filter
-        if (selectedTag !== 'all') {
+        // Tag filter - show events that have ANY of the selected tags
+        if (selectedTags.length > 0) {
           const eventTagLabels = event.tags.map(tag => tag.label)
-          if (!eventTagLabels.some(label => 
-            label.toLowerCase() === selectedTag.toLowerCase()
-          )) {
-            return false
-          }
+          const hasMatchingTag = selectedTags.some(selectedTag =>
+            eventTagLabels.some(eventTag => 
+              eventTag.toLowerCase().includes(selectedTag.toLowerCase())
+            )
+          )
+          if (!hasMatchingTag) return false
         }
 
         return true
@@ -886,6 +900,14 @@ export default function MarketsPage() {
           const bestAsk = market.bestAsk ? parseFloat(market.bestAsk) : 0
           if (bestAsk < minAskNum || bestAsk > maxAskNum) {
             return false
+          }
+
+          // Volume filter - check if market meets minimum volume requirement
+          if (minVolume && minVolume !== '0') {
+            const minVolumeNum = parseFloat(minVolume)
+            // Use volume24hr for active markets, volume for closed markets
+            const marketVolume = market.volume24hr || market.volume || 0
+            if (marketVolume < minVolumeNum) return false
           }
 
           return true
@@ -981,11 +1003,12 @@ export default function MarketsPage() {
     ? currentData // Already paginated by server
     : currentData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
-  const hasActiveFilters = searchTerm !== '' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode, eventStatus) || sortDirection !== 'desc'
+  const hasActiveFilters = searchTerm !== '' || selectedTags.length > 0 || minVolume !== '100' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode, eventStatus) || sortDirection !== 'desc'
 
   const clearAllFilters = () => {
     setSearchTerm('')
-    setSelectedTag('all')
+    setSelectedTags([])
+    setMinVolume('100')
     setMinPrice('')
     setMaxPrice('')
     setMinBestAsk('')
@@ -1001,7 +1024,8 @@ export default function MarketsPage() {
     console.log('🧹 resetFiltersForStatusChange called for eventStatus:', eventStatus, 'viewMode:', viewMode)
     console.log('🧹 Current sortBy before reset:', sortBy)
     setSearchTerm('')
-    setSelectedTag('all')
+    setSelectedTags([])
+    setMinVolume('100')
     setMinPrice('')
     setMaxPrice('')
     setMinBestAsk('')
@@ -1033,7 +1057,8 @@ export default function MarketsPage() {
       
       // Then update all other states in the same batch
       setSearchTerm('')
-      setSelectedTag('all')
+      setSelectedTags([])
+      setMinVolume('100')
       setMinPrice('')
       setMaxPrice('')
       setMinBestAsk('')
@@ -1062,7 +1087,7 @@ export default function MarketsPage() {
     }
     console.log('📄 Resetting currentPage to 1 due to filter changes')
     setCurrentPage(1)
-  }, [debouncedSearchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
+  }, [debouncedSearchTerm, selectedTags, minVolume, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
 
   return (
     <div className="min-h-screen bg-background">
@@ -1080,9 +1105,9 @@ export default function MarketsPage() {
         <div className="container mx-auto px-4 max-w-[1200px]">
           <div className="flex items-center gap-6 py-3 overflow-x-auto scrollbar-hide">
             <Button
-              variant={selectedTag === 'all' ? 'default' : 'ghost'}
+              variant={selectedTags.length === 0 ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setSelectedTag('all')}
+              onClick={() => setSelectedTags([])}
               className="whitespace-nowrap"
             >
               All
@@ -1090,9 +1115,15 @@ export default function MarketsPage() {
             {PREDEFINED_TAGS.map((tag) => (
               <Button
                 key={tag}
-                variant={selectedTag === tag ? 'default' : 'ghost'}
+                variant={selectedTags.includes(tag) ? 'default' : 'ghost'}
                 size="sm"
-                onClick={() => setSelectedTag(tag)}
+                onClick={() => {
+                  setSelectedTags(prev => 
+                    prev.includes(tag) 
+                      ? prev.filter(t => t !== tag)
+                      : [...prev, tag]
+                  )
+                }}
                 className="whitespace-nowrap"
               >
                 {tag}
@@ -1144,6 +1175,8 @@ export default function MarketsPage() {
                   <span className="text-sm font-medium">Active:</span>
 
                   {searchTerm && <Badge variant="secondary">Search: "{searchTerm}"</Badge>}
+                  {selectedTags.length > 0 && <Badge variant="secondary">Tags: {selectedTags.join(', ')}</Badge>}
+                  {minVolume !== '100' && <Badge variant="secondary">Min Volume: ${minVolume === '1000' ? '1K' : minVolume === '1000000' ? '1M' : minVolume}</Badge>}
                   {(minPrice || maxPrice) && <Badge variant="secondary">Price: {minPrice || '0'}-{maxPrice || '1'}</Badge>}
                   {(minBestAsk || maxBestAsk) && <Badge variant="secondary">Ask: {minBestAsk || '0'}-{maxBestAsk || '1'}</Badge>}
                   {(sortBy !== getDefaultSort(viewMode) || sortDirection !== 'desc') && <Badge variant="secondary">Sort: {sortBy} ({sortDirection})</Badge>}
@@ -1254,6 +1287,23 @@ export default function MarketsPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Advanced Filters Group */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">ADVANCED FILTERS</h3>
+                  <div className="space-y-2">
+                    <Select value={minVolume} onValueChange={setMinVolume}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Minimum Volume" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="100">Above $100</SelectItem>
+                        <SelectItem value="1000">Above $1K</SelectItem>
+                        <SelectItem value="1000000">Above $1M</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
                 {/* Sort Options Group */}
                 <div className="space-y-3">
@@ -1464,6 +1514,23 @@ export default function MarketsPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Advanced Filters */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground">ADVANCED FILTERS</h3>
+                    <div className="space-y-2">
+                      <Select value={minVolume} onValueChange={setMinVolume}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Minimum Volume" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="100">Above $100</SelectItem>
+                          <SelectItem value="1000">Above $1K</SelectItem>
+                          <SelectItem value="1000000">Above $1M</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
                   {/* Sort */}
                   <div className="space-y-2">
