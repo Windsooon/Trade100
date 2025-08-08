@@ -498,6 +498,7 @@ export default function MarketsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<number>(1)
+  const [isResettingForStatusChange, setIsResettingForStatusChange] = useState(false)
 
   const itemsPerPage = 20
 
@@ -998,14 +999,22 @@ export default function MarketsPage() {
   // Reset filters when switching between active/closed status
   useEffect(() => {
     console.log('🔄 eventStatus changed to:', eventStatus)
+    setIsResettingForStatusChange(true)
     resetFiltersForStatusChange()
+    // Reset flag after state updates complete
+    setTimeout(() => setIsResettingForStatusChange(false), 0)
   }, [eventStatus])
 
   // Reset to page 1 when filters change
   useEffect(() => {
+    // Skip if we're currently resetting due to status change
+    if (isResettingForStatusChange) {
+      console.log('📄 Skipping currentPage reset - status change in progress')
+      return
+    }
     console.log('📄 Resetting currentPage to 1 due to filter changes')
     setCurrentPage(1)
-  }, [debouncedSearchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
+  }, [debouncedSearchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, isResettingForStatusChange])
 
   return (
     <div className="min-h-screen bg-background">
