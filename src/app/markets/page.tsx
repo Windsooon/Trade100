@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, startTransition, flushSync } from 'react'
+import { useState, useEffect, startTransition, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -499,6 +499,7 @@ export default function MarketsPage() {
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [isResettingForStatusChange, setIsResettingForStatusChange] = useState(false)
+  const isResettingRef = useRef(false)
   
   // Debug: Log when isResettingForStatusChange changes
   useEffect(() => {
@@ -596,7 +597,7 @@ export default function MarketsPage() {
     ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag] // Active mode: only essential params that require new data
     : ['all-events', eventStatus, viewMode, debouncedSearchTerm, selectedTag, sortBy, sortDirection, currentPage] // Closed mode: stable order, excluding price filters since they're not supported
   
-  console.log('🔑 Query key:', JSON.stringify(queryKey), 'enabled:', !isResettingForStatusChange, 'isResettingForStatusChange:', isResettingForStatusChange)
+  console.log('🔑 Query key:', JSON.stringify(queryKey), 'enabled:', !isResettingForStatusChange && !isResettingRef.current, 'isResettingForStatusChange:', isResettingForStatusChange, 'isResettingRef:', isResettingRef.current)
   
   const {
     data: allEventsData,
@@ -606,7 +607,7 @@ export default function MarketsPage() {
   } = useQuery<EventsResponse>({
     queryKey: queryKey,
     queryFn: async () => {
-      console.log('🌐 API Request STARTED for eventStatus:', eventStatus, 'sortBy:', sortBy, 'viewMode:', viewMode, 'isResettingForStatusChange:', isResettingForStatusChange)
+      console.log('🌐 API Request STARTED for eventStatus:', eventStatus, 'sortBy:', sortBy, 'viewMode:', viewMode, 'isResettingForStatusChange:', isResettingForStatusChange, 'isResettingRef:', isResettingRef.current)
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUTS.DEFAULT)
       
@@ -688,7 +689,7 @@ export default function MarketsPage() {
     retry: 1,
     staleTime: 30 * 1000,
     gcTime: 60 * 1000,
-    enabled: !isResettingForStatusChange,
+    enabled: !isResettingForStatusChange && !isResettingRef.current,
   })
 
   // Process markets from events for Markets view mode
@@ -1020,41 +1021,48 @@ export default function MarketsPage() {
   useEffect(() => {
     console.log('🔄 eventStatus changed to:', eventStatus)
     
-    // First, synchronously set the flag to disable React Query
-    flushSync(() => {
-      console.log('🔄 Setting isResettingForStatusChange to TRUE (sync)')
+    // Set ref immediately to prevent React Query from running
+    isResettingRef.current = true
+    
+    // Use startTransition to batch all state updates together
+    startTransition(() => {
+      console.log('🔄 Setting isResettingForStatusChange to TRUE and resetting all filter states')
+      
+      // Set the flag first
       setIsResettingForStatusChange(true)
+      
+      // Then update all other states in the same batch
+      setSearchTerm('')
+      setSelectedTag('all')
+      setMinPrice('')
+      setMaxPrice('')
+      setMinBestAsk('')
+      setMaxBestAsk('')
+      setSortBy(getDefaultSort(viewMode, eventStatus))
+      setSortDirection('desc')
+      setCurrentPage(1)
     })
     
-    // Then update all other states
-    console.log('🔄 Resetting all filter states')
-    setSearchTerm('')
-    setSelectedTag('all')
-    setMinPrice('')
-    setMaxPrice('')
-    setMinBestAsk('')
-    setMaxBestAsk('')
-    setSortBy(getDefaultSort(viewMode, eventStatus))
-    setSortDirection('desc')
-    setCurrentPage(1)
-    
-    // Reset flag after all updates complete
-    setTimeout(() => {
+    // Reset flags after React has processed all updates
+    const timer = setTimeout(() => {
       console.log('🔄 Setting isResettingForStatusChange to FALSE')
+      isResettingRef.current = false
       setIsResettingForStatusChange(false)
     }, 0)
+    
+    return () => clearTimeout(timer)
   }, [eventStatus])
 
   // Reset to page 1 when filters change
   useEffect(() => {
     // Skip if we're currently resetting due to status change
-    if (isResettingForStatusChange) {
+    if (isResettingForStatusChange || isResettingRef.current) {
       console.log('📄 Skipping currentPage reset - status change in progress')
       return
     }
     console.log('📄 Resetting currentPage to 1 due to filter changes')
     setCurrentPage(1)
-  }, [debouncedSearchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, isResettingForStatusChange])
+  }, [debouncedSearchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
 
   return (
     <div className="min-h-screen bg-background">
