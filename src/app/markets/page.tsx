@@ -581,7 +581,7 @@ export default function MarketsPage() {
     ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag] // Active mode: only essential params that require new data
     : ['all-events', eventStatus, viewMode, debouncedSearchTerm, selectedTag, sortBy, sortDirection, currentPage] // Closed mode: stable order, excluding price filters since they're not supported
   
-  console.log('🔑 Query key:', JSON.stringify(queryKey))
+  console.log('🔑 Query key:', JSON.stringify(queryKey), 'enabled:', !isResettingForStatusChange)
   
   const {
     data: allEventsData,
@@ -673,6 +673,7 @@ export default function MarketsPage() {
     retry: 1,
     staleTime: 30 * 1000,
     gcTime: 60 * 1000,
+    enabled: !isResettingForStatusChange,
   })
 
   // Process markets from events for Markets view mode
