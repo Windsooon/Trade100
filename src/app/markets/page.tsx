@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, startTransition } from 'react'
+import { useState, useEffect, startTransition, flushSync } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -1016,13 +1016,29 @@ export default function MarketsPage() {
     // Note: viewMode and eventStatus are preserved
   }
 
-  // Reset filters when switching between active/closed status
+  // Reset filters when switching between active/closed status  
   useEffect(() => {
     console.log('🔄 eventStatus changed to:', eventStatus)
-    console.log('🔄 Setting isResettingForStatusChange to TRUE')
-    setIsResettingForStatusChange(true)
-    resetFiltersForStatusChange()
-    // Reset flag after state updates complete
+    
+    // First, synchronously set the flag to disable React Query
+    flushSync(() => {
+      console.log('🔄 Setting isResettingForStatusChange to TRUE (sync)')
+      setIsResettingForStatusChange(true)
+    })
+    
+    // Then update all other states
+    console.log('🔄 Resetting all filter states')
+    setSearchTerm('')
+    setSelectedTag('all')
+    setMinPrice('')
+    setMaxPrice('')
+    setMinBestAsk('')
+    setMaxBestAsk('')
+    setSortBy(getDefaultSort(viewMode, eventStatus))
+    setSortDirection('desc')
+    setCurrentPage(1)
+    
+    // Reset flag after all updates complete
     setTimeout(() => {
       console.log('🔄 Setting isResettingForStatusChange to FALSE')
       setIsResettingForStatusChange(false)
