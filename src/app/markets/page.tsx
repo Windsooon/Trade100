@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, startTransition, flushSync } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -293,7 +293,7 @@ function MarketCard({ market, eventSlug, sortBy, isClosed = false }: { market: M
           )}
           <div className="w-24 text-right">
             <div className="text-xs text-muted-foreground mb-1">{isClosed ? 'Volume' : '24h Volume'}</div>
-            <div className="font-medium">{formatVolume(isClosed ? (market.volume || market.volume24hr) : market.volume24hr || null)}</div>
+            <div className="font-medium">{formatVolume(isClosed ? (market.volume || market.volume24hr || null) : (market.volume24hr || null))}</div>
           </div>
         </div>
 
@@ -428,10 +428,15 @@ function EventCard({ event, sortBy, isClosed = false }: { event: Event; sortBy: 
                       <div className="font-medium">{formatVolume(displayVolume)}</div>
                     </div>
 
-                    {!isClosed && (
+                    {!isClosed ? (
                       <div className="text-center">
                         <div className="text-xs text-muted-foreground mb-1">Ends</div>
                         <div className="font-medium">{formatDate(event.endDate)}</div>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground mb-1">Closed</div>
+                        <div className="font-medium">{formatDate(event.closedTime || event.closed_time || event.endDate)}</div>
                       </div>
                     )}
                   </div>
@@ -493,6 +498,22 @@ export default function MarketsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<number>(1)
+  const [isResettingForStatusChange, setIsResettingForStatusChange] = useState(false)
+  
+  // Debug: Log when isResettingForStatusChange changes
+  useEffect(() => {
+    console.log('🚩 isResettingForStatusChange changed to:', isResettingForStatusChange)
+  }, [isResettingForStatusChange])
+  
+  // Debug: Log when sortBy changes
+  useEffect(() => {
+    console.log('🎯 sortBy changed to:', sortBy)
+  }, [sortBy])
+  
+  // Debug: Log when eventStatus changes
+  useEffect(() => {
+    console.log('📋 eventStatus state changed to:', eventStatus)
+  }, [eventStatus])
 
   const itemsPerPage = 20
 
@@ -571,16 +592,21 @@ export default function MarketsPage() {
   }
 
   // Fetch events data
+  const queryKey = eventStatus === 'active' 
+    ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag] // Active mode: only essential params that require new data
+    : ['all-events', eventStatus, viewMode, debouncedSearchTerm, selectedTag, sortBy, sortDirection, currentPage] // Closed mode: stable order, excluding price filters since they're not supported
+  
+  console.log('🔑 Query key:', JSON.stringify(queryKey), 'enabled:', !isResettingForStatusChange, 'isResettingForStatusChange:', isResettingForStatusChange)
+  
   const {
     data: allEventsData,
     isLoading: eventsLoading,
     isError: eventsError,
     error: eventsErrorDetails,
   } = useQuery<EventsResponse>({
-    queryKey: eventStatus === 'active' 
-      ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag] // Active mode: only essential params that require new data
-      : ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, currentPage], // Closed mode: all params for server-side processing
+    queryKey: queryKey,
     queryFn: async () => {
+      console.log('🌐 API Request STARTED for eventStatus:', eventStatus, 'sortBy:', sortBy, 'viewMode:', viewMode, 'isResettingForStatusChange:', isResettingForStatusChange)
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUTS.DEFAULT)
       
@@ -608,12 +634,12 @@ export default function MarketsPage() {
           
           // Map frontend sort options to API sort parameters
           const getApiSortParams = (sortBy: string, sortDirection: string) => {
-            let order = 'endDate' // Default order
+            let order = 'closed_time' // Default order for closed events
             
             if (sortBy === 'volume24hr' || sortBy === 'volume1wk' || sortBy === 'liquidity' || sortBy === 'volume') {
               order = 'volume'
             } else if (sortBy === 'endDate') {
-              order = 'endDate'
+              order = 'closed_time'
             }
             
             return {
@@ -662,6 +688,7 @@ export default function MarketsPage() {
     retry: 1,
     staleTime: 30 * 1000,
     gcTime: 60 * 1000,
+    enabled: !isResettingForStatusChange,
   })
 
   // Process markets from events for Markets view mode
@@ -796,8 +823,8 @@ export default function MarketsPage() {
             comparison = a.title.localeCompare(b.title)
             break
           case 'endDate':
-              const aEndDate = a.endDate || '2099-12-31'
-              const bEndDate = b.endDate || '2099-12-31'
+              const aEndDate = a.closedTime || a.closed_time || a.endDate || '2099-12-31'
+              const bEndDate = b.closedTime || b.closed_time || b.endDate || '2099-12-31'
               comparison = new Date(aEndDate).getTime() - new Date(bEndDate).getTime()
             break
           default:
@@ -970,6 +997,37 @@ export default function MarketsPage() {
 
   // Reset filters when switching between active/closed status
   const resetFiltersForStatusChange = () => {
+    console.log('🧹 resetFiltersForStatusChange called for eventStatus:', eventStatus, 'viewMode:', viewMode)
+    console.log('🧹 Current sortBy before reset:', sortBy)
+    setSearchTerm('')
+    setSelectedTag('all')
+    setMinPrice('')
+    setMaxPrice('')
+    setMinBestAsk('')
+    setMaxBestAsk('')
+    const newSort = getDefaultSort(viewMode, eventStatus)
+    console.log('📊 Setting sortBy from', sortBy, 'to:', newSort)
+    setSortBy(newSort)
+    console.log('📊 Setting sortDirection to: desc')
+    setSortDirection('desc')
+    console.log('📊 Setting currentPage to: 1')
+    setCurrentPage(1)
+    console.log('🧹 resetFiltersForStatusChange completed')
+    // Note: viewMode and eventStatus are preserved
+  }
+
+  // Reset filters when switching between active/closed status  
+  useEffect(() => {
+    console.log('🔄 eventStatus changed to:', eventStatus)
+    
+    // First, synchronously set the flag to disable React Query
+    flushSync(() => {
+      console.log('🔄 Setting isResettingForStatusChange to TRUE (sync)')
+      setIsResettingForStatusChange(true)
+    })
+    
+    // Then update all other states
+    console.log('🔄 Resetting all filter states')
     setSearchTerm('')
     setSelectedTag('all')
     setMinPrice('')
@@ -979,18 +1037,24 @@ export default function MarketsPage() {
     setSortBy(getDefaultSort(viewMode, eventStatus))
     setSortDirection('desc')
     setCurrentPage(1)
-    // Note: viewMode and eventStatus are preserved
-  }
-
-  // Reset filters when switching between active/closed status
-  useEffect(() => {
-    resetFiltersForStatusChange()
+    
+    // Reset flag after all updates complete
+    setTimeout(() => {
+      console.log('🔄 Setting isResettingForStatusChange to FALSE')
+      setIsResettingForStatusChange(false)
+    }, 0)
   }, [eventStatus])
 
   // Reset to page 1 when filters change
   useEffect(() => {
+    // Skip if we're currently resetting due to status change
+    if (isResettingForStatusChange) {
+      console.log('📄 Skipping currentPage reset - status change in progress')
+      return
+    }
+    console.log('📄 Resetting currentPage to 1 due to filter changes')
     setCurrentPage(1)
-  }, [debouncedSearchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
+  }, [debouncedSearchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, isResettingForStatusChange])
 
   return (
     <div className="min-h-screen bg-background">
@@ -1194,7 +1258,7 @@ export default function MarketsPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="volume">Volume</SelectItem>
-                          <SelectItem value="endDate">End Date</SelectItem>
+                          <SelectItem value="endDate">Closed Time</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button
@@ -1268,7 +1332,7 @@ export default function MarketsPage() {
                 ) : (
                   <>
                     Showing {startIndex + 1}-{Math.min(endIndex, total)} of {total} {eventStatus} events
-                    {allEventsData && ` (${allEventsData.events.length} total)`}
+                    {allEventsData?.events && ` (${allEventsData.events.length} total)`}
                   </>
                 )}
               </div>
@@ -1404,7 +1468,7 @@ export default function MarketsPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="volume">Volume</SelectItem>
-                            <SelectItem value="endDate">End Date</SelectItem>
+                            <SelectItem value="endDate">Closed Time</SelectItem>
                           </SelectContent>
                         </Select>
                         <Button

@@ -8,6 +8,8 @@ export interface Event {
   slug: string
   startDate: string
   endDate: string
+  closedTime?: string
+  closed_time?: string
   volume?: number
   volume24hr?: number
   volume1wk?: number
