@@ -128,6 +128,12 @@ function MarketCard({ market, eventSlug, sortBy, isClosed = false }: { market: M
       const diffInMs = date.getTime() - now.getTime()
       const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24))
       
+      // For past dates (closed events), always show the actual date
+      if (diffInMs < 0) {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      }
+      
+      // For future dates (active events)
       if (diffInDays < 1) return 'Today'
       if (diffInDays === 1) return '1 day'
       if (diffInDays < 7) return `${diffInDays} days`
@@ -341,6 +347,12 @@ function EventCard({ event, sortBy, isClosed = false }: { event: Event; sortBy: 
       const diffInMs = date.getTime() - now.getTime()
       const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24))
       
+      // For past dates (closed events), always show the actual date
+      if (diffInMs < 0) {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      }
+      
+      // For future dates (active events)
       if (diffInDays < 1) return 'Today'
       if (diffInDays === 1) return '1 day'
       if (diffInDays < 7) return `${diffInDays} days`
