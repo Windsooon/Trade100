@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, startTransition } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -584,7 +584,7 @@ export default function MarketsPage() {
   } = useQuery<EventsResponse>({
     queryKey: eventStatus === 'active' 
       ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag] // Active mode: only essential params that require new data
-      : ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, currentPage], // Closed mode: all params for server-side processing
+      : ['all-events', eventStatus, viewMode, debouncedSearchTerm, selectedTag, sortBy, sortDirection, currentPage], // Closed mode: stable order, excluding price filters since they're not supported
     queryFn: async () => {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUTS.DEFAULT)
@@ -989,7 +989,9 @@ export default function MarketsPage() {
 
   // Reset filters when switching between active/closed status
   useEffect(() => {
-    resetFiltersForStatusChange()
+    startTransition(() => {
+      resetFiltersForStatusChange()
+    })
   }, [eventStatus])
 
   // Reset to page 1 when filters change
