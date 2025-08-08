@@ -1126,6 +1126,10 @@ export default function MarketsPage() {
                 {tag}
               </Button>
             ))}
+            {/* Multiple Select Indicator */}
+            <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+              multi-select
+            </span>
           </div>
         </div>
       </div>
@@ -1285,22 +1289,24 @@ export default function MarketsPage() {
                   </div>
                 )}
 
-                {/* Advanced Filters Group */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-muted-foreground">ADVANCED FILTERS</h3>
-                  <div className="space-y-2">
-                    <Select value={minVolume} onValueChange={setMinVolume}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Minimum Volume" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="100">Above $100</SelectItem>
-                        <SelectItem value="1000">Above $1K</SelectItem>
-                        <SelectItem value="1000000">Above $1M</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {/* Advanced Filters Group - Only show for active events */}
+                {eventStatus === 'active' && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground">ADVANCED FILTERS</h3>
+                    <div className="space-y-2">
+                      <Select value={minVolume} onValueChange={setMinVolume}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Minimum Volume" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="100">Above $100</SelectItem>
+                          <SelectItem value="1000">Above $1K</SelectItem>
+                          <SelectItem value="1000000">Above $1M</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Sort Options Group */}
                 <div className="space-y-3">
@@ -1512,22 +1518,24 @@ export default function MarketsPage() {
                     </div>
                   )}
 
-                  {/* Advanced Filters */}
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-muted-foreground">ADVANCED FILTERS</h3>
+                  {/* Advanced Filters - Only show for active events */}
+                  {eventStatus === 'active' && (
                     <div className="space-y-2">
-                      <Select value={minVolume} onValueChange={setMinVolume}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Minimum Volume" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="100">Above $100</SelectItem>
-                          <SelectItem value="1000">Above $1K</SelectItem>
-                          <SelectItem value="1000000">Above $1M</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <h3 className="text-sm font-semibold text-muted-foreground">ADVANCED FILTERS</h3>
+                      <div className="space-y-2">
+                        <Select value={minVolume} onValueChange={setMinVolume}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Minimum Volume" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="100">Above $100</SelectItem>
+                            <SelectItem value="1000">Above $1K</SelectItem>
+                            <SelectItem value="1000000">Above $1M</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Sort */}
                   <div className="space-y-2">
