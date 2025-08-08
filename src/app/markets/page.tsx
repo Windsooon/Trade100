@@ -293,7 +293,7 @@ function MarketCard({ market, eventSlug, sortBy, isClosed = false }: { market: M
           )}
           <div className="w-24 text-right">
             <div className="text-xs text-muted-foreground mb-1">{isClosed ? 'Volume' : '24h Volume'}</div>
-            <div className="font-medium">{formatVolume(isClosed ? (market.volume || market.volume24hr) : market.volume24hr || null)}</div>
+            <div className="font-medium">{formatVolume(isClosed ? (market.volume || market.volume24hr || null) : (market.volume24hr || null))}</div>
           </div>
         </div>
 
@@ -428,10 +428,15 @@ function EventCard({ event, sortBy, isClosed = false }: { event: Event; sortBy: 
                       <div className="font-medium">{formatVolume(displayVolume)}</div>
                     </div>
 
-                    {!isClosed && (
+                    {!isClosed ? (
                       <div className="text-center">
                         <div className="text-xs text-muted-foreground mb-1">Ends</div>
                         <div className="font-medium">{formatDate(event.endDate)}</div>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground mb-1">Closed</div>
+                        <div className="font-medium">{formatDate(event.closedTime || event.closed_time || event.endDate)}</div>
                       </div>
                     )}
                   </div>
@@ -608,12 +613,12 @@ export default function MarketsPage() {
           
           // Map frontend sort options to API sort parameters
           const getApiSortParams = (sortBy: string, sortDirection: string) => {
-            let order = 'endDate' // Default order
+            let order = 'closed_time' // Default order for closed events
             
             if (sortBy === 'volume24hr' || sortBy === 'volume1wk' || sortBy === 'liquidity' || sortBy === 'volume') {
               order = 'volume'
             } else if (sortBy === 'endDate') {
-              order = 'endDate'
+              order = 'closed_time'
             }
             
             return {
@@ -796,8 +801,8 @@ export default function MarketsPage() {
             comparison = a.title.localeCompare(b.title)
             break
           case 'endDate':
-              const aEndDate = a.endDate || '2099-12-31'
-              const bEndDate = b.endDate || '2099-12-31'
+              const aEndDate = a.closedTime || a.closed_time || a.endDate || '2099-12-31'
+              const bEndDate = b.closedTime || b.closed_time || b.endDate || '2099-12-31'
               comparison = new Date(aEndDate).getTime() - new Date(bEndDate).getTime()
             break
           default:
@@ -1194,7 +1199,7 @@ export default function MarketsPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="volume">Volume</SelectItem>
-                          <SelectItem value="endDate">End Date</SelectItem>
+                          <SelectItem value="endDate">Closed Time</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button
@@ -1268,7 +1273,7 @@ export default function MarketsPage() {
                 ) : (
                   <>
                     Showing {startIndex + 1}-{Math.min(endIndex, total)} of {total} {eventStatus} events
-                    {allEventsData && ` (${allEventsData.events.length} total)`}
+                    {allEventsData?.events && ` (${allEventsData.events.length} total)`}
                   </>
                 )}
               </div>
@@ -1404,7 +1409,7 @@ export default function MarketsPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="volume">Volume</SelectItem>
-                            <SelectItem value="endDate">End Date</SelectItem>
+                            <SelectItem value="endDate">Closed Time</SelectItem>
                           </SelectContent>
                         </Select>
                         <Button
