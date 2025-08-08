@@ -576,16 +576,21 @@ export default function MarketsPage() {
   }
 
   // Fetch events data
+  const queryKey = eventStatus === 'active' 
+    ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag] // Active mode: only essential params that require new data
+    : ['all-events', eventStatus, viewMode, debouncedSearchTerm, selectedTag, sortBy, sortDirection, currentPage] // Closed mode: stable order, excluding price filters since they're not supported
+  
+  console.log('🔑 Query key:', JSON.stringify(queryKey))
+  
   const {
     data: allEventsData,
     isLoading: eventsLoading,
     isError: eventsError,
     error: eventsErrorDetails,
   } = useQuery<EventsResponse>({
-    queryKey: eventStatus === 'active' 
-      ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTag] // Active mode: only essential params that require new data
-      : ['all-events', eventStatus, viewMode, debouncedSearchTerm, selectedTag, sortBy, sortDirection, currentPage], // Closed mode: stable order, excluding price filters since they're not supported
+    queryKey: queryKey,
     queryFn: async () => {
+      console.log('🌐 API Request triggered for eventStatus:', eventStatus, 'sortBy:', sortBy, 'viewMode:', viewMode)
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUTS.DEFAULT)
       
@@ -975,13 +980,16 @@ export default function MarketsPage() {
 
   // Reset filters when switching between active/closed status
   const resetFiltersForStatusChange = () => {
+    console.log('🧹 resetFiltersForStatusChange called for eventStatus:', eventStatus, 'viewMode:', viewMode)
     setSearchTerm('')
     setSelectedTag('all')
     setMinPrice('')
     setMaxPrice('')
     setMinBestAsk('')
     setMaxBestAsk('')
-    setSortBy(getDefaultSort(viewMode, eventStatus))
+    const newSort = getDefaultSort(viewMode, eventStatus)
+    console.log('📊 Setting sortBy to:', newSort)
+    setSortBy(newSort)
     setSortDirection('desc')
     setCurrentPage(1)
     // Note: viewMode and eventStatus are preserved
@@ -989,13 +997,13 @@ export default function MarketsPage() {
 
   // Reset filters when switching between active/closed status
   useEffect(() => {
-    startTransition(() => {
-      resetFiltersForStatusChange()
-    })
+    console.log('🔄 eventStatus changed to:', eventStatus)
+    resetFiltersForStatusChange()
   }, [eventStatus])
 
   // Reset to page 1 when filters change
   useEffect(() => {
+    console.log('📄 Resetting currentPage to 1 due to filter changes')
     setCurrentPage(1)
   }, [debouncedSearchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
 
