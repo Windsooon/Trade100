@@ -531,7 +531,7 @@ export default function MarketsPage() {
   // Get default sort option for each view mode and status
   const getDefaultSort = (mode: 'markets' | 'events', status: 'active' | 'closed' = 'active'): string => {
     if (status === 'closed') {
-      return 'volume' // Default to volume for closed events/markets
+      return 'endDate' // Default to closed_time for closed events/markets
     }
     return mode === 'markets' ? 'volume24hr' : 'volume24hr'
   }
