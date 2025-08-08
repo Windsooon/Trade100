@@ -1056,13 +1056,13 @@ export default function MarketsPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     // Skip if we're currently resetting due to status change
-    if (isResettingForStatusChange) {
+    if (isResettingForStatusChange || isResettingRef.current) {
       console.log('📄 Skipping currentPage reset - status change in progress')
       return
     }
     console.log('📄 Resetting currentPage to 1 due to filter changes')
     setCurrentPage(1)
-  }, [debouncedSearchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection, isResettingForStatusChange])
+  }, [debouncedSearchTerm, selectedTag, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
 
   return (
     <div className="min-h-screen bg-background">
