@@ -62,7 +62,7 @@ interface TagsResponse {
 
 // Predefined tags list (matching the navigation style)
 const PREDEFINED_TAGS = [
-  'Politics', 'Middle East', 'Sports', 'Crypto',
+  'Politics', 'Middle East', 'Sports', 'Esports', 'Crypto',
   'Tech', 'Culture', 'World', 'Economy', 'Trump', 'Elections', 'Mentions'
 ]
 
@@ -71,6 +71,7 @@ const TAG_LABEL_TO_ID_MAP: Record<string, string> = {
   'Politics': '2',
   'Middle East': '154',
   'Sports': '1',
+  'Esports': '64',
   'Crypto': '21',
   'Tech': '1401',
   'Culture': '596',
