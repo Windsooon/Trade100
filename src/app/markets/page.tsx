@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { RefreshCw, Filter, X, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, ChevronsUpDown, Search, Check, X as XIcon } from 'lucide-react'
 import { Event, Market } from '@/lib/stores'
 import { Navbar } from '@/components/ui/navbar'
@@ -83,6 +84,89 @@ const TAG_LABEL_TO_ID_MAP: Record<string, string> = {
 // Helper function to get tag ID from label
 const getTagId = (label: string): string | undefined => {
   return TAG_LABEL_TO_ID_MAP[label]
+}
+
+// Multi-Select Tags Dropdown Component
+function MultiSelectTagsDropdown({ 
+  value, 
+  onValueChange, 
+  placeholder = "Select tags...",
+  label 
+}: { 
+  value: string[]
+  onValueChange: (value: string[]) => void
+  placeholder?: string
+  label?: string
+}) {
+  const [open, setOpen] = useState(false)
+  
+  const toggleTag = (tag: string) => {
+    onValueChange(
+      value.includes(tag) 
+        ? value.filter(t => t !== tag)
+        : [...value, tag]
+    )
+  }
+
+  const displayValue = value.length === 0 
+    ? placeholder 
+    : value.length === 1 
+      ? value[0] 
+      : `${value.length} tags selected`
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button 
+          variant="outline" 
+          className="w-full justify-between text-left font-normal"
+          role="combobox"
+          aria-expanded={open}
+        >
+          <span className="truncate">{displayValue}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-full p-0" align="start">
+        <div className="max-h-60 overflow-y-auto p-1">
+          {value.length > 0 && (
+            <>
+              <div className="px-2 py-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onValueChange([])}
+                  className="h-auto p-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Clear all
+                </Button>
+              </div>
+              <div className="h-px bg-border mx-1 my-1" />
+            </>
+          )}
+          {PREDEFINED_TAGS.map((tag) => (
+            <DropdownMenuItem
+              key={tag}
+              className="cursor-pointer px-2 py-1.5"
+              onSelect={(e) => {
+                e.preventDefault()
+                toggleTag(tag)
+              }}
+            >
+              <div className="flex items-center space-x-2 w-full">
+                <Checkbox
+                  checked={value.includes(tag)}
+                  onChange={() => toggleTag(tag)}
+                  className="shrink-0"
+                />
+                <span className="flex-1">{tag}</span>
+              </div>
+            </DropdownMenuItem>
+          ))}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
 }
 
 // Market Card Component (for inside event cards)
@@ -502,6 +586,7 @@ export default function MarketsPage() {
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [excludedTags, setExcludedTags] = useState<string[]>([])
   const [minVolume, setMinVolume] = useState<string>('100') // Default to >$100
   const [minPrice, setMinPrice] = useState<string>('')
   const [maxPrice, setMaxPrice] = useState<string>('')
@@ -605,10 +690,26 @@ export default function MarketsPage() {
     return [isNaN(min) ? 0 : min, isNaN(max) ? 1 : max]
   }
 
+  // Helper function to handle excluding tags and auto-removing from include list
+  const handleExcludeTags = (newExcludedTags: string[]) => {
+    setExcludedTags(newExcludedTags)
+    
+    // Auto-remove excluded tags from selected tags
+    setSelectedTags(prev => prev.filter(tag => !newExcludedTags.includes(tag)))
+  }
+
+  // Helper function to handle including tags and auto-removing from exclude list
+  const handleIncludeTags = (newSelectedTags: string[]) => {
+    setSelectedTags(newSelectedTags)
+    
+    // Auto-remove included tags from excluded tags
+    setExcludedTags(prev => prev.filter(tag => !newSelectedTags.includes(tag)))
+  }
+
   // Fetch events data
   const queryKey = eventStatus === 'active' 
-    ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTags] // Active mode: only essential params that require new data
-    : ['all-events', eventStatus, viewMode, debouncedSearchTerm, selectedTags, sortBy, sortDirection, currentPage] // Closed mode: stable order, excluding price filters since they're not supported
+    ? ['all-events', debouncedSearchTerm, eventStatus, viewMode, selectedTags, excludedTags] // Active mode: only essential params that require new data
+    : ['all-events', eventStatus, viewMode, debouncedSearchTerm, selectedTags, excludedTags, sortBy, sortDirection, currentPage] // Closed mode: stable order, excluding price filters since they're not supported
   
   console.log('🔑 Query key:', JSON.stringify(queryKey), 'enabled:', !isResettingForStatusChange && !isResettingRef.current, 'isResettingForStatusChange:', isResettingForStatusChange, 'isResettingRef:', isResettingRef.current)
   
@@ -673,6 +774,12 @@ export default function MarketsPage() {
             const tagIds = selectedTags.map(tag => getTagId(tag)).filter(Boolean)
             if (tagIds.length > 0) {
               url.searchParams.set('category', tagIds.join(','))
+            }
+          }
+          if (excludedTags.length > 0) {
+            const excludeTagIds = excludedTags.map(tag => getTagId(tag)).filter(Boolean)
+            if (excludeTagIds.length > 0) {
+              url.searchParams.set('excludeCategory', excludeTagIds.join(','))
             }
           }
           // Note: Price filters are not supported for closed events
@@ -752,6 +859,17 @@ export default function MarketsPage() {
             )
           )
           if (!hasMatchingTag) return false
+        }
+
+        // Exclude tags filter - exclude events that have ANY of the excluded tags
+        if (excludedTags.length > 0) {
+          const eventTagLabels = event.tags.map(tag => tag.label)
+          const hasExcludedTag = excludedTags.some(excludedTag =>
+            eventTagLabels.some(eventTag => 
+              eventTag.toLowerCase().includes(excludedTag.toLowerCase())
+            )
+          )
+          if (hasExcludedTag) return false
         }
 
         // Price range filter - check if any market has prices in range
@@ -877,6 +995,17 @@ export default function MarketsPage() {
             )
           )
           if (!hasMatchingTag) return false
+        }
+
+        // Exclude tags filter - exclude events that have ANY of the excluded tags
+        if (excludedTags.length > 0) {
+          const eventTagLabels = event.tags.map(tag => tag.label)
+          const hasExcludedTag = excludedTags.some(excludedTag =>
+            eventTagLabels.some(eventTag => 
+              eventTag.toLowerCase().includes(excludedTag.toLowerCase())
+            )
+          )
+          if (hasExcludedTag) return false
         }
 
         return true
@@ -1012,11 +1141,12 @@ export default function MarketsPage() {
     ? currentData // Already paginated by server
     : currentData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
-  const hasActiveFilters = searchTerm !== '' || selectedTags.length > 0 || minVolume !== '100' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode, eventStatus) || sortDirection !== 'desc'
+  const hasActiveFilters = searchTerm !== '' || selectedTags.length > 0 || excludedTags.length > 0 || minVolume !== '100' || minPrice !== '' || maxPrice !== '' || minBestAsk !== '' || maxBestAsk !== '' || sortBy !== getDefaultSort(viewMode, eventStatus) || sortDirection !== 'desc'
 
   const clearAllFilters = () => {
     setSearchTerm('')
     setSelectedTags([])
+    setExcludedTags([])
     setMinVolume('100')
     setMinPrice('')
     setMaxPrice('')
@@ -1034,6 +1164,7 @@ export default function MarketsPage() {
     console.log('🧹 Current sortBy before reset:', sortBy)
     setSearchTerm('')
     setSelectedTags([])
+    setExcludedTags([])
     setMinVolume('100')
     setMinPrice('')
     setMaxPrice('')
@@ -1067,6 +1198,7 @@ export default function MarketsPage() {
       // Then update all other states in the same batch
       setSearchTerm('')
       setSelectedTags([])
+      setExcludedTags([])
       setMinVolume('100')
       setMinPrice('')
       setMaxPrice('')
@@ -1096,7 +1228,7 @@ export default function MarketsPage() {
     }
     console.log('📄 Resetting currentPage to 1 due to filter changes')
     setCurrentPage(1)
-  }, [debouncedSearchTerm, selectedTags, minVolume, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
+  }, [debouncedSearchTerm, selectedTags, excludedTags, minVolume, minPrice, maxPrice, minBestAsk, maxBestAsk, sortBy, sortDirection])
 
   return (
     <div className="min-h-screen bg-background">
@@ -1116,7 +1248,7 @@ export default function MarketsPage() {
             <Button
               variant={selectedTags.length === 0 ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setSelectedTags([])}
+              onClick={() => handleIncludeTags([])}
               className="whitespace-nowrap"
             >
               All
@@ -1131,11 +1263,10 @@ export default function MarketsPage() {
                 variant={selectedTags.includes(tag) ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => {
-                  setSelectedTags(prev => 
-                    prev.includes(tag) 
-                      ? prev.filter(t => t !== tag)
-                      : [...prev, tag]
-                  )
+                  const newTags = selectedTags.includes(tag) 
+                    ? selectedTags.filter(t => t !== tag)
+                    : [...selectedTags, tag]
+                  handleIncludeTags(newTags)
                 }}
                 className="whitespace-nowrap"
               >
@@ -1189,6 +1320,7 @@ export default function MarketsPage() {
 
                   {searchTerm && <Badge variant="secondary">Search: "{searchTerm}"</Badge>}
                   {selectedTags.length > 0 && <Badge variant="secondary">Tags: {selectedTags.join(', ')}</Badge>}
+                  {excludedTags.length > 0 && <Badge variant="secondary">Exclude: {excludedTags.join(', ')}</Badge>}
                   {minVolume !== '100' && <Badge variant="secondary">Min Volume: ${minVolume === '1000' ? '1K' : minVolume === '1000000' ? '1M' : minVolume}</Badge>}
                   {(minPrice || maxPrice) && <Badge variant="secondary">Price: {minPrice || '0'}-{maxPrice || '1'}</Badge>}
                   {(minBestAsk || maxBestAsk) && <Badge variant="secondary">Ask: {minBestAsk || '0'}-{maxBestAsk || '1'}</Badge>}
@@ -1379,6 +1511,16 @@ export default function MarketsPage() {
                     </div>
                   )}
 
+                </div>
+
+                {/* Exclude Tags Filter Group */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">EXCLUDE TAGS</h3>
+                  <MultiSelectTagsDropdown
+                    value={excludedTags}
+                    onValueChange={handleExcludeTags}
+                    placeholder="Select tags to exclude..."
+                  />
                 </div>
 
                 {/* Search Bar */}
@@ -1608,6 +1750,16 @@ export default function MarketsPage() {
                       </div>
                     )}
 
+                  </div>
+
+                  {/* Exclude Tags */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground">EXCLUDE TAGS</h3>
+                    <MultiSelectTagsDropdown
+                      value={excludedTags}
+                      onValueChange={handleExcludeTags}
+                      placeholder="Select tags to exclude..."
+                    />
                   </div>
 
                   {hasActiveFilters && (
