@@ -24,6 +24,16 @@ interface ActivitySectionProps {
   onSortDirectionChange: (direction: 'ASC' | 'DESC') => void
 }
 
+interface TradeSummary {
+  totalBuyAmount: number
+  totalSellAmount: number
+  averageBuyPrice: number
+  averageSellPrice: number
+  totalBuyShares: number
+  totalSellShares: number
+  tradeCount: number
+}
+
 interface MarketGroup {
   slug: string
   title: string
@@ -31,6 +41,9 @@ interface MarketGroup {
   totalTrades: number
   totalVolume: number
   totalShares: number
+  tradeSummary: TradeSummary
+  totalRedeem: number
+  totalMerge: number
 }
 
 interface EventGroup {
@@ -40,6 +53,60 @@ interface EventGroup {
   totalTrades: number
   totalVolume: number
   totalShares: number
+}
+
+// Calculate trade summary for a list of activities
+function calculateTradeSummary(activities: ActivityItem[]): TradeSummary {
+  const trades = activities.filter(activity => activity.type === 'TRADE')
+  
+  if (trades.length === 0) {
+    return {
+      totalBuyAmount: 0,
+      totalSellAmount: 0,
+      averageBuyPrice: 0,
+      averageSellPrice: 0,
+      totalBuyShares: 0,
+      totalSellShares: 0,
+      tradeCount: 0
+    }
+  }
+
+  const buyTrades = trades.filter(trade => trade.side === 'BUY')
+  const sellTrades = trades.filter(trade => trade.side === 'SELL')
+
+  const totalBuyAmount = buyTrades.reduce((sum, trade) => sum + trade.usdcSize, 0)
+  const totalSellAmount = sellTrades.reduce((sum, trade) => sum + trade.usdcSize, 0)
+  const totalBuyShares = buyTrades.reduce((sum, trade) => sum + trade.size, 0)
+  const totalSellShares = sellTrades.reduce((sum, trade) => sum + trade.size, 0)
+
+  const averageBuyPrice = buyTrades.length > 0 
+    ? buyTrades.reduce((sum, trade) => sum + trade.price, 0) / buyTrades.length 
+    : 0
+  
+  const averageSellPrice = sellTrades.length > 0 
+    ? sellTrades.reduce((sum, trade) => sum + trade.price, 0) / sellTrades.length 
+    : 0
+
+  return {
+    totalBuyAmount,
+    totalSellAmount,
+    averageBuyPrice,
+    averageSellPrice,
+    totalBuyShares,
+    totalSellShares,
+    tradeCount: trades.length
+  }
+}
+
+// Calculate redeem and merge totals for a list of activities
+function calculateRedeemMergeTotals(activities: ActivityItem[]): { totalRedeem: number; totalMerge: number } {
+  const redeems = activities.filter(activity => activity.type === 'REDEEM')
+  const merges = activities.filter(activity => activity.type === 'MERGE')
+
+  const totalRedeem = redeems.reduce((sum, activity) => sum + activity.usdcSize, 0)
+  const totalMerge = merges.reduce((sum, activity) => sum + activity.usdcSize, 0)
+
+  return { totalRedeem, totalMerge }
 }
 
 // Group activities by event and then by market within each event
@@ -67,7 +134,18 @@ function groupActivitiesByEvent(activities: ActivityItem[]): EventGroup[] {
         activities: [],
         totalTrades: 0,
         totalVolume: 0,
-        totalShares: 0
+        totalShares: 0,
+        tradeSummary: {
+          totalBuyAmount: 0,
+          totalSellAmount: 0,
+          averageBuyPrice: 0,
+          averageSellPrice: 0,
+          totalBuyShares: 0,
+          totalSellShares: 0,
+          tradeCount: 0
+        },
+        totalRedeem: 0,
+        totalMerge: 0
       }
     }
     
@@ -86,7 +164,18 @@ function groupActivitiesByEvent(activities: ActivityItem[]): EventGroup[] {
   // Convert to final structure and sort
   return Object.values(eventGrouped).map(event => ({
     ...event,
-    markets: Object.values(event.markets).sort((a, b) => b.totalTrades - a.totalTrades)
+    markets: Object.values(event.markets).map(market => {
+      // Calculate summaries for this market
+      const tradeSummary = calculateTradeSummary(market.activities)
+      const { totalRedeem, totalMerge } = calculateRedeemMergeTotals(market.activities)
+      
+      return {
+        ...market,
+        tradeSummary,
+        totalRedeem,
+        totalMerge
+      }
+    }).sort((a, b) => b.totalTrades - a.totalTrades)
   })).sort((a, b) => b.totalTrades - a.totalTrades)
 }
 
@@ -297,6 +386,47 @@ export function ActivitySection({
                                   </CollapsibleTrigger>
                                   <CollapsibleContent>
                                     <div className="border-t">
+                                      {/* Market Summary */}
+                                      <div className="p-3 bg-muted/20 border-b">
+                                        <div className="text-xs text-muted-foreground space-y-1">
+                                          {/* Trade Summary */}
+                                          {marketGroup.tradeSummary.tradeCount > 0 ? (
+                                            <div>
+                                              <span className="font-medium">Trades:</span> 
+                                              <span className="ml-1">
+                                                BUY: {formatCurrency(marketGroup.tradeSummary.totalBuyAmount)} 
+                                                ({marketGroup.tradeSummary.totalBuyShares.toFixed(2)} shares, avg ${marketGroup.tradeSummary.averageBuyPrice.toFixed(4)}) | 
+                                                SELL: {formatCurrency(marketGroup.tradeSummary.totalSellAmount)} 
+                                                ({marketGroup.tradeSummary.totalSellShares.toFixed(2)} shares, avg ${marketGroup.tradeSummary.averageSellPrice.toFixed(4)})
+                                              </span>
+                                            </div>
+                                          ) : (
+                                            <div>No trades</div>
+                                          )}
+                                          
+                                          {/* Redeem Summary */}
+                                          {marketGroup.totalRedeem > 0 && (
+                                            <div>
+                                              <span className="font-medium">Redeems:</span> 
+                                              <span className="ml-1">{formatCurrency(marketGroup.totalRedeem)}</span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Merge Summary */}
+                                          {marketGroup.totalMerge > 0 && (
+                                            <div>
+                                              <span className="font-medium">Merges:</span> 
+                                              <span className="ml-1">{formatCurrency(marketGroup.totalMerge)}</span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Show message if no redemptions */}
+                                          {marketGroup.totalRedeem === 0 && marketGroup.totalMerge === 0 && marketGroup.tradeSummary.tradeCount > 0 && (
+                                            <div>No redemptions</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
                                       <div className="space-y-1 p-2">
                                         {marketGroup.activities.map((activity, activityIndex) => (
                                           <ActivityCard 
