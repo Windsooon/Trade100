@@ -152,4 +152,124 @@ export const useSettingsStore = create<SettingsStore>()(
       name: 'trade100-settings',
     }
   )
-) 
+)
+
+// Real-time market data store for home page
+interface HomePageMarket {
+  conditionId: string
+  clobTokenIds: string
+  staticPrice: number
+  realtimePrice?: number
+  lastPriceUpdate?: number
+}
+
+interface HomePageMarketStore {
+  marketsByTab: Record<string, HomePageMarket[]>
+  activeTab: string
+  visitedTabs: Set<string>
+  realtimePrices: Record<string, { price: number; lastUpdate: number }>
+  lastTabSwitch: number
+  setActiveTab: (tab: string) => void
+  setMarketsForTab: (tab: string, markets: HomePageMarket[]) => void
+  addVisitedTab: (tab: string) => void
+  updateRealtimePrice: (conditionId: string, price: number) => void
+  getRealtimePrice: (conditionId: string) => number | undefined
+  getActiveMarkets: () => HomePageMarket[]
+  getVisitedTabsMarkets: () => HomePageMarket[]
+  getMarketsChangeKey: () => string
+  shouldKeepConnection: (tab: string) => boolean
+}
+
+export const useHomePageMarketStore = create<HomePageMarketStore>((set, get) => ({
+  marketsByTab: {},
+  activeTab: 'volume',
+  visitedTabs: new Set(['volume']),
+  realtimePrices: {},
+  lastTabSwitch: Date.now(),
+  
+  setActiveTab: (tab: string) => {
+    set({ activeTab: tab, lastTabSwitch: Date.now() })
+  },
+  
+  setMarketsForTab: (tab: string, markets: HomePageMarket[]) => {
+    set((state) => ({
+      marketsByTab: {
+        ...state.marketsByTab,
+        [tab]: markets
+      }
+    }))
+  },
+  
+  addVisitedTab: (tab: string) => {
+    const state = get()
+    // Only add if tab has markets available
+    if (state.marketsByTab[tab] && state.marketsByTab[tab].length > 0) {
+      set((state) => ({
+        visitedTabs: new Set([...state.visitedTabs, tab])
+      }))
+    }
+  },
+  
+  updateRealtimePrice: (conditionId: string, price: number) => {
+    const now = Date.now()
+    const state = get()
+    const lastUpdate = state.realtimePrices[conditionId]?.lastUpdate || 0
+    
+    // Throttle updates to 500ms per market
+    if (now - lastUpdate < 500) {
+      return
+    }
+    
+    set((state) => ({
+      realtimePrices: {
+        ...state.realtimePrices,
+        [conditionId]: { price, lastUpdate: now }
+      }
+    }))
+  },
+  
+  getRealtimePrice: (conditionId: string) => {
+    return get().realtimePrices[conditionId]?.price
+  },
+  
+  getActiveMarkets: () => {
+    const state = get()
+    return state.marketsByTab[state.activeTab] || []
+  },
+  
+  getVisitedTabsMarkets: () => {
+    const state = get()
+    const allMarkets: HomePageMarket[] = []
+    
+    // Collect markets from all visited tabs
+    state.visitedTabs.forEach(tabId => {
+      const tabMarkets = state.marketsByTab[tabId] || []
+      allMarkets.push(...tabMarkets)
+    })
+    
+    // Remove duplicates by conditionId
+    const uniqueMarkets = allMarkets.reduce((acc, market) => {
+      if (!acc.find(m => m.conditionId === market.conditionId)) {
+        acc.push(market)
+      }
+      return acc
+    }, [] as HomePageMarket[])
+    
+    return uniqueMarkets
+  },
+  
+  getMarketsChangeKey: () => {
+    const state = get()
+    // Create a key that changes when markets or visited tabs change
+    const marketsHash = JSON.stringify(state.marketsByTab)
+    const visitedTabsHash = Array.from(state.visitedTabs).sort().join(',')
+    return `${marketsHash}_${visitedTabsHash}`
+  },
+  
+  shouldKeepConnection: (tab: string) => {
+    const state = get()
+    const timeSinceSwitch = Date.now() - state.lastTabSwitch
+    // Keep connection for 30 seconds after tab switch
+    return tab === state.activeTab || timeSinceSwitch < 30000
+  }
+})) 
