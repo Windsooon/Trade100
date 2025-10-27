@@ -9,7 +9,8 @@ export interface MarketInsightCardProps {
 
 // New interface for market history API response
 export interface MarketHistoryResponse {
-  market: string
+  yes_asset_id: string
+  no_asset_id: string
   start: number
   fidelity: number
   data: MarketHistoryDataPoint[]
@@ -119,4 +120,24 @@ export interface ChartTabProps {
 
 export interface InfoTabProps {
   selectedMarket: Market | null
+}
+
+// Helper function to extract YES and NO asset IDs from clobTokenIds
+export function getAssetIds(clobTokenIds: string | undefined): { yesAssetId: string; noAssetId: string } | null {
+  if (!clobTokenIds) {
+    return null
+  }
+  
+  try {
+    const ids = JSON.parse(clobTokenIds)
+    if (ids && ids.length >= 2 && ids[0] && ids[1]) {
+      return {
+        yesAssetId: ids[0],
+        noAssetId: ids[1]
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
 } 

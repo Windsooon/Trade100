@@ -3,12 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, Loader2, TrendingUp, WifiOff, Activity, BarChart3, TrendingUp as LineChart } from 'lucide-react'
 import { createChart, IChartApi, ISeriesApi, ColorType, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts'
-import { ChartTabProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint, VolumeType } from './types'
-
-// Global cache for market history to prevent duplicate API calls
-let globalMarketHistoryCache: Map<string, { data: MarketHistoryResponse; timestamp: number }> = new Map()
-let globalMarketHistoryPromises: Map<string, Promise<MarketHistoryResponse>> = new Map()
-const MARKET_HISTORY_CACHE_DURATION = 30000 // 30 seconds
+import { ChartTabProps, TimePeriod, MarketHistoryResponse, MarketHistoryDataPoint, VolumeType, getAssetIds } from './types'
 
 type ChartType = 'candle' | 'line'
 
@@ -488,25 +483,17 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     }
   }, [selectedPeriod, chartKey, formatVolume])
 
-  // Simple client-side cache for market history data
-  const cacheRef = useRef<Map<string, { data: MarketHistoryDataPoint[]; timestamp: number }>>(new Map())
-  const CACHE_DURATION = 60 * 1000 // 1 minute cache
-
-  // Check if we have valid cached data
-  const getCachedData = useCallback((cacheKey: string): MarketHistoryDataPoint[] | null => {
-    const cached = cacheRef.current.get(cacheKey)
-    if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-      return cached.data
-    }
-    return null
-  }, [])
-
-  // Store data in cache
-  const setCachedData = useCallback((cacheKey: string, data: MarketHistoryDataPoint[]) => {
-    cacheRef.current.set(cacheKey, {
-      data,
-      timestamp: Date.now()
+  // Helper function to build market history API URL
+  // Note: The new API only returns data for periods with actual trades (no zero-filling)
+  const buildMarketHistoryUrl = useCallback((yesAssetId: string, noAssetId: string, startTs: number, endTs: number, fidelity: number) => {
+    const params = new URLSearchParams({
+      yes_asset_id: yesAssetId,
+      no_asset_id: noAssetId,
+      startTs: startTs.toString(),
+      endTs: endTs.toString(),
+      fidelity: fidelity.toString()
     })
+    return `https://api-test-production-3326.up.railway.app/api/market-history?${params.toString()}`
   }, [])
 
   // Calculate timestamps for getting historical data based on period
@@ -589,15 +576,19 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
   // Fetch latest data point for real-time updates
   const fetchLatestDataPoint = useCallback(async (): Promise<MarketHistoryDataPoint | null> => {
-    if (!selectedMarket?.conditionId) {
+    if (!selectedMarket?.conditionId || !selectedMarket?.clobTokenIds) {
+      return null
+    }
+
+    const assetIds = getAssetIds(selectedMarket.clobTokenIds)
+    if (!assetIds) {
       return null
     }
 
     try {
       const { startTs, endTs, fidelity } = calculateLatestDataRange(selectedPeriod)
-      const marketId = selectedMarket.conditionId
       
-      const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
+      const url = buildMarketHistoryUrl(assetIds.yesAssetId, assetIds.noAssetId, startTs, endTs, fidelity)
       
       const response = await fetch(url)
       
@@ -611,6 +602,8 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         return null
       }
       
+      // Note: The API only returns timestamps where trades occurred
+      
       // Return the latest data point (last in array)
       return result.data[result.data.length - 1]
       
@@ -618,7 +611,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       console.error('Error fetching latest data point:', error)
       throw error
     }
-  }, [selectedMarket?.conditionId, selectedPeriod, calculateLatestDataRange])
+  }, [selectedMarket?.conditionId, selectedMarket?.clobTokenIds, selectedPeriod, calculateLatestDataRange, buildMarketHistoryUrl])
 
   // Update or insert data point based on timestamp comparison
   const updateChartWithLatestData = useCallback((newDataPoint: MarketHistoryDataPoint) => {
@@ -733,108 +726,21 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
 
   // New fetch function for market history API
   const fetchMarketHistoryData = useCallback(async () => {
-    if (!selectedMarket?.conditionId) {
+    if (!selectedMarket?.conditionId || !selectedMarket?.clobTokenIds) {
       setError('No market selected or market data unavailable')
+      return
+    }
+
+    const assetIds = getAssetIds(selectedMarket.clobTokenIds)
+    if (!assetIds) {
+      setError('Invalid token IDs for market')
       return
     }
     
     const { startTs, endTs, fidelity } = calculateTimeRange(selectedPeriod)
-    const marketId = selectedMarket.conditionId
-    const requestKey = `${marketId}-${selectedPeriod}-${fidelity}`
+    const requestKey = `${selectedMarket.conditionId}-${selectedPeriod}-${fidelity}`
 
-    // Check global cache first
-    const now = Date.now()
-    const cachedData = globalMarketHistoryCache.get(requestKey)
-          if (cachedData && (now - cachedData.timestamp) < MARKET_HISTORY_CACHE_DURATION) {
-        // Process cached data
-        const result = cachedData.data
-        const processedData = result.data.map(point => chartType === 'candle' ? ({
-          time: point.timestamp as any,
-          open: point.price.open,
-          high: point.price.high,
-          low: point.price.low,
-          close: point.price.close
-        }) : ({
-          time: point.timestamp as any,
-          value: point.price.close
-        }))
-        
-        const volumeData = result.data.map(point => ({
-          time: point.timestamp as any,
-          value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
-          color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
-        }))
-        
-        if (seriesRef.current) {
-          seriesRef.current.setData(processedData)
-          
-          // Update line color for line chart
-          if (chartType === 'line' && 'applyOptions' in seriesRef.current) {
-            const lineColor = getLineColor(result.data)
-            seriesRef.current.applyOptions({ color: lineColor })
-          }
-        }
-        if (volumeSeriesRef.current) {
-          volumeSeriesRef.current.setData(volumeData)
-        }
-        
-        // Update latest timestamp for real-time updates
-        if (result.data.length > 0) {
-          latestTimestampRef.current = result.data[result.data.length - 1].timestamp
-        }
-        
-        setLoading(false)
-        return
-      }
 
-    // Check if request is already in progress globally
-          const existingPromise = globalMarketHistoryPromises.get(requestKey)
-    if (existingPromise) {
-      try {
-        const result = await existingPromise
-        // Process data same as above
-        const processedData = result.data.map(point => chartType === 'candle' ? ({
-          time: point.timestamp as any,
-          open: point.price.open,
-          high: point.price.high,
-          low: point.price.low,
-          close: point.price.close
-        }) : ({
-          time: point.timestamp as any,
-          value: point.price.close
-        }))
-        
-        const volumeData = result.data.map(point => ({
-          time: point.timestamp as any,
-          value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
-          color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
-        }))
-        
-        if (seriesRef.current) {
-          seriesRef.current.setData(processedData)
-          
-          // Update line color for line chart
-          if (chartType === 'line' && 'applyOptions' in seriesRef.current) {
-            const lineColor = getLineColor(result.data)
-            seriesRef.current.applyOptions({ color: lineColor })
-          }
-        }
-        if (volumeSeriesRef.current) {
-          volumeSeriesRef.current.setData(volumeData)
-        }
-        
-        // Update latest timestamp for real-time updates
-        if (result.data.length > 0) {
-          latestTimestampRef.current = result.data[result.data.length - 1].timestamp
-        }
-        
-        setLoading(false)
-      } catch (error) {
-        setError('Failed to load market data')
-        setLoading(false)
-      }
-      return
-    }
 
     // Check if this exact request is already active locally (legacy protection)
     if (activeRequestsRef.current.has(requestKey)) {
@@ -847,67 +753,13 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
     setError(null)
     setVolumeError(null)
     
-    // Store this request in global promises
-    const apiPromise = (async (): Promise<MarketHistoryResponse> => {
-      try {
-        const cacheKey = requestKey
-
-        // Check local cache first (existing logic)
-        const cachedData = getCachedData(cacheKey)
-      if (cachedData) {
-        rawDataRef.current = cachedData
-        volumeDataRef.current = cachedData // Same data contains both price and volume
-        
-        // Update chart with cached data
-        const chartData = cachedData.map(point => chartType === 'candle' ? ({
-          time: point.timestamp as any,
-          open: point.price.open,
-          high: point.price.high,
-          low: point.price.low,
-          close: point.price.close
-        }) : ({
-          time: point.timestamp as any,
-          value: point.price.close
-        }))
-        
-        if (seriesRef.current) {
-          seriesRef.current.setData(chartData)
-          
-          // Update line color for line chart
-          if (chartType === 'line' && 'applyOptions' in seriesRef.current) {
-            const lineColor = getLineColor(cachedData)
-            seriesRef.current.applyOptions({ color: lineColor })
-          }
-        }
-        
-        // Update volume display
-        const volumeData = cachedData.map(point => ({
-          time: point.timestamp as any,
-          value: volumeType === 'totalDollarVolume' ? point.volume.totalDollarVolume : point.volume.totalSize,
-          color: point.price.close >= point.price.open ? '#26a69a' : '#ef5350'
-        }))
-        
-        if (volumeSeriesRef.current) {
-          volumeSeriesRef.current.setData(volumeData)
-        }
-        
-        // Update latest timestamp for real-time updates
-        if (cachedData.length > 0) {
-          latestTimestampRef.current = cachedData[cachedData.length - 1].timestamp
-        }
-        
-        setLoading(false)
-        // Clean up active request marker for cached responses
-        activeRequestsRef.current.delete(requestKey)
-        return { 
-          data: cachedData,
-          market: marketId,
-          start: startTs,
-          fidelity: fidelity
-        }
+    try {
+      const assetIds = getAssetIds(selectedMarket.clobTokenIds!)
+      if (!assetIds) {
+        throw new Error('Invalid token IDs for market')
       }
-
-      const url = `https://trade-analyze-production.up.railway.app/api/market-history?market=${encodeURIComponent(marketId)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`
+      
+      const url = buildMarketHistoryUrl(assetIds.yesAssetId, assetIds.noAssetId, startTs, endTs, fidelity)
       
       const response = await fetch(url)
       
@@ -921,36 +773,20 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         throw new Error('No market history data available for this period.')
       }
       
-      // Store in global cache
-      globalMarketHistoryCache.set(requestKey, { data: result, timestamp: Date.now() })
+      // Note: The API only returns timestamps where trades occurred,
+      // so gaps in data represent periods with no trading activity
       
-      // Store raw data and cache it locally too
+      // Store raw data
       rawDataRef.current = result.data
       volumeDataRef.current = result.data // Same data contains both price and volume
-      setCachedData(cacheKey, result.data)
       
       // Update latest timestamp for real-time updates
       if (result.data.length > 0) {
         latestTimestampRef.current = result.data[result.data.length - 1].timestamp
       }
-      
-             return result
        
-       } catch (error) {
-         throw error
-       } finally {
-         globalMarketHistoryPromises.delete(requestKey)
-       }
-     })()
-     
-     // Register the global promise
-     globalMarketHistoryPromises.set(requestKey, apiPromise)
-     
-     try {
-       const result = await apiPromise
-       
-       // Convert to chart format
-      const chartData = result.data.map(point => chartType === 'candle' ? ({
+      // Convert to chart format
+      const processedData = result.data.map(point => chartType === 'candle' ? ({
         time: point.timestamp as any,
         open: point.price.open,
         high: point.price.high,
@@ -963,7 +799,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       
       // Update chart with new data
       if (seriesRef.current) {
-        seriesRef.current.setData(chartData)
+        seriesRef.current.setData(processedData)
         
         // Update line color for line chart
         if (chartType === 'line' && 'applyOptions' in seriesRef.current) {
@@ -983,11 +819,6 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
         volumeSeriesRef.current.setData(volumeData)
       }
       
-      // Update latest timestamp for real-time updates
-      if (result.data.length > 0) {
-        latestTimestampRef.current = result.data[result.data.length - 1].timestamp
-      }
-      
       setLoading(false)
       
     } catch (err) {
@@ -998,7 +829,7 @@ export function ChartTab({ selectedMarket, selectedToken }: ChartTabProps) {
       // Always clean up the active request marker
       activeRequestsRef.current.delete(requestKey)
     }
-  }, [selectedMarket?.conditionId, selectedPeriod, calculateTimeRange, volumeType, getCachedData, setCachedData, chartType])
+  }, [selectedMarket?.conditionId, selectedMarket?.clobTokenIds, selectedPeriod, calculateTimeRange, volumeType, chartType, buildMarketHistoryUrl])
 
   // Trigger chart re-initialization when chart type changes
   useEffect(() => {
