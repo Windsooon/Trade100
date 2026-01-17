@@ -1,6 +1,7 @@
 import { IPolymarketApiClient } from '../api-client'
 import { TradeHistoryQuery, TradeHistoryResponse, TradeRecord } from '../interfaces/trade-history.interface'
-import { ActivityQuery, ActivityResponse, ActivityRecord } from '../interfaces/activity.interface'
+import { ActivityQuery, ActivityResponse, ActivityRecord, ActivityType } from '../interfaces/activity.interface'
+import { CandlesticksQuery, CandlestickResponse } from '../interfaces/candlesticks.interface'
 import { domeApiRateLimiter } from '../rate-limiter'
 import { proxyFetch } from '@/lib/fetch'
 import { API_CONFIG } from '@/lib/config'
@@ -408,24 +409,33 @@ export class DomeApiAdapter implements IPolymarketApiClient {
    */
   private transformActivityResponse(data: any): ActivityResponse {
     return {
-      activities: (data.activities || []).map((activity: any) => ({
-        tokenId: activity.token_id,
-        tokenLabel: activity.token_label,
-        side: activity.side || '',
-        marketSlug: activity.market_slug,
-        conditionId: activity.condition_id,
-        shares: activity.shares,
-        sharesNormalized: activity.shares_normalized,
-        price: activity.price,
-        blockNumber: activity.block_number,
-        logIndex: activity.log_index,
-        txHash: activity.tx_hash,
-        title: activity.title,
-        timestamp: activity.timestamp,
-        orderHash: activity.order_hash || '',
-        user: activity.user,
-        type: activity.type,
-      })),
+      activities: (data.activities || []).map((activity: any) => {
+        // The API returns "side" as the activity type (REDEEM, MERGE, SPLIT, etc.)
+        const activityType = activity.side || ''
+        const type: ActivityType = (activityType === 'REDEEM' || activityType === 'MERGE' || activityType === 'SPLIT' || 
+          activityType === 'REWARD' || activityType === 'CONVERSION' || activityType === 'TRADE') 
+          ? activityType as ActivityType 
+          : 'TRADE'
+        
+        return {
+          tokenId: activity.token_id || '',
+          tokenLabel: activity.token_label || '',
+          side: activity.side === 'BUY' || activity.side === 'SELL' ? activity.side : '',
+          marketSlug: activity.market_slug || '',
+          conditionId: activity.condition_id || '',
+          shares: activity.shares || 0,
+          sharesNormalized: activity.shares_normalized || 0,
+          price: activity.price || 0,
+          blockNumber: activity.block_number || 0,
+          logIndex: activity.log_index || 0,
+          txHash: activity.tx_hash || '',
+          title: activity.title || '',
+          timestamp: activity.timestamp || 0,
+          orderHash: activity.order_hash || '',
+          user: activity.user || '',
+          type,
+        }
+      }),
       pagination: {
         limit: data.pagination?.limit || 0,
         offset: data.pagination?.offset || 0,
@@ -433,5 +443,44 @@ export class DomeApiAdapter implements IPolymarketApiClient {
         hasMore: data.pagination?.has_more || false,
       },
     }
+  }
+
+  /**
+   * 获取Candlesticks数据
+   */
+  async getCandlesticks(query: CandlesticksQuery): Promise<CandlestickResponse> {
+    return domeApiRateLimiter.execute(async () => {
+      const params = new URLSearchParams()
+      params.append('start_time', query.startTime.toString())
+      params.append('end_time', query.endTime.toString())
+      if (query.interval) {
+        params.append('interval', query.interval.toString())
+      }
+      
+      const url = `${this.baseUrl}/candlesticks/${query.conditionId}?${params.toString()}`
+      
+      console.log('[Dome API] Fetching candlesticks:', {
+        url,
+        conditionId: query.conditionId,
+        startTime: query.startTime,
+        endTime: query.endTime,
+        interval: query.interval,
+      })
+      
+      const response = await proxyFetch(url, {
+        headers: this.getHeaders(),
+      })
+      
+      const data = await this.handleApiResponse<{ candlesticks: CandlestickResponse }>(
+        response,
+        () => {
+          return this.getCandlesticks(query)
+        },
+        3
+      )
+      
+      // Extract the candlesticks array from the response
+      return data.candlesticks || []
+    })
   }
 }

@@ -1,5 +1,6 @@
 import { TradeHistoryQuery, TradeHistoryResponse, TradeRecord } from './interfaces/trade-history.interface'
 import { ActivityQuery, ActivityResponse, ActivityRecord } from './interfaces/activity.interface'
+import { CandlesticksQuery, CandlestickResponse } from './interfaces/candlesticks.interface'
 
 /**
  * API客户端抽象接口
@@ -27,4 +28,9 @@ export interface IPolymarketApiClient {
    * 获取所有活动记录（自动处理分页）
    */
   getAllActivity(query: Omit<ActivityQuery, 'limit' | 'offset'>): Promise<ActivityRecord[]>
+  
+  /**
+   * 获取Candlesticks数据
+   */
+  getCandlesticks(query: CandlesticksQuery): Promise<CandlestickResponse>
 }
