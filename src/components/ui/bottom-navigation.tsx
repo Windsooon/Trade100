@@ -17,7 +17,8 @@ import {
   MoreHorizontal, 
   Settings, 
   Github,
-  Search
+  Search,
+  BarChart3
 } from "lucide-react"
 import { SettingsSheet } from "@/components/ui/settings-sheet"
 import { SearchModal } from "@/components/ui/search-modal"
@@ -50,6 +51,11 @@ const navigationItems = [
     name: "Portfolio", 
     href: "/portfolio",
     icon: Wallet,
+  },
+  {
+    name: "Analysis",
+    href: "/trading-analysis",
+    icon: BarChart3,
   },
 ]
 

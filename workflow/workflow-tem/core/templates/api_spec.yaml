@@ -1,0 +1,66 @@
+# API 规范 (API Specification)
+# 接口需求摘要: {{在此填写接口需求摘要}}
+
+openapi: "3.0.3"
+info:
+  title: "{{API 名称}}"
+  description: "{{API 描述}}"
+  version: "1.0.0"
+
+paths:
+  /{{资源路径}}:
+    get:
+      summary: "{{操作摘要}}"
+      description: "{{操作详细描述}}"
+      parameters:
+        - name: "{{参数名}}"
+          in: query
+          required: false
+          schema:
+            type: string
+          description: "{{参数描述}}"
+      responses:
+        "200":
+          description: "成功响应"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/{{响应模型名}}"
+        "400":
+          description: "请求参数错误"
+        "500":
+          description: "服务器内部错误"
+
+    post:
+      summary: "{{操作摘要}}"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/{{请求模型名}}"
+      responses:
+        "201":
+          description: "创建成功"
+        "400":
+          description: "请求参数错误"
+
+components:
+  schemas:
+    {{模型名}}:
+      type: object
+      required:
+        - {{必填字段1}}
+      properties:
+        {{字段名1}}:
+          type: string
+          description: "{{字段描述}}"
+        {{字段名2}}:
+          type: integer
+          description: "{{字段描述}}"
+          minimum: 0
+        {{字段名3}}:
+          type: string
+          format: date-time
+          description: "{{字段描述}}"
+          nullable: true

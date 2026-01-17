@@ -23,6 +23,16 @@ export const API_CONFIG = {
   TIMEOUTS: {
     DEFAULT: 30000, // 30 seconds
   },
+  
+  // Dome API Configuration
+  DOME_API: {
+    BASE_URL: 'https://api.domeapi.io/v1/polymarket',
+    API_KEY: process.env.DOME_API_KEY, // Optional
+    RATE_LIMIT: {
+      QPS: 1,                    // 每秒1个请求
+      INTERVAL_MS: 1000,         // 间隔1000ms
+    },
+  },
 } as const
 
 // Helper functions to build API URLs

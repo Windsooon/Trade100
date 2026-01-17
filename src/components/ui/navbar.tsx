@@ -41,8 +41,11 @@ export function Navbar() {
               <Link href="/portfolio" className="navbar-link">
                 Portfolio
               </Link>
+              <Link href="/trading-analysis" className="navbar-link">
+                Analysis
+              </Link>
               
-              {/* Search positioned right after Portfolio */}
+              {/* Search positioned right after Analysis */}
               <div className="ml-8">
                 <SearchDropdown />
               </div>

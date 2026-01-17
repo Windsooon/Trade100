@@ -89,4 +89,65 @@ export function calculatePnLPercentage(pnl: number, positionValue: number): numb
   if (initialValue === 0) return 0
   
   return (pnl / initialValue) * 100
+}
+
+/**
+ * Calculate realized P/L from trades
+ * Uses FIFO method to match buys and sells
+ */
+export function calculateRealizedPnL(trades: Array<{ side: 'BUY' | 'SELL', shares: number, price: number }>): number {
+  const buyQueue: Array<{ shares: number, price: number }> = []
+  let realizedPnL = 0
+
+  for (const trade of trades) {
+    if (trade.side === 'BUY') {
+      buyQueue.push({ shares: trade.shares, price: trade.price })
+    } else if (trade.side === 'SELL') {
+      let remainingSell = trade.shares
+      while (remainingSell > 0 && buyQueue.length > 0) {
+        const buy = buyQueue[0]
+        if (buy.shares <= remainingSell) {
+          realizedPnL += (trade.price - buy.price) * buy.shares
+          remainingSell -= buy.shares
+          buyQueue.shift()
+        } else {
+          realizedPnL += (trade.price - buy.price) * remainingSell
+          buy.shares -= remainingSell
+          remainingSell = 0
+        }
+      }
+    }
+  }
+
+  return realizedPnL
+}
+
+/**
+ * Calculate unrealized P/L for current holdings
+ */
+export function calculateUnrealizedPnL(
+  currentHolding: number,
+  avgCostPrice: number,
+  currentPrice: number
+): number {
+  if (currentHolding <= 0) return 0
+  return (currentPrice - avgCostPrice) * currentHolding
+}
+
+/**
+ * Calculate win rate from market summaries
+ */
+export function calculateWinRate(marketSummaries: Array<{ totalPnL: number }>): number {
+  if (marketSummaries.length === 0) return 0
+  const winningMarkets = marketSummaries.filter(m => m.totalPnL > 0).length
+  return winningMarkets / marketSummaries.length
+}
+
+/**
+ * Calculate average holding time in days
+ */
+export function calculateAverageHoldingTime(holdingTimes: number[]): number {
+  if (holdingTimes.length === 0) return 0
+  const avgSeconds = holdingTimes.reduce((a, b) => a + b, 0) / holdingTimes.length
+  return avgSeconds / (24 * 3600) // Convert to days
 } 
