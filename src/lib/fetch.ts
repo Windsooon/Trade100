@@ -22,8 +22,8 @@ export async function proxyFetch(url: string, options: RequestInit = {}): Promis
           ...options,
           // @ts-expect-error - TypeScript doesn't know about dispatcher option in fetch
           dispatcher: proxyAgent,
-          // Add timeout to prevent hanging
-          signal: options.signal || AbortSignal.timeout(30000)
+          // Add timeout to prevent hanging (60 seconds for slow connections)
+          signal: options.signal || AbortSignal.timeout(60000)
         })
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
@@ -36,8 +36,8 @@ export async function proxyFetch(url: string, options: RequestInit = {}): Promis
   // Fallback to regular fetch (client-side or when proxy fails)
   return fetch(url, {
     ...options,
-    // Add timeout for direct fetch too
-    signal: options.signal || AbortSignal.timeout(30000)
+    // Add timeout for direct fetch too (60 seconds for slow connections)
+    signal: options.signal || AbortSignal.timeout(60000)
   })
 }
 

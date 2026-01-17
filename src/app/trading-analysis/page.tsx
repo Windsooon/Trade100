@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { format, parse } from "date-fns"
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
 import { BottomNavigation } from '@/components/ui/bottom-navigation'
@@ -10,20 +11,73 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { WalletManagerDialog } from "@/components/trading-analysis/wallet-manager-dialog"
 import { MarketAnalysisTable } from "@/components/trading-analysis/market-analysis-table"
+import { DatePicker } from "@/components/ui/date-picker"
 import { useWalletManager } from "@/hooks/use-wallet-manager"
 import { useTradingAnalysis } from "@/hooks/use-trading-analysis"
 import { formatCurrency, formatPercentage } from "@/lib/portfolio-utils"
-import { AlertCircle, Settings, RefreshCw, TrendingUp, TrendingDown, Wallet, BarChart3 } from "lucide-react"
+import { AlertCircle, Settings, RefreshCw, TrendingUp, TrendingDown, Wallet, BarChart3, Calendar } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 
 export default function TradingAnalysisPage() {
+  const renderCountRef = React.useRef(0)
+  renderCountRef.current += 1
+  console.log(`[TradingAnalysisPage] Render #${renderCountRef.current}`)
+  
   const { wallets, getEnabledWallets, isLoading: isLoadingWallets } = useWalletManager()
   const enabledWallets = React.useMemo(() => {
-    return wallets.filter(w => w.enabled).map(w => w.address)
+    const enabled = wallets.filter(w => w.enabled).map(w => w.address)
+    console.log('[TradingAnalysisPage] enabledWallets memoized:', enabled)
+    return enabled
   }, [wallets])
   
   const [autoRefresh, setAutoRefresh] = React.useState(true)
+  
+  // Parse date from URL on mount
+  const [selectedDate, setSelectedDate] = React.useState<Date>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const dateParam = params.get('date')
+      if (dateParam) {
+        try {
+          const parsed = parse(dateParam, 'yyyy-MM-dd', new Date())
+          console.log('[TradingAnalysisPage] Initial date from URL:', dateParam, parsed.toISOString())
+          return parsed
+        } catch {
+          console.log('[TradingAnalysisPage] Failed to parse date from URL, using today')
+        }
+      }
+    }
+    const today = new Date()
+    console.log('[TradingAnalysisPage] Initial date (today):', today.toISOString())
+    return today
+  })
+  
+  // Update date when URL changes
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const dateParam = params.get('date')
+      if (dateParam) {
+        try {
+          const parsed = parse(dateParam, 'yyyy-MM-dd', new Date())
+          if (parsed.getTime() !== selectedDate.getTime()) {
+            console.log('[TradingAnalysisPage] Date changed from URL:', dateParam)
+            setSelectedDate(parsed)
+          }
+        } catch (e) {
+          console.error('[TradingAnalysisPage] Error parsing date from URL:', e)
+        }
+      }
+    }
+  }, [typeof window !== 'undefined' ? window.location.search : ''])
+  
+  console.log('[TradingAnalysisPage] Calling useTradingAnalysis with:', {
+    enabledWallets,
+    autoRefresh,
+    selectedDate: selectedDate.toISOString(),
+  })
+  
   const {
     marketSummaries,
     overallStats,
@@ -34,6 +88,7 @@ export default function TradingAnalysisPage() {
   } = useTradingAnalysis(enabledWallets, {
     autoRefresh,
     enabled: enabledWallets.length > 0,
+    selectedDate,
   })
 
   // Load auto refresh setting from localStorage
@@ -83,14 +138,19 @@ export default function TradingAnalysisPage() {
       <div className="container mx-auto px-4 py-6 pb-20 md:pb-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-3xl font-bold">Trading Analysis</h1>
               <p className="text-muted-foreground mt-2">
                 Analyze your trading history, performance, and market insights
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <DatePicker
+                date={selectedDate}
+                onDateChange={(date) => date && setSelectedDate(date)}
+                placeholder="Select date"
+              />
               <WalletManagerDialog>
                 <Button variant="outline">
                   <Settings className="h-4 w-4 mr-2" />
@@ -136,93 +196,6 @@ export default function TradingAnalysisPage() {
             </Alert>
           ) : (
             <>
-              {/* Overall Stats */}
-              {overallStats && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardDescription>Total P/L</CardDescription>
-                      <CardTitle className="text-2xl">
-                        {formatCurrency(overallStats.totalPnL)}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        <div>Realized: {formatCurrency(overallStats.totalRealizedPnL)}</div>
-                        <div>Unrealized: {formatCurrency(overallStats.totalUnrealizedPnL)}</div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardDescription>Total Trades</CardDescription>
-                      <CardTitle className="text-2xl">{overallStats.totalTradeCount}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-xs text-muted-foreground">
-                        Win Rate: {formatPercentage(overallStats.winRate * 100)}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardDescription>Winning Trades</CardDescription>
-                      <CardTitle className="text-2xl">{overallStats.winningTrades}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-xs text-muted-foreground">
-                        Avg Profit: {formatCurrency(overallStats.avgProfit)}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardDescription>Losing Trades</CardDescription>
-                      <CardTitle className="text-2xl">{overallStats.losingTrades}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-xs text-muted-foreground">
-                        Avg Loss: {formatCurrency(overallStats.avgLoss)}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Trading Behavior */}
-              {tradingBehavior && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Trading Behavior</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div>
-                        <div className="text-sm text-muted-foreground">Daily Trades</div>
-                        <div className="text-2xl font-bold">{tradingBehavior.tradeFrequency.daily.toFixed(1)}</div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">Avg Holding Time</div>
-                        <div className="text-2xl font-bold">
-                          {(tradingBehavior.averageHoldingTime / (24 * 3600)).toFixed(1)} days
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">Buy/Sell Ratio</div>
-                        <div className="text-2xl font-bold">{tradingBehavior.buySellRatio.ratio.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">Win Rate</div>
-                        <div className="text-2xl font-bold">{formatPercentage(tradingBehavior.winRate * 100)}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
               {/* Market Summaries - Using Table */}
               {error ? (
                 <Alert variant="destructive">
@@ -263,13 +236,16 @@ export default function TradingAnalysisPage() {
                         onChange={(e) => handleToggleAutoRefresh(e.target.checked)}
                         className="rounded"
                       />
-                      Auto Refresh (10s)
+                      Auto Refresh (100s)
                     </label>
                   </div>
                   <MarketAnalysisTable
                     summaries={marketSummaries}
                     isLoading={isLoading}
                     wallets={enabledWallets}
+                    selectedDate={selectedDate}
+                    totalTradeCount={overallStats?.totalTradeCount}
+                    walletConfigs={wallets.filter(w => w.enabled).map(w => ({ address: w.address, alias: w.alias || w.address }))}
                   />
                 </>
               )}

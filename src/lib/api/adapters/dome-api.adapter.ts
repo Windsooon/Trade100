@@ -155,13 +155,19 @@ export class DomeApiAdapter implements IPolymarketApiClient {
 
   /**
    * 获取所有交易历史（自动处理分页）
+   * @param query 查询参数
+   * @param maxRecords 最大记录数限制（可选，默认10000）。如果设置，达到此数量后停止分页
    */
-  async getAllTradeHistory(query: Omit<TradeHistoryQuery, 'limit' | 'offset'>): Promise<TradeRecord[]> {
+  async getAllTradeHistory(
+    query: Omit<TradeHistoryQuery, 'limit' | 'offset'>,
+    maxRecords?: number
+  ): Promise<TradeRecord[]> {
     const allRecords: TradeRecord[] = []
     let offset = 0
     const limit = 100 // 使用较小的limit，避免单次请求过大
+    const maxLimit = maxRecords ?? 10000 // 默认最多10000条，但可以自定义
     
-    console.log('[Dome API] Starting to fetch all trade history:', { query, limit })
+    console.log('[Dome API] Starting to fetch all trade history:', { query, limit, maxLimit })
     
     try {
       while (true) {
@@ -181,6 +187,12 @@ export class DomeApiAdapter implements IPolymarketApiClient {
         
         allRecords.push(...response.orders)
         
+        // 如果已经达到最大限制，停止
+        if (allRecords.length >= maxLimit) {
+          console.log(`[Dome API] Reached max limit (${maxLimit}). Stopping.`)
+          break
+        }
+        
         // 如果没有更多数据或返回空，停止
         if (!response.pagination.hasMore || response.orders.length === 0) {
           console.log('[Dome API] Finished fetching all trade history. Total:', allRecords.length)
@@ -194,12 +206,6 @@ export class DomeApiAdapter implements IPolymarketApiClient {
         }
         
         offset += limit
-        
-        // 安全限制：最多获取10000条记录
-        if (allRecords.length >= 10000) {
-          console.warn('[Dome API] Reached maximum record limit (10000). Stopping.')
-          break
-        }
       }
     } catch (error) {
       console.error('[Dome API] Error in getAllTradeHistory:', error)
@@ -331,25 +337,61 @@ export class DomeApiAdapter implements IPolymarketApiClient {
     // Dome API 可能返回 orders 数组或直接是数组
     const orders = data.orders || (Array.isArray(data) ? data : [])
     
+    // Debug: Log raw API response structure for first order
+    if (orders.length > 0) {
+      console.log('[Dome API Adapter] Raw API response - First order keys:', Object.keys(orders[0]))
+      console.log('[Dome API Adapter] Raw API response - First order sample:', JSON.stringify(orders[0], null, 2))
+    }
+    
     return {
-      orders: orders.map((order: any) => ({
-        tokenId: order.token_id || order.tokenId || '',
-        tokenLabel: order.token_label || order.tokenLabel || '',
-        side: (order.side || 'BUY') as 'BUY' | 'SELL',
-        marketSlug: order.market_slug || order.marketSlug || '',
-        conditionId: order.condition_id || order.conditionId || '',
-        shares: order.shares || 0,
-        sharesNormalized: order.shares_normalized || order.sharesNormalized || 0,
-        price: order.price || 0,
-        blockNumber: order.block_number || order.blockNumber || 0,
-        logIndex: order.log_index || order.logIndex || 0,
-        txHash: order.tx_hash || order.txHash || '',
-        title: order.title || '',
-        timestamp: order.timestamp || 0,
-        orderHash: order.order_hash || order.orderHash || '',
-        user: order.user || '',
-        taker: order.taker,
-      })),
+      orders: orders.map((order: any, index: number) => {
+        const rawShares = order.shares || 0
+        // Calculate shares_normalized from shares if not provided (raw / 1000000)
+        const sharesNormalized = order.shares_normalized !== undefined 
+          ? order.shares_normalized 
+          : (order.sharesNormalized !== undefined 
+              ? order.sharesNormalized 
+              : (rawShares > 0 ? rawShares / 1000000 : 0))
+        
+        // Get tokenLabel from various possible field names
+        const tokenLabel = order.token_label || order.tokenLabel || order.token_label_raw || ''
+        
+        // Debug: Log first few orders to verify field mapping
+        if (index < 3) {
+          console.log('[Dome API Adapter] Order transformation:', {
+            index,
+            rawShares,
+            shares_normalized_from_api: order.shares_normalized,
+            sharesNormalized_from_api: order.sharesNormalized,
+            calculated_sharesNormalized: sharesNormalized,
+            token_label_from_api: order.token_label,
+            tokenLabel_from_api: order.tokenLabel,
+            final_tokenLabel: tokenLabel,
+            tokenLabelType: typeof tokenLabel,
+            side: order.side,
+            allKeys: Object.keys(order),
+          })
+        }
+        
+        return {
+          tokenId: order.token_id || order.tokenId || '',
+          tokenLabel: tokenLabel,
+          side: (order.side || 'BUY') as 'BUY' | 'SELL',
+          marketSlug: order.market_slug || order.marketSlug || '',
+          conditionId: order.condition_id || order.conditionId || '',
+          shares: rawShares,
+          sharesNormalized: sharesNormalized,
+          price: order.price || 0,
+          blockNumber: order.block_number || order.blockNumber || 0,
+          logIndex: order.log_index || order.logIndex || 0,
+          txHash: order.tx_hash || order.txHash || '',
+          title: order.title || '',
+          timestamp: order.timestamp || 0,
+          orderHash: order.order_hash || order.orderHash || '',
+          user: order.user || '',
+          taker: order.taker,
+        }
+      }),
       pagination: {
         limit: data.pagination?.limit || data.limit || 0,
         offset: data.pagination?.offset || data.offset || 0,

@@ -1,7 +1,21 @@
 "use client"
 
+import * as React from "react"
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { startOfDay, endOfDay } from 'date-fns'
 import { MarketSummary, OverallStats, TradingBehavior } from '@/lib/services/trading-analysis.service'
+
+/**
+ * Calculate Unix timestamps for a given date (start of day to end of day)
+ */
+function getDateRange(date: Date): { startTime: number; endTime: number } {
+  const start = startOfDay(date)
+  const end = endOfDay(date)
+  return {
+    startTime: Math.floor(start.getTime() / 1000),
+    endTime: Math.floor(end.getTime() / 1000),
+  }
+}
 
 /**
  * React Hook 封装交易分析服务
@@ -13,26 +27,90 @@ export function useTradingAnalysis(
   options?: {
     autoRefresh?: boolean
     enabled?: boolean
+    selectedDate?: Date  // 选择的日期，默认为今天
   }
 ) {
   const queryClient = useQueryClient()
+  
+  // Log hook invocation
+  const renderCountRef = React.useRef(0)
+  renderCountRef.current += 1
+  console.log(`[useTradingAnalysis] Hook called (render #${renderCountRef.current}):`, {
+    walletCount: walletAddresses.length,
+    selectedDate: options?.selectedDate?.toISOString(),
+    autoRefresh: options?.autoRefresh,
+    enabled: options?.enabled,
+  })
+  
+  // Memoize selectedDate to prevent unnecessary recalculations
+  const selectedDate = React.useMemo(() => {
+    const date = options?.selectedDate || new Date()
+    console.log('[useTradingAnalysis] selectedDate memoized:', date.toISOString())
+    return date
+  }, [options?.selectedDate?.getTime()])
+  
+  // Memoize dateRange to prevent query key changes
+  const dateRange = React.useMemo(() => {
+    const range = getDateRange(selectedDate)
+    console.log('[useTradingAnalysis] dateRange memoized:', range)
+    return range
+  }, [selectedDate.getTime()])
+  
+  // Memoize wallet addresses to prevent unnecessary refetches
+  const stableWalletAddresses = React.useMemo(() => {
+    const stable = [...walletAddresses].sort() // Sort for stable reference
+    console.log('[useTradingAnalysis] stableWalletAddresses memoized:', stable)
+    return stable
+  }, [walletAddresses.join(',')])
+  
+  // Log query key
+  const queryKey = ['trading-analysis', 'market-summaries', stableWalletAddresses, dateRange.startTime, dateRange.endTime]
+  console.log('[useTradingAnalysis] Query key:', JSON.stringify(queryKey))
 
+  // Use unified endpoint that makes ONE API call
   const {
-    data: marketSummaries,
-    isLoading: isLoadingSummaries,
-    error: summariesError,
-    refetch: refetchSummaries,
-  } = useQuery<MarketSummary[]>({
-    queryKey: ['trading-analysis', 'market-summaries', walletAddresses],
+    data: analysisData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<{
+    marketSummaries: MarketSummary[]
+    overallStats: OverallStats
+    tradingBehavior: TradingBehavior
+  }>({
+    queryKey: ['trading-analysis', 'all', stableWalletAddresses, dateRange.startTime, dateRange.endTime],
     queryFn: async () => {
-      if (walletAddresses.length === 0) {
+      console.log('[useTradingAnalysis] queryFn EXECUTING - fetching ALL analyses with SINGLE API call')
+      if (stableWalletAddresses.length === 0) {
         console.warn('[useTradingAnalysis] No wallets provided, skipping fetch')
-        return []
+        return {
+          marketSummaries: [],
+          overallStats: {
+            totalRealizedPnL: 0,
+            totalUnrealizedPnL: 0,
+            totalPnL: 0,
+            totalTradeCount: 0,
+            totalVolume: 0,
+            winningTrades: 0,
+            losingTrades: 0,
+            winRate: 0,
+            avgProfit: 0,
+            avgLoss: 0,
+          },
+          tradingBehavior: {
+            tradeFrequency: { daily: 0, weekly: 0 },
+            averageHoldingTime: 0,
+            buySellRatio: { buyCount: 0, sellCount: 0, ratio: 0 },
+            winRate: 0,
+            avgProfit: 0,
+            avgLoss: 0,
+          },
+        }
       }
       
-      const walletsParam = walletAddresses.join(',')
-      const url = `/api/trading/market-summary?wallets=${encodeURIComponent(walletsParam)}`
-      console.log('[useTradingAnalysis] Fetching market summaries:', { url, walletCount: walletAddresses.length })
+      const walletsParam = stableWalletAddresses.join(',')
+      const url = `/api/trading/analysis?wallets=${encodeURIComponent(walletsParam)}&startTime=${dateRange.startTime}&endTime=${dateRange.endTime}`
+      console.log('[useTradingAnalysis] Fetching all analyses:', { url, walletCount: stableWalletAddresses.length, dateRange })
       
       const response = await fetch(url)
       const data = await response.json()
@@ -44,83 +122,43 @@ export function useTradingAnalysis(
           statusText: response.statusText,
           error: data.error,
           details: data.details,
-          fullData: data,
           url,
-          walletAddresses,
         })
         throw new Error(errorMessage)
       }
       
-      console.log('[useTradingAnalysis] Market summaries received:', data.summaries?.length || 0)
-      return data.summaries || []
-    },
-    refetchInterval: options?.autoRefresh ? 10000 : false, // 10秒自动刷新
-    staleTime: 5000, // 5秒内认为数据新鲜
-    enabled: options?.enabled !== false && walletAddresses.length > 0,
-  })
-
-  const {
-    data: overallStats,
-    isLoading: isLoadingStats,
-    error: statsError,
-    refetch: refetchStats,
-  } = useQuery<OverallStats>({
-    queryKey: ['trading-analysis', 'overall-stats', walletAddresses],
-    queryFn: async () => {
-      const walletsParam = walletAddresses.join(',')
-      const response = await fetch(`/api/trading/overall-stats?wallets=${encodeURIComponent(walletsParam)}`)
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to fetch overall stats')
+      console.log('[useTradingAnalysis] All analyses received:', {
+        markets: data.marketSummaries?.length || 0,
+        hasStats: !!data.overallStats,
+        hasBehavior: !!data.tradingBehavior,
+      })
+      
+      return {
+        marketSummaries: data.marketSummaries || [],
+        overallStats: data.overallStats,
+        tradingBehavior: data.tradingBehavior,
       }
-      const data = await response.json()
-      return data.stats
     },
-    refetchInterval: options?.autoRefresh ? 10000 : false,
-    staleTime: 5000,
-    enabled: options?.enabled !== false && walletAddresses.length > 0,
+    refetchInterval: options?.autoRefresh ? 100000 : false, // 100秒自动刷新
+    staleTime: 30000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    enabled: options?.enabled !== false && stableWalletAddresses.length > 0,
   })
-
-  const {
-    data: tradingBehavior,
-    isLoading: isLoadingBehavior,
-    error: behaviorError,
-    refetch: refetchBehavior,
-  } = useQuery<TradingBehavior>({
-    queryKey: ['trading-analysis', 'trading-behavior', walletAddresses],
-    queryFn: async () => {
-      const walletsParam = walletAddresses.join(',')
-      const response = await fetch(`/api/trading/trading-behavior?wallets=${encodeURIComponent(walletsParam)}`)
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to fetch trading behavior')
-      }
-      const data = await response.json()
-      return data.behavior
-    },
-    refetchInterval: options?.autoRefresh ? 10000 : false,
-    staleTime: 5000,
-    enabled: options?.enabled !== false && walletAddresses.length > 0,
-  })
-
-  // 手动刷新所有数据
-  const refetchAll = async () => {
-    await Promise.all([
-      refetchSummaries(),
-      refetchStats(),
-      refetchBehavior(),
-    ])
-  }
+  
+  // Extract individual data from unified response
+  const marketSummaries = analysisData?.marketSummaries || []
+  const overallStats = analysisData?.overallStats
+  const tradingBehavior = analysisData?.tradingBehavior
 
   return {
-    marketSummaries: marketSummaries || [],
+    marketSummaries,
     overallStats,
     tradingBehavior,
-    isLoading: isLoadingSummaries || isLoadingStats || isLoadingBehavior,
-    error: summariesError || statsError || behaviorError,
-    refetch: refetchAll,
-    refetchSummaries,
-    refetchStats,
-    refetchBehavior,
+    isLoading,
+    error,
+    refetch,
   }
 }

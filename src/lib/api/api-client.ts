@@ -18,8 +18,10 @@ export interface IPolymarketApiClient {
   
   /**
    * 获取所有交易历史（自动处理分页）
+   * @param query 查询参数
+   * @param maxRecords 最大记录数限制（可选）
    */
-  getAllTradeHistory(query: Omit<TradeHistoryQuery, 'limit' | 'offset'>): Promise<TradeRecord[]>
+  getAllTradeHistory(query: Omit<TradeHistoryQuery, 'limit' | 'offset'>, maxRecords?: number): Promise<TradeRecord[]>
   
   /**
    * 获取所有活动记录（自动处理分页）

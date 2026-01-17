@@ -26,8 +26,15 @@ export function WalletManagerDialog({ children }: { children: React.ReactNode })
     setSuccess(null)
 
     const trimmedAddress = newAddress.trim()
+    const trimmedAlias = newAlias.trim()
+    
     if (!trimmedAddress) {
       setError("Please enter a wallet address")
+      return
+    }
+
+    if (!trimmedAlias) {
+      setError("Please enter an alias for the wallet")
       return
     }
 
@@ -40,7 +47,7 @@ export function WalletManagerDialog({ children }: { children: React.ReactNode })
     }
 
     try {
-      addWallet(trimmedAddress, newAlias.trim() || undefined)
+      addWallet(trimmedAddress, trimmedAlias)
       setNewAddress("")
       setNewAlias("")
       setSuccess("Wallet added successfully")
@@ -93,12 +100,13 @@ export function WalletManagerDialog({ children }: { children: React.ReactNode })
               value={newAddress}
               onChange={(e) => setNewAddress(e.target.value)}
             />
-            <Label htmlFor="alias">Alias (Optional)</Label>
+            <Label htmlFor="alias">Alias *</Label>
             <Input
               id="alias"
               placeholder="My Main Wallet"
               value={newAlias}
               onChange={(e) => setNewAlias(e.target.value)}
+              required
             />
             <Button onClick={handleAddWallet} className="w-full">
               <Plus className="h-4 w-4 mr-2" />

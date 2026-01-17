@@ -54,6 +54,7 @@ export class WalletManager implements IWalletManager {
 
   /**
    * 获取所有钱包配置
+   * 从 localStorage 加载已保存的钱包配置
    */
   getWallets(): WalletConfig[] {
     if (typeof window === 'undefined') {
@@ -65,7 +66,9 @@ export class WalletManager implements IWalletManager {
       if (!stored) {
         return []
       }
-      return JSON.parse(stored) as WalletConfig[]
+      const wallets = JSON.parse(stored) as WalletConfig[]
+      console.log(`[WalletManager] Loaded ${wallets.length} wallet(s) from localStorage`)
+      return wallets
     } catch (error) {
       console.error('Error reading wallets from localStorage:', error)
       return []
@@ -159,6 +162,7 @@ export class WalletManager implements IWalletManager {
 
   /**
    * 保存钱包配置到 localStorage
+   * 钱包配置会自动持久化，在浏览器刷新后仍然可用
    */
   private saveWallets(wallets: WalletConfig[]): void {
     if (typeof window === 'undefined') {
@@ -167,6 +171,7 @@ export class WalletManager implements IWalletManager {
 
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(wallets))
+      console.log(`[WalletManager] Saved ${wallets.length} wallet(s) to localStorage`)
     } catch (error) {
       console.error('Error saving wallets to localStorage:', error)
       throw new Error('Failed to save wallet configuration')
