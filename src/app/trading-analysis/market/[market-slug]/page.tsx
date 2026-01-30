@@ -618,7 +618,7 @@ export default function MarketDetailPage() {
                             </Button>
                           </TableHead>
                         )}
-                        <TableHead>Tx Hash</TableHead>
+                        <TableHead>Order Hash</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -646,14 +646,9 @@ export default function MarketDetailPage() {
                             </TableCell>
                           )}
                           <TableCell>
-                            <a
-                              href={`https://polygonscan.com/tx/${trade.txHash}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-blue-500 hover:underline"
-                            >
-                              {trade.txHash.slice(0, 10)}...
-                            </a>
+                            <span className="text-sm font-mono break-all">
+                              {trade.orderHash || "-"}
+                            </span>
                           </TableCell>
                         </TableRow>
                       ))}
