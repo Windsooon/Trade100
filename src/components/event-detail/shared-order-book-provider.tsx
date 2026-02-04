@@ -39,10 +39,12 @@ const SharedOrderBookContext = createContext<SharedOrderBookContextType | null>(
 
 interface SharedOrderBookProviderProps {
   children: React.ReactNode
-  allActiveMarkets: Market[]
+  allActiveMarkets?: Market[]
+  getMarkets?: () => Market[]
+  isHomePage?: boolean
 }
 
-export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOrderBookProviderProps) {
+export function SharedOrderBookProvider({ children, allActiveMarkets, getMarkets, isHomePage = false }: SharedOrderBookProviderProps) {
 
   const [orderBooks, setOrderBooks] = useState<Record<string, BookData>>({})
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
@@ -61,22 +63,36 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
   const MAX_RETRY_ATTEMPTS = 5
   const RETRY_DELAYS = [1000, 2000, 4000, 8000, 16000] // Exponential backoff
 
+  // Get current markets from either prop or function
+  const currentMarkets = useMemo(() => {
+    if (getMarkets) {
+      return getMarkets()
+    }
+    return allActiveMarkets || []
+  }, [allActiveMarkets, getMarkets])
+
   // Get all active market token IDs for WebSocket subscription
   const allActiveTokenIds = useMemo(() => {
     const allTokens: string[] = []
-    allActiveMarkets.forEach(market => {
+    currentMarkets.forEach(market => {
       if (market.clobTokenIds) {
         try {
           const ids = JSON.parse(market.clobTokenIds)
-          if (ids[0]) allTokens.push(ids[0]) // YES token
-          if (ids[1]) allTokens.push(ids[1]) // NO token
+          if (isHomePage) {
+            // For home page, only subscribe to YES tokens
+            if (ids[0]) allTokens.push(ids[0])
+          } else {
+            // For event detail pages, subscribe to both YES and NO tokens
+            if (ids[0]) allTokens.push(ids[0]) // YES token
+            if (ids[1]) allTokens.push(ids[1]) // NO token
+          }
         } catch {
           // Skip invalid token IDs
         }
       }
     })
-    return allTokens.sort()
-  }, [allActiveMarkets])
+          return allTokens.sort()
+  }, [currentMarkets, isHomePage])
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -95,7 +111,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
   }, [])
 
   // Fetch initial last trade prices from API
-  const fetchLastTradePrices = useCallback(async (markets: Market[] = allActiveMarkets) => {
+  const fetchLastTradePrices = useCallback(async (markets: Market[] = currentMarkets) => {
     if (!markets.length || isUnmountingRef.current || lastTradePricesLoadedRef.current || fetchingLastTradePricesRef.current) {
       return
     }
@@ -256,9 +272,9 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
           if (Array.isArray(data)) {
             data.forEach(item => {
               // Handle initial order book snapshots (event_type: "book")
-              if (item.asset_id && item.event_type === 'book' && item.bids && item.asks) {
+              if (item.asset_id && item.event_type === 'book' && (item.bids || item.asks)) {
                 // Find which market this asset_id belongs to using conditionId = asset_id
-                const market = allActiveMarkets.find(m => {
+                const market = currentMarkets.find(m => {
                   if (!m.clobTokenIds) return false
                   try {
                     const ids = JSON.parse(m.clobTokenIds)
@@ -280,11 +296,13 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
                     // Default to yes
                   }
 
-                  // WebSocket sends:
-                  // - Bids: small→big (need to reverse for display: big→small)
-                  // - Asks: big→small (need to reverse for display: small→big)
-                  const processedBids = (item.bids || []).slice().reverse() // Reverse bids: small→big to big→small
-                  const processedAsks = (item.asks || []).slice().reverse() // Reverse asks: big→small to small→big
+                  // WebSocket sends bids/asks
+                  // - bids: ascending order (need to reverse for highest first)
+                  // - asks: ascending order (already correct - lowest first)
+                  const processedBids = (item.bids || []).slice().reverse() // Reverse to get highest bid first
+                  const processedAsks = (item.asks || []).slice() // Keep ascending order for lowest ask first
+
+
 
                   setOrderBooks(prev => ({
                     ...prev,
@@ -303,7 +321,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
               // Handle price change updates (event_type: "price_change")
               else if (item.asset_id && item.event_type === 'price_change' && item.changes) {
                 // Find which market this asset_id belongs to
-                const market = allActiveMarkets.find(m => {
+                const market = currentMarkets.find(m => {
                   if (!m.clobTokenIds) return false
                   try {
                     const ids = JSON.parse(m.clobTokenIds)
@@ -386,7 +404,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
               // Handle last trade price updates (event_type: "last_trade_price")
               else if (item.asset_id && item.event_type === 'last_trade_price' && item.price && item.side) {
                 // Find which market this asset_id belongs to
-                const market = allActiveMarkets.find(m => {
+                const market = currentMarkets.find(m => {
                   if (!m.clobTokenIds) return false
                   try {
                     const ids = JSON.parse(m.clobTokenIds)
@@ -493,7 +511,7 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
         setConnectionStatus('error')
       }
     }
-  }, [allActiveTokenIds, allActiveMarkets, cleanup])
+  }, [allActiveTokenIds, currentMarkets, cleanup])
 
   // Manual retry function
   const manualRetry = useCallback(() => {
@@ -510,19 +528,23 @@ export function SharedOrderBookProvider({ children, allActiveMarkets }: SharedOr
       setRetryAttempt(0)
       connect()
     }
-
+    // Note: No cleanup function - we want to keep connections across tab switches
+  }, [connect, cleanup, allActiveTokenIds.join(',')]) // Use join to create stable dependency
+  
+  // Cleanup only on component unmount
+  useEffect(() => {
     return () => {
       isUnmountingRef.current = true
       cleanup()
     }
-  }, [connect, cleanup, allActiveTokenIds.join(',')]) // Use join to create stable dependency
+  }, [])
 
   // Fetch initial last trade prices when markets change
   useEffect(() => {
-    if (allActiveMarkets.length > 0) {
-      fetchLastTradePrices(allActiveMarkets)
+    if (currentMarkets.length > 0) {
+      fetchLastTradePrices(currentMarkets)
     }
-  }, [allActiveMarkets.length])
+  }, [currentMarkets.length, fetchLastTradePrices])
 
   // Note: Cleanup is handled by the main WebSocket useEffect above
 
